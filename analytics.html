@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- 🔹 Basic SEO -->
+    <title>Analytics | AccMarket</title>
+    <meta
+      name="description"
+      content="View your AccMarket analytics including total revenue, deals performance, buyer and seller activity, and other important marketplace insights."
+    />
+    <meta
+      name="keywords"
+      content="AccMarket analytics, revenue analytics, marketplace insights, deals analytics, account market data, seller analytics, buyer analytics, dashboard stats"
+    />
+    <meta name="author" content="AccMarket" />
+
+    <!-- 🔹 Open Graph (Social Media Preview) -->
+    <meta property="og:title" content="AccMarket Analytics" />
+    <meta
+      property="og:description"
+      content="Track your revenue, deal performance, buyer/seller activity and overall marketplace stats through AccMarket Analytics."
+    />
+    <meta
+      property="og:image"
+      content="https://accmarket.name.ng/images/logo.png"
+    />
+    <meta
+      property="og:url"
+      content="https://accmarket.name.ng/analytics.html"
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="AccMarket" />
+
+    <!-- 🔹 Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="AccMarket Analytics" />
+    <meta
+      name="twitter:description"
+      content="Monitor your dashboard metrics, revenue, deal statistics and account market insights using AccMarket Analytics."
+    />
+    <meta
+      name="twitter:image"
+      content="https://accmarket.name.ng/images/logo.png"
+    />
+
+    <!-- 🔹 Favicon & App Icons -->
+    <link
+      rel="icon"
+      href="https://accmarket.name.ng/images/logo.png"
+      type="image/png"
+    />
+    <link
+      rel="shortcut icon"
+      href="https://accmarket.name.ng/images/logo.png"
+      type="image/png"
+    />
+    <link
+      rel="apple-touch-icon"
+      href="https://accmarket.name.ng/images/logo.png"
+    />
+    <meta name="apple-mobile-web-app-title" content="AccMarket" />
+    <meta name="theme-color" content="#0b1e5b" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="AccMarket" />
+
+    <!-- 🔹 Robots -->
+    <meta name="robots" content="index, follow" />
+    <!-- Google Fonts -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Font Awesome for icons -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    />
+    <!-- CSS -->
+    <link rel="stylesheet" href="assets/css/analytics.css" />
+    <!--JAVASCRIPT-->
+    <script type="module" src="assets/js/analytics.js" ></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  </head>
+  <body>
+    <!-- HEADER -->
+    <header class="header container">
+      <div class="header-left">
+        <button
+          id="sidebarToggle"
+          class="hamburger"
+          aria-label="Toggle sidebar"
+        >
+          <i class="fas fa-bars"></i>
+        </button>
+      </div>
+
+      <div class="header-center">
+        <a href="#" class="brand" id="themeToggle">
+          <i class="fas fa-shield-alt"></i> AccMarket
+        </a>
+      </div>
+
+      <div class="header-right">
+        <button
+          id="profileToggle"
+          class="profile-btn"
+          aria-label="Open profile menu"
+        >
+          <i class="fas fa-user-circle"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- LEFT SIDEBAR -->
+    <aside id="leftSidebar" class="sidebar left">
+      <button class="close-btn" id="closeLeft">&times;</button>
+      <div class="search-box">
+        <form onsubmit="return false;">
+          <!-- prevents page reload -->
+          <input type="text" placeholder="Search..." />
+          <button type="submit"><i class="fas fa-search"></i></button>
+        </form>
+      </div>
+      <div class="categories">
+        <h4>Categories</h4>
+        <ul id="categoryList" class="category-list">
+          <li><a href="#">FACEBOOK</a></li>
+          <li><a href="#">TIKTOK</a></li>
+          <li><a href="#">INSTAGRAM</a></li>
+          <li><a href="#">TWITTER </a></li>
+          <li><a href="#">SNAPCHAT</a></li>
+          <li><a href="#">LINKEDIN</a></li>
+          <li><a href="#">REDDIT</a></li>
+          <li><a href="#">MAILS</a></li>
+          <li><a href="#">PINTEREST</a></li>
+          <li><a href="#">DISCORD</a></li>
+          <li><a href="#">TWITCH</a></li>
+          <li><a href="#">QOURA</a></li>
+          <li><a href="#">VKONTAKTE</a></li>
+          <li><a href="#">DEEPSEEK</a></li>
+          <li><a href="#">CHATGPT</a></li>
+          <li><a href="#">ESTY.COM</a></li>
+          <li><a href="#">YELP.COM</a></li>
+          <li><a href="#">PLAYSTATION</a></li>
+          <li><a href="#">STEAM</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- RIGHT SIDEBAR -->
+    <aside id="rightSidebar" class="sidebar right">
+      <button class="close-btn" id="closeRight">&times;</button>
+      <h2>Quick Access</h2>
+
+      <ul class="quick-list">
+        <li>
+          <a href="dashboard.html"><i class="fas fa-home"></i> Dashboard</a>
+        </li>
+
+        <li>
+          <a href="wallet.html"><i class="fas fa-wallet"></i> Wallet</a>
+        </li>
+        <li class="seller-only" style="display: none">
+          <a href="sell.html"><i class="fas fa-coins"></i> Sell Account</a>
+        </li>
+        <li>
+          <a href="chats.html"><i class="fas fa-message"></i> My Chats</a>
+        </li>
+        <li style="position: relative">
+          <a href="notification.html" class="notification-link">
+            <i class="fas fa-bell"></i>
+            <span
+              id="notification-count"
+              class="notification-badge"
+              aria-live="polite"
+              title="Unread notifications"
+              >0</span
+            >
+            Notifications
+          </a>
+        </li>
+        <li class="analytics-only" style="display: none">
+          <a href="analytics.html"
+            ><i class="fas fa-chart-line"></i> Analytics</a
+          >
+        </li>
+        <li>
+          <a href="orders.html"><i class="fas fa-box"></i> My Orders</a>
+        </li>
+        <li>
+          <a href="support.html"><i class="fas fa-headset"></i> Support</a>
+        </li>
+        <li>
+          <a href="settings.html"><i class="fas fa-cog"></i> Settings</a>
+        </li>
+        <li>
+          <a href="#" class="logout"
+            ><i class="fas fa-sign-out-alt"></i> Logout</a
+          >
+        </li>
+      </ul>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="user-overview-page">
+      <section class="user-overview-container">
+        <h2>User Overview</h2>
+
+        <!-- Search User -->
+        <div class="search-box">
+          <input type="text" id="searchUser" placeholder="Search by UID" />
+          <button id="searchBtn"><i class="fas fa-search"></i></button>
+        </div>
+
+        <!-- User Summary Card -->
+        <div class="user-card">
+          <div class="user-info">
+            <div class="avatar"><i class="fas fa-user"></i></div>
+            <div>
+              <h3 id="userFullName"></h3>
+              <p id="userEmail"></p>
+              <span class="role-tag" id="userRole"></span>
+              <span class="verify-tag" id="verifyStatus"></span>
+            </div>
+          </div>
+          <div class="joined">
+            <p>Joined:</p>
+            <strong id="userJoined"></strong>
+          </div>
+        </div>
+
+        <!-- Account Details -->
+        <div class="details-box">
+          <h3>Account Information</h3>
+          <div class="detail-item">
+            <span>Username:</span>
+            <p id="userUsername"></p>
+          </div>
+          <div class="detail-item">
+            <span>Phone:</span>
+            <p id="userPhone"></p>
+          </div>
+          <div class="detail-item">
+            <span>Account Status:</span>
+            <p id="accountStatus"></p>
+          </div>
+          <div class="detail-item">
+            <span>Country:</span>
+            <p id="userCountry"></p>
+          </div>
+          <div class="detail-item">
+            <span>Country Flag:</span>
+            <p id="userCountryFlag"></p>
+          </div>
+          <div class="detail-item">
+            <span>About:</span>
+            <p id="userAbout"></p>
+          </div>
+        </div>
+
+        <!-- Financial Summary -->
+        <div class="details-box">
+          <h3>Financial Information</h3>
+          <div class="detail-item">
+            <span>Wallet Balance:</span>
+            <p id="walletBalance"></p>
+          </div>
+          <div class="detail-item">
+            <span>Total Orders:</span>
+            <p id="totalOrders"></p>
+          </div>
+          <div class="detail-item">
+            <span>Total Earned:</span>
+            <p id="totalSpent"></p>
+          </div>
+          <div class="detail-item">
+            <span>Accounts Sold:</span>
+            <p id="accountsSold"></p>
+          </div>
+        </div>
+
+        <!-- Activity Summary -->
+        <div class="details-box">
+          <h3>Activity Overview</h3>
+          <div class="detail-item">
+            <span>Last IP:</span>
+            <p id="lastLogin"></p>
+          </div>
+          <div class="detail-item">
+            <span>Last Device:</span>
+            <p id="loginDevice"></p>
+          </div>
+          <div class="detail-item">
+            <span>Telegram Chat ID:</span>
+            <p id="telegramChatID"></p>
+          </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="actions-box">
+          <button class="action-btn upgrade-user">Upgrade User</button>
+          <button class="action-btn reset-password">Reset Password</button>
+          <button class="action-btn toggle-status">Suspend User</button>
+          <button class="action-btn magic-link-user">Send Magic Link</button>
+        </div>
+      </section>
+    </main>
+
+    <main class="order-history-page">
+      <section class="order-history-container">
+        <h2>Order History</h2>
+
+        <!-- Search Bar -->
+        <div class="search-box">
+          <input
+            type="text"
+            id="searchOrder"
+            placeholder="Search by Order ID..."
+          />
+          <button id="searchOrderBtn"><i class="fas fa-search"></i></button>
+        </div>
+
+        <!-- Orders List -->
+        <div id="orders-list" class="orders-list"></div>
+      </section>
+    </main>
+
+    <main class="analytics-summary-page">
+      <section class="analytics-summary-container">
+        <h2>Admin Analytics Overview</h2>
+
+        <div class="stats-grid">
+          <!-- Total Users -->
+          <div class="stat-card">
+            <p class="label">Total Users</p>
+            <h3 id="totalUsers">0</h3>
+          </div>
+
+          <!-- Verified Sellers -->
+          <div class="stat-card">
+            <p class="label">Verified Sellers</p>
+            <h3 id="verifiedSellers">0</h3>
+          </div>
+
+          <!-- Total Buyers -->
+          <div class="stat-card">
+            <p class="label">Total Buyers</p>
+            <h3 id="totalBuyers">0</h3>
+          </div>
+
+          <!-- Total Admin -->
+          <div class="stat-card">
+            <p class="label">Total Admin</p>
+            <h3 id="totalAdmin">0</h3>
+          </div>
+
+          <!-- Total Orders -->
+          <div class="stat-card">
+            <p class="label">Total Orders</p>
+            <h3 id="totalOrder">0</h3>
+          </div>
+
+          <!-- Completed Orders -->
+          <div class="stat-card">
+            <p class="label">Completed Orders</p>
+            <h3 id="completedOrders">0</h3>
+          </div>
+
+          <!-- Pending Orders -->
+          <div class="stat-card">
+            <p class="label">Pending Orders</p>
+            <h3 id="pendingOrders">0</h3>
+          </div>
+
+          <!-- Failed Orders -->
+          <div class="stat-card">
+            <p class="label">Failed Orders</p>
+            <h3 id="failedOrders">0</h3>
+          </div>
+
+          <!-- Total Balance -->
+          <div class="stat-card">
+            <p class="label">Total User Wallet Balance</p>
+            <h3 id="totalBalance">₦0</h3>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <main class="revenue-breakdown-page">
+      <section class="revenue-breakdown-container">
+        <h2>Revenue Breakdown</h2>
+
+        <div class="revenue-grid">
+          <!-- Seller Upgrade Fees -->
+          <div class="revenue-card">
+            <p class="label">Seller Upgrade Fees</p>
+            <h3 id="upgradeFees">₦0</h3>
+          </div>
+
+          <!-- Monthly Maintenance Fees -->
+          <div class="revenue-card">
+            <p class="label">Monthly Seller Fees</p>
+            <h3 id="monthlyFees">₦0</h3>
+          </div>
+
+          <!-- Order Commissions -->
+          <div class="revenue-card">
+            <p class="label">Order Commissions</p>
+            <h3 id="orderCommission">₦0</h3>
+          </div>
+
+          <!-- Admin Credits -->
+          <div class="revenue-card">
+            <p class="label">Admin Credits</p>
+            <h3 id="adminCredit">₦0</h3>
+          </div>
+
+          <!-- Total Revenue -->
+          <div class="revenue-card total">
+            <p class="label">Total Platform Revenue</p>
+            <h3 id="totalPlatformRevenue">₦0</h3>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <main class="analytics-charts-page">
+      <section class="analytics-charts-container">
+        <h2>Analytics Charts</h2>
+
+        <div class="charts-grid">
+          <!-- Orders Over Time -->
+          <div class="chart-card">
+            <h3>Orders Over Time</h3>
+            <canvas id="ordersChart"></canvas>
+          </div>
+
+          <!-- Revenue Over Time -->
+          <div class="chart-card">
+            <h3>Revenue Overview</h3>
+            <canvas id="revenueChart"></canvas>
+          </div>
+
+          <!-- User Growth -->
+          <div class="chart-card">
+            <h3>User Growth</h3>
+            <canvas id="userGrowthChart"></canvas>
+          </div>
+
+          <!-- Top Categories Sold -->
+          <div class="chart-card">
+            <h3>Top Categories Sold</h3>
+            <canvas id="categoryChart"></canvas>
+          </div>
+        </div>
+      </section>
+    </main>
+    
+    <main class="analytics-main">
+
+  <button id="show-new-users-btn" class="show-btn">
+    Show New Users
+  </button>
+
+  <!-- Modal -->
+  <div id="new-users-modal" class="modal">
+    <div class="modal-content">
+      <span id="close-modal" class="close-btn">&times;</span>
+      <h2>New Users</h2>
+      <div id="new-users-list"></div>
+    </div>
+  </div>
+<section class="listings-main">
+  <h2>All Account Listings</h2>
+  <div class="listings-container">
+    <table id="seller-accounts-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>User ID</th>
+          <th>Platform</th>
+          <th>Username</th>
+          <th>Followers</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Rows will load dynamically via JS -->
+      </tbody>
+    </table>
+  </div>
+</section>
+
+</main>
+
+  </body>
+</html>

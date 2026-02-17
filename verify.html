@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AccMarket | Email Verification</title>
+    <!-- Google Fonts -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Font Awesome for icons -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    />
+
+    <!-- SweetAlert -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+  <!-- Supabase JS -->
+  <script src="https://unpkg.com/@supabase/supabase-js"></script>
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="assets/css/verify.css" />
+
+    <!--JAVASCRIPT-->
+    <script src="assets/js/verify.js" defer></script>
+  </head>
+  <body>
+    <!-- HEADER -->
+    <header class="header container">
+      <div class="header-left">
+        <button
+          id="sidebarToggle"
+          class="hamburger"
+          aria-label="Toggle sidebar"
+        >
+          <i class="fas fa-bars"></i>
+        </button>
+      </div>
+
+      <div class="header-center">
+        <a href="#" class="brand">
+          <i class="fas fa-shield-alt"></i> AccMarket
+        </a>
+      </div>
+    </header>
+    <!-- LEFT SIDEBAR -->
+    <aside id="leftSidebar" class="sidebar left">
+      <button class="close-btn" id="closeLeft">&times;</button>
+      <div class="search-box">
+        <form onsubmit="return false;">
+          <!-- prevents page reload -->
+          <input type="text" placeholder="Search..." />
+          <button type="submit"><i class="fas fa-search"></i></button>
+        </form>
+      </div>
+      <div class="categories">
+        <h4>Categories</h4>
+        <ul id="categoryList" class="category-list">
+          <li><a href="#">FACEBOOK</a></li>
+          <li><a href="#">TIKTOK</a></li>
+          <li><a href="#">INSTAGRAM</a></li>
+          <li><a href="#">TWITTER </a></li>
+          <li><a href="#">SNAPCHAT</a></li>
+          <li><a href="#">LINKEDIN</a></li>
+          <li><a href="#">REDDIT</a></li>
+          <li><a href="#">MAILS</a></li>
+          <li><a href="#">PINTEREST</a></li>
+          <li><a href="#">DISCORD</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <body>
+  <main class="verify-container">
+    <div class="verify-card">
+      <!-- Loading State -->
+      <div class="verify-state active" id="verify-loading">
+        <div class="spinner"></div>
+        <h2>Verifying your account...</h2>
+        <p>Please wait while we confirm your email.</p>
+      </div>
+
+      <!-- Success State -->
+      <div class="verify-state" id="verify-success">
+        <img src="../success.png" alt="Verification Successful" class="verify-icon" />
+        <h2>Email Verified 🎉</h2>
+        <p>Your account has been successfully verified. You can now log in.</p>
+        <a href="login.html" class="btn">Go to Login</a>
+      </div>
+
+      <!-- Error State -->
+      <div class="verify-state" id="verify-error">
+        <img src="../error.png" alt="Verification Failed" class="verify-icon" />
+        <h2>Verification Failed ❌</h2>
+        <p>We couldn’t verify your account. Please try again or request a new email.</p>
+        <a href="auth.html" class="btn btn-outline">Back to Register</a>
+      </div>
+    </div>
+  </main>
+  </body>
+</html>

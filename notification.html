@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- ✅ BASIC SEO -->
+    <title>AccMarket | Notifications</title>
+    <meta
+      name="description"
+      content="Stay updated with your latest account transactions, alerts, and system updates on AccMarket. View all your notifications in one secure place."
+    />
+    <meta
+      name="keywords"
+      content="AccMarket, notifications, alerts, updates, messages, account marketplace, buy accounts, sell accounts, secure trading"
+    />
+    <meta name="author" content="AccMarket Team" />
+
+    <!-- ✅ OPEN GRAPH (SOCIAL SHARE PREVIEW) -->
+    <meta property="og:title" content="AccMarket – Notifications" />
+    <meta
+      property="og:description"
+      content="Check your latest alerts and updates on AccMarket — your trusted platform for verified account trading."
+    />
+    <meta property="og:image" content="https://accmarket.com/images/logo.png" />
+    <meta property="og:url" content="https://accmarket.com/notification.html" />
+    <meta property="og:type" content="website" />
+
+    <!-- ✅ TWITTER CARD -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="AccMarket – Notifications" />
+    <meta
+      name="twitter:description"
+      content="Stay updated with your latest alerts and system messages on AccMarket."
+    />
+    <meta
+      name="twitter:image"
+      content="https://accmarket.com/images/logo.png"
+    />
+
+    <!-- ✅ MOBILE VIEW -->
+    <meta name="theme-color" content="#0b1e5b" />
+
+    <!-- ✅ FAVICON -->
+    <link
+      rel="icon"
+      href="https://accmarket.com/images/logo.png"
+      type="image/png"
+    />
+
+    <!-- ✅ STRUCTURED DATA (for Google Search) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        "name": "AccMarket Notifications",
+        "url": "https://accmarket.com/notification.html",
+        "description": "View your latest account notifications and system alerts on AccMarket — Nigeria’s #1 verified account marketplace.",
+        "publisher": {
+          "@type": "Organization",
+          "name": "AccMarket",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://accmarket.com/images/logo.png"
+          }
+        }
+      }
+    </script>
+    <!-- Google Fonts -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Font Awesome for icons -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    />
+    <!-- CSS -->
+    <link rel="stylesheet" href="assets/css/notification.css" />
+    <!--JAVASCRIPT-->
+    <script type="module" src="assets/js/notification.js" ></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  </head>
+  <body>
+    <!-- HEADER -->
+    <header class="header container">
+      <div class="header-left">
+        <button
+          id="sidebarToggle"
+          class="hamburger"
+          aria-label="Toggle sidebar"
+        >
+          <i class="fas fa-bars"></i>
+        </button>
+      </div>
+
+      <div class="header-center">
+        <a href="#" class="brand" id="themeToggle">
+          <i class="fas fa-shield-alt"></i> AccMarket
+        </a>
+      </div>
+
+      <div class="header-right">
+        <button
+          id="profileToggle"
+          class="profile-btn"
+          aria-label="Open profile menu"
+        >
+          <i class="fas fa-user-circle"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- LEFT SIDEBAR -->
+    <aside id="leftSidebar" class="sidebar left">
+      <button class="close-btn" id="closeLeft">&times;</button>
+      <div class="search-box">
+        <form onsubmit="return false;">
+          <!-- prevents page reload -->
+          <input type="text" placeholder="Search..." />
+          <button type="submit"><i class="fas fa-search"></i></button>
+        </form>
+      </div>
+      <div class="categories">
+        <h4>Categories</h4>
+        <ul id="categoryList" class="category-list">
+          <li><a href="#">FACEBOOK</a></li>
+          <li><a href="#">TIKTOK</a></li>
+          <li><a href="#">INSTAGRAM</a></li>
+          <li><a href="#">TWITTER </a></li>
+          <li><a href="#">SNAPCHAT</a></li>
+          <li><a href="#">LINKEDIN</a></li>
+          <li><a href="#">REDDIT</a></li>
+          <li><a href="#">MAILS</a></li>
+          <li><a href="#">PINTEREST</a></li>
+          <li><a href="#">DISCORD</a></li>
+          <li><a href="#">TWITCH</a></li>
+          <li><a href="#">QOURA</a></li>
+          <li><a href="#">VKONTAKTE</a></li>
+          <li><a href="#">DEEPSEEK</a></li>
+          <li><a href="#">CHATGPT</a></li>
+          <li><a href="#">ESTY.COM</a></li>
+          <li><a href="#">YELP.COM</a></li>
+          <li><a href="#">PLAYSTATION</a></li>
+          <li><a href="#">STEAM</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- RIGHT SIDEBAR -->
+    <aside id="rightSidebar" class="sidebar right">
+      <button class="close-btn" id="closeRight">&times;</button>
+      <h2>Quick Access</h2>
+
+      <ul class="quick-list">
+        <li>
+          <a href="dashboard.html"><i class="fas fa-home"></i> Dashboard</a>
+        </li>
+
+        <li>
+          <a href="wallet.html"><i class="fas fa-wallet"></i> Wallet</a>
+        </li>
+        <li class="seller-only" style="display: none">
+          <a href="sell.html"><i class="fas fa-coins"></i> Sell Account</a>
+        </li>
+        <li>
+          <a href="chats.html"><i class="fas fa-message"></i> My Chats</a>
+        </li>
+        <li style="position: relative">
+          <a href="notification.html" class="notification-link">
+            <i class="fas fa-bell"></i>
+            <span
+              id="notification-count"
+              class="notification-badge"
+              aria-live="polite"
+              title="Unread notifications"
+              >0</span
+            >
+            Notifications
+          </a>
+        </li>
+        <li class="analytics-only" style="display: none">
+          <a href="analytics.html"
+            ><i class="fas fa-chart-line"></i> Analytics</a
+          >
+        </li>
+        <li>
+          <a href="orders.html"><i class="fas fa-box"></i> My Orders</a>
+        </li>
+        <li>
+          <a href="support.html"><i class="fas fa-headset"></i> Support</a>
+        </li>
+        <li>
+          <a href="settings.html"><i class="fas fa-cog"></i> Settings</a>
+        </li>
+        <li>
+          <a href="#" class="logout"
+            ><i class="fas fa-sign-out-alt"></i> Logout</a
+          >
+        </li>
+      </ul>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+
+    <main class="notifications container">
+      <div class="notifications-header">
+        <h2>Notifications</h2>
+        <button id="markAllRead" title="Mark all as read">
+          <i class="fas fa-check-double"></i>
+        </button>
+      </div>
+
+       <!-- Loading spinner -->
+  <div id="loading-spinner" class="loading-spinner">
+    <i class="fas fa-spinner fa-spin"></i> Loading Notifications...
+  </div>
+
+      <div id="notificationsList" class="notifications-list"></div>
+    </main>
+  </body>
+</html>
