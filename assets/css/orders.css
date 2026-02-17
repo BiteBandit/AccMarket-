@@ -1,0 +1,678 @@
+/* ---------- Global ---------- */
+:root {
+  --milk: #fdfdfc;
+  --dark-blue: #0b1e5b;
+  --black: #111111;
+  --gray: #6b7280;
+  --light-gray: #e5e7eb;
+}
+
+body {
+  font-family: "Inter", sans-serif;
+  margin: 0;
+  background: var(--milk);
+  color: var(--black);
+}
+
+/* Container */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+/* ---------- Header ---------- */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--light-gray);
+  background: var(--milk);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  animation: fadeDown 0.6s ease;
+}
+
+/* Left, Center, Right sections */
+.header-left,
+.header-right {
+  flex: 0 0 auto;
+}
+
+.header-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.brand {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--dark-blue);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: color 0.3s ease;
+}
+
+.brand:hover {
+  color: var(--black);
+}
+
+/* ---------- Header Icons ---------- */
+.hamburger,
+.profile-btn {
+  border: none;
+  background: transparent;
+  font-size: 1.8rem;
+  cursor: pointer;
+  color: var(--dark-blue);
+  transition: transform 0.3s ease, color 0.3s ease;
+}
+
+.hamburger:hover {
+  transform: rotate(90deg);
+  color: var(--black);
+}
+
+.profile-btn:hover {
+  color: var(--black);
+  transform: scale(1.1);
+}
+
+/* ---------- Sidebar ---------- */
+.sidebar {
+  position: fixed;
+  top: 0;
+  width: 180px;
+  height: 100%;
+  background: var(--dark-blue);
+  color: white;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.25);
+  padding: 1rem;
+  z-index: 200;
+  transition: transform 0.4s ease;
+  overflow-y: auto;
+}
+
+.sidebar h2,
+.sidebar p,
+.sidebar a {
+  color: white;
+}
+
+/* LEFT sidebar */
+.sidebar.left {
+  left: 0;
+  transform: translateX(-100%);
+}
+
+/* RIGHT sidebar */
+.sidebar.right {
+  right: 0;
+  transform: translateX(100%);
+}
+
+/* Active state (visible) */
+.sidebar.active {
+  transform: translateX(0);
+}
+
+/* Close button */
+.close-btn {
+  border: none;
+  background: transparent;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--milk);
+  float: right;
+  transition: transform 0.3s ease;
+}
+
+.close-btn:hover {
+  transform: rotate(90deg);
+}
+
+/* ---------- Sidebar Content ---------- */
+
+.sidebar h2 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  color: var(--dark-blue);
+}
+
+.sidebar p {
+  font-size: 0.9rem;
+  margin-bottom: 1.2rem;
+  color: var(--gray);
+}
+
+.sidebar .btn {
+  margin-bottom: 0.8rem;
+}
+
+.btn.primary {
+  background: #fff;
+  color: var(--dark-blue);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+/* ---------- Buttons ---------- */
+.btn {
+  text-decoration: none;
+  font-weight: 500;
+  padding: 0.6rem 1.3rem;
+  border-radius: 10px;
+  margin-left: 0.6rem;
+  transition: all 0.3s ease;
+  display: inline-block;
+}
+
+.btn.primary:hover {
+  background: var(--dark-blue);
+  color: #fff;
+  transform: translateY(-2px);
+}
+
+.btn.ghost {
+  border: 1px solid #fff;
+  color: #fff;
+}
+
+.btn.ghost:hover {
+  background: #fff;
+  color: var(--dark-blue);
+  transform: translateY(-2px);
+}
+
+.btn.full {
+  display: block;
+  width: 100%;
+  text-align: center;
+}
+
+/* ---------- Animations ---------- */
+@keyframes fadeDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 600px) {
+  .brand {
+    font-size: 1.5rem;
+  }
+
+  .hamburger i,
+  .profile-btn i {
+    font-size: 1.8rem;
+  }
+}
+
+/* ---------- Search Box (Premium Style) ---------- */
+.sidebar.left .search-box {
+  position: relative;
+  width: 100%;
+  margin: 1.5rem 0;
+}
+
+.sidebar.left .search-box input {
+  width: 75%;
+  padding: 0.6rem 0.8rem 0.6rem 2.3rem; /* left padding for icon */
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  outline: none;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--black);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.sidebar.left .search-box input:focus {
+  background: #ffffff;
+  box-shadow: 0 0 6px rgba(11, 30, 91, 0.3);
+}
+
+.sidebar.left .search-box i {
+  position: absolute;
+  top: 37%;
+  left: 0.8rem;
+  transform: translateY(-50%);
+  color: var(--gray);
+  font-size: 1rem;
+  pointer-events: none;
+  transition: color 0.3s ease;
+}
+
+.sidebar.left .search-box input:focus + i,
+.sidebar.left .search-box input:not(:placeholder-shown) + i {
+  color: var(--dark-blue);
+}
+
+/* Categories Section */
+.categories {
+  margin-top: 1.5rem;
+}
+
+.categories h4 {
+  color: #fff; /* white text for dark sidebar */
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Main list */
+.category-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+.category-list > li {
+  margin-bottom: 0.5rem;
+}
+
+.category-list a {
+  display: block;
+  color: #fff;
+  text-decoration: none;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.category-list a:hover {
+  background: #0a1740; /* slightly darker on hover */
+}
+
+/* Sub-list */
+.sub-list {
+  list-style: none;
+  padding-left: 1rem;
+  margin-top: 0.3rem;
+  display: none; /* hidden by default */
+}
+
+.sub-list li {
+  margin-bottom: 0.3rem;
+}
+
+.sub-list a {
+  font-size: 0.9rem;
+  color: #cfd6e4; /* lighter text for subitems */
+}
+
+.sub-list a:hover {
+  color: #fff;
+}
+
+/* Toggle sub-list */
+.category-list li > a:after {
+  content: "\f078"; /* Font Awesome down arrow */
+  font-family: "Font Awesome 6 Free";
+  font-weight: 900;
+  float: right;
+  transition: transform 0.3s ease;
+}
+
+.category-list li.active > a:after {
+  transform: rotate(180deg); /* rotate arrow when active */
+}
+
+.category-list li.active > .sub-list {
+  display: block; /* show sub-list when active */
+}
+
+/* ---------- Right Sidebar (Quick Access) ---------- */
+.sidebar.right h2 {
+  color: #fff;
+  margin-bottom: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.quick-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+.quick-list li {
+  margin-bottom: 0.6rem;
+}
+
+.quick-list a {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: #fff;
+  text-decoration: none;
+  font-size: 1.1rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  transition: background 0.3s ease, transform 0.2s ease;
+}
+
+.quick-list a:hover {
+  background: #0a1740;
+  transform: translateX(3px);
+}
+
+.quick-list a.logout {
+  color: #ff4d4d;
+}
+
+.quick-list a.logout:hover {
+  background: rgba(255, 77, 77, 0.15);
+}
+
+/* ---------- Orders Page ---------- */
+.orders-page {
+  padding: 2rem 1rem;
+  background: var(--milk);
+  animation: fadeIn 0.6s ease;
+}
+
+.orders-header h2 {
+  color: var(--dark-blue);
+  font-size: 1.6rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.orders-header .sub-text {
+  text-align: center;
+  color: var(--gray);
+  font-size: 0.95rem;
+  margin-top: 0.3rem;
+  margin-bottom: 1.8rem;
+}
+
+/* ---------- Orders List ---------- */
+.orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.order-item {
+  background: #fff;
+  padding: 1.1rem 1rem;
+  border-radius: 14px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.07);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background 0.25s ease;
+  border: 1px solid var(--light-gray);
+}
+
+.order-item:hover {
+  background: #f7f9ff;
+}
+
+.order-info h4 {
+  color: var(--black);
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.order-info .order-date {
+  color: var(--gray);
+  font-size: 0.85rem;
+  margin-top: 0.25rem;
+}
+
+/* ---------- Order Meta (right side) ---------- */
+.order-meta {
+  text-align: right;
+}
+
+.order-amount {
+  font-weight: 700;
+  color: var(--dark-blue);
+  display: block;
+  font-size: 0.95rem;
+  margin-bottom: 0.4rem;
+}
+
+/* ---------- Status Badges ---------- */
+.order-status {
+  padding: 0.3rem 0.7rem;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.order-status.success {
+  background: #e5f8ec;
+  color: #1b8a42;
+}
+
+.order-status.pending {
+  background: #fff7e6;
+  color: #b77e00;
+}
+
+.order-status.failed {
+  background: #ffeaea;
+  color: #c62828;
+}
+
+/* ---------- Animation ---------- */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------- Responsiveness ---------- */
+@media (max-width: 500px) {
+  .order-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.6rem;
+  }
+
+  .order-meta {
+    text-align: left;
+  }
+}
+
+/* ---------- Order Item ---------- */
+.order-item {
+  position: relative; /* required for absolute positioning of menu */
+  padding: 1rem;
+  margin-bottom: 1rem;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+/* ---------- 3-Dot Menu (Top Right) ---------- */
+.order-actions {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 10;
+}
+
+.actions-toggle {
+  font-size: 1.2rem;
+  color: var(--gray, #888);
+  cursor: pointer;
+  padding: 0.4rem;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.actions-toggle:hover {
+  background: #eef1ff;
+  transform: scale(1.08);
+}
+
+/* ---------- Dropdown Menu ---------- */
+.actions-menu {
+  position: absolute;
+  top: 36px; /* distance below the 3-dot icon */
+  right: 0;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 0.5rem 0;
+  width: 160px;
+  display: none; /* hidden by default */
+  z-index: 20;
+  animation: fadeMenu 0.2s ease;
+}
+
+.actions-menu.show {
+  display: block; /* shown when JS toggles 'show' */
+}
+
+/* ---------- Action Buttons ---------- */
+.action-btn {
+  width: 100%;
+  padding: 0.7rem 1rem;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--black, #111);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.action-btn:hover {
+  background: #f3f5ff;
+}
+
+/* ---------- Animation ---------- */
+@keyframes fadeMenu {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------- Order Meta (Price & Status) ---------- */
+.order-meta {
+  margin-top: 0.8rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.order-status.completed {
+  color: green;
+}
+.order-status.pending {
+  color: orange;
+}
+.order-status.failed {
+  color: red;
+}
+
+.notification-badge {
+  display: none;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 4px 7px;
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  line-height: 1;
+  transform: scale(1);
+  transition: transform 0.18s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.notification-badge.pop {
+  transform: scale(1.3);
+}
+
+/* ---------- Order Menu Wrapper ---------- */
+.order-menu {
+  position: absolute;
+  top: 0.6rem;      /* top spacing */
+  right: 0.6rem;    /* right spacing */
+  z-index: 100;
+}
+
+/* ---------- Three Dot Button ---------- */
+.menu-btn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 5px;
+  color: var(--dark-blue);
+  user-select: none;
+}
+
+/* ---------- Dropdown Menu ---------- */
+.menu-dropdown {
+  position: absolute;
+  top: 28px;       /* below the button */
+  right: 0;        /* top-right alignment */
+  background: #fff;
+  padding: 0.5rem 0.8rem;
+  border-radius: 10px;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+  display: none;
+  z-index: 10;
+  min-width: 120px;
+}
+
+/* Show dropdown when active */
+.menu-dropdown.show {
+  display: block;
+}
+
+/* ---------- Copy ID Button ---------- */
+.copy-id-btn {
+  margin: 0;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--black);
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.3rem 0;
+  border: none;
+  background: none;
+}
+
+.copy-id-btn:hover {
+  color: var(--dark-blue);
+  font-weight: 600;
+}

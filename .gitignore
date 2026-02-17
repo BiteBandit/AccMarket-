@@ -1,0 +1,15 @@
+# Netlify local files
+.netlify/
+
+# Environment files (do not commit API keys)
+.env
+
+# Node modules (if any)
+node_modules/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Optional: log files
+*.log

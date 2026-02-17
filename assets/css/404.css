@@ -1,0 +1,122 @@
+/* ---------- Global ---------- */
+:root {
+  --milk: #fdfdfc;
+  --dark-blue: #0b1e5b;
+  --black: #111111;
+  --gray: #6b7280;
+  --light-gray: #e5e7eb;
+}
+body {
+  font-family: "Inter", sans-serif;
+  margin: 0;
+  background: var(--milk);
+  color: var(--black);
+}
+
+/* ---------- 404 Page ---------- */
+.error-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: var(--milk);
+  text-align: center;
+  animation: fadeIn 0.6s ease;
+  padding: 1rem;
+}
+
+.error-container {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08);
+  padding: 3rem 2rem;
+  max-width: 480px;
+  width: 100%;
+}
+
+/* ---------- Illustration ---------- */
+.error-illustration {
+  width: 140px;
+  margin-bottom: 1.2rem;
+  animation: float 3s ease-in-out infinite;
+}
+
+/* ---------- Text ---------- */
+.error-container h1 {
+  font-size: 5rem;
+  font-weight: 800;
+  color: var(--dark-blue);
+  margin: 0;
+}
+
+.error-container h2 {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--black);
+  margin: 0.8rem 0;
+}
+
+.error-container p {
+  color: var(--gray);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin-bottom: 2rem;
+}
+
+/* ---------- Button ---------- */
+.home-btn {
+  display: inline-block;
+  background: var(--dark-blue);
+  color: #fff;
+  text-decoration: none;
+  padding: 0.8rem 1.5rem;
+  border-radius: 10px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.home-btn:hover {
+  background: #091947;
+  transform: translateY(-2px);
+}
+
+/* ---------- Animation ---------- */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 600px) {
+  .error-container {
+    padding: 2rem 1.5rem;
+  }
+
+  .error-container h1 {
+    font-size: 4rem;
+  }
+
+  .error-container h2 {
+    font-size: 1.2rem;
+  }
+
+  .error-illustration {
+    width: 100px;
+  }
+}

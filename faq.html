@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- ✅ MOBILE VIEW -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+
+    <title>AccMarket FAQ | Frequently Asked Questions & Support</title>
+
+    <meta
+      name="description"
+      content="Find answers to the most common questions about buying accounts, selling accounts, escrow protection, verification, payments, and how AccMarket works."
+    />
+
+    <meta
+      name="keywords"
+      content="AccMarket FAQ, account FAQs, escrow questions, buyer questions, seller questions, marketplace support, account trading help, AccMarket Nigeria"
+    />
+
+    <meta name="author" content="AccMarket" />
+
+    <!-- 🔹 Open Graph -->
+    <meta property="og:title" content="AccMarket FAQ | Get Answers & Support" />
+    <meta
+      property="og:description"
+      content="Learn how AccMarket works. Find answers to questions about escrow, payments, buying accounts, selling accounts, verification, and safety."
+    />
+    <meta
+      property="og:image"
+      content="https://accmarket.name.ng/images/logo.png"
+    />
+    <meta property="og:url" content="https://accmarket.name.ng/faq.html" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="AccMarket" />
+
+    <!-- 🔹 Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="AccMarket FAQ | Help & Support" />
+    <meta
+      name="twitter:description"
+      content="Quick answers to your most common questions about buying, selling, escrow, payments, and marketplace rules."
+    />
+    <meta
+      name="twitter:image"
+      content="https://accmarket.name.ng/images/logo.png"
+    />
+
+    <!-- 🔹 Favicon -->
+    <link
+      rel="icon"
+      href="https://accmarket.name.ng/images/logo.png"
+      type="image/png"
+    />
+    <link
+      rel="shortcut icon"
+      href="https://accmarket.name.ng/images/logo.png"
+      type="image/png"
+    />
+    <link
+      rel="apple-touch-icon"
+      href="https://accmarket.name.ng/images/logo.png"
+    />
+
+    <meta name="apple-mobile-web-app-title" content="AccMarket" />
+    <meta name="theme-color" content="#0b1e5b" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="AccMarket" />
+
+    <!-- 🔹 Robots -->
+    <meta name="robots" content="index, follow" />
+
+    <!-- ✅ SCHEMA.ORG — FAQ STRUCTURED DATA (Google Rich Result) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "What is AccMarket?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "AccMarket is a safe marketplace where users can buy and sell digital accounts with escrow protection to prevent scams."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How does escrow work on AccMarket?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "When a buyer purchases an account, the payment is held securely until the seller delivers the correct login details and the buyer confirms everything is working. Only then is the seller paid."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is buying accounts on AccMarket safe?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. All transactions go through escrow and verified sellers must complete KYC, reducing the risk of scams."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How do I become a verified seller?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "To become a verified seller, upload your KYC documents including ID verification and proof of legitimacy. Our team reviews and approves your verification."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "What fees does AccMarket charge?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "AccMarket charges commission on completed orders and small upgrade or monthly maintenance fees for sellers using premium tools."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "What happens if a transaction fails?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "If a seller fails to deliver, or the buyer receives the wrong account, escrow refunds the buyer and the seller is penalized."
+            }
+          }
+        ]
+      }
+    </script>
+    <!-- Google Fonts -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Font Awesome for icons -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    />
+    <!-- CSS -->
+    <link rel="stylesheet" href="assets/css/faq.css" />
+    <!--JAVASCRIPT-->
+    <script src="assets/js/faq.js" defer></script>
+  </head>
+  <body>
+    <!-- HEADER -->
+    <header class="header container">
+      <div class="header-left">
+        <button
+          id="sidebarToggle"
+          class="hamburger"
+          aria-label="Toggle sidebar"
+        >
+          <i class="fas fa-bars"></i>
+        </button>
+      </div>
+
+      <div class="header-center">
+        <a href="#" class="brand">
+          <i class="fas fa-shield-alt"></i> AccMarket
+        </a>
+      </div>
+    </header>
+    <!-- LEFT SIDEBAR -->
+    <aside id="leftSidebar" class="sidebar left">
+      <button class="close-btn" id="closeLeft">&times;</button>
+      <div class="search-box">
+        <form onsubmit="return false;">
+          <!-- prevents page reload -->
+          <input type="text" placeholder="Search..." />
+          <button type="submit"><i class="fas fa-search"></i></button>
+        </form>
+      </div>
+      <div class="categories">
+        <h4>Categories</h4>
+        <ul id="categoryList" class="category-list">
+          <li><a href="#">FACEBOOK</a></li>
+          <li><a href="#">TIKTOK</a></li>
+          <li><a href="#">INSTAGRAM</a></li>
+          <li><a href="#">TWITTER </a></li>
+          <li><a href="#">SNAPCHAT</a></li>
+          <li><a href="#">LINKEDIN</a></li>
+          <li><a href="#">REDDIT</a></li>
+          <li><a href="#">MAILS</a></li>
+          <li><a href="#">PINTEREST</a></li>
+          <li><a href="#">DISCORD</a></li>
+          <li><a href="#">TWITCH</a></li>
+          <li><a href="#">QOURA</a></li>
+          <li><a href="#">VKONTAKTE</a></li>
+          <li><a href="#">DEEPSEEK</a></li>
+          <li><a href="#">CHATGPT</a></li>
+          <li><a href="#">ESTY.COM</a></li>
+          <li><a href="#">YELP.COM</a></li>
+          <li><a href="#">PLAYSTATION</a></li>
+          <li><a href="#">STEAM</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- MAIN BODY -->
+    <main class="faq-page container">
+      <section class="faq-section">
+        <div class="container">
+          <h2>Frequently Asked Questions</h2>
+          <p class="faq-intro">
+            Find answers to common questions about AccMarket, our escrow system,
+            and account policies.
+          </p>
+
+          <div class="faq-list">
+            <div class="faq-item">
+              <button class="faq-question">
+                What is AccMarket?
+                <i class="fas fa-chevron-down"></i>
+              </button>
+              <div class="faq-answer">
+                AccMarket is a trusted marketplace that provides verified,
+                ready-to-use social media accounts for individuals and brands
+                who want to save time.
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question">
+                How does your escrow service work?
+                <i class="fas fa-chevron-down"></i>
+              </button>
+              <div class="faq-answer">
+                Our escrow system holds the buyer’s payment securely until the
+                account is fully verified as working. Once both parties confirm,
+                the funds are released. This ensures fair and safe transactions.
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question">
+                What happens if an account gets recovered or has issues?
+                <i class="fas fa-chevron-down"></i>
+              </button>
+              <div class="faq-answer">
+                If any issue occurs within the warranty period, our support team
+                will verify and either replace the account or refund based on
+                the situation.
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question">
+                Can I resell AccMarket accounts?
+                <i class="fas fa-chevron-down"></i>
+              </button>
+              <div class="faq-answer">
+                Yes, but we recommend informing your clients that the account
+                originally came from AccMarket. Misuse or resale that leads to
+                fraud is strictly prohibited.
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question">
+                How can I contact support?
+                <i class="fas fa-chevron-down"></i>
+              </button>
+              <div class="faq-answer">
+                You can contact our 24/7 support team via Telegram at
+                <a href="https://t.me/Accmarket_Support0" target="_blank"
+                  >@AccMarketSupport</a
+                >
+                or email us at
+                <a href="mailto:support@accmarket.com">support@accmarket.com</a
+                >.
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question">
+                How long does it take to receive my account?
+                <i class="fas fa-chevron-down"></i>
+              </button>
+              <div class="faq-answer">
+                Delivery time depends on the account type. Most accounts are
+                delivered instantly or within a few hours after payment
+                verification.
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question">
+                What payment methods do you accept?
+                <i class="fas fa-chevron-down"></i>
+              </button>
+              <div class="faq-answer">
+                We currently accept crypto payments, bank transfers, and other
+                secure escrow-supported payment methods depending on your
+                region.
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question">
+                Is AccMarket safe and legit?
+                <i class="fas fa-chevron-down"></i>
+              </button>
+              <div class="faq-answer">
+                Yes, AccMarket operates with a verified escrow system to protect
+                buyers and sellers. Every account is tested before delivery for
+                security and functionality.
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question">
+                What if my account doesn’t work after delivery?
+                <i class="fas fa-chevron-down"></i>
+              </button>
+              <div class="faq-answer">
+                Contact support immediately. We’ll verify and either fix,
+                replace, or refund depending on the issue and warranty
+                conditions.
+              </div>
+            </div>
+            <div class="faq-item">
+              <button class="faq-question">
+                Do you provide bulk account discounts?
+                <i class="fas fa-chevron-down"></i>
+              </button>
+              <div class="faq-answer">
+                Yes! We offer discounts for bulk purchases. Contact our support
+                team to discuss pricing based on quantity and account type.
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="site-footer">
+        <div class="footer-inner container">
+          <div class="footer-about">
+            <h3 class="brand-sm">
+              <i class="fas fa-shield-alt"></i> AccMarket
+            </h3>
+            <p class="legal-note">
+              AccMarket provides verified, ready-to-use accounts for individuals
+              and brands who value their time and results. Please note that we
+              are not responsible for any misuse of accounts or engagement in
+              illegal activities. For support, complaints, or inquiries, kindly
+              reach out to us on Telegram
+              <a href="https://t.me/TheReal_Ceos" target="_blank" rel="noopener"
+                >@AccMarketSupport</a
+              >.
+            </p>
+          </div>
+
+          <div class="footer-links-group">
+            <h4>Useful Links</h4>
+            <ul class="footer-links">
+              <li><a href="/product">Products</a></li>
+              <li><a href="auth.html">Login</a></li>
+              <li><a href="auth.html">Register</a></li>
+            </ul>
+          </div>
+
+          <div class="footer-resources">
+            <h4>Resources</h4>
+            <ul class="footer-links">
+              <li><a href="faq.html">FAQ</a></li>
+              <li><a href="blog.html">Blogs</a></li>
+              <li><a href="terms.html">Terms & Policy</a></li>
+            </ul>
+          </div>
+
+          <div class="footer-contact">
+            <h4>Contact</h4>
+            <p class="location">Nigeria 🇳🇬</p>
+            <p>
+              <a href="mailto:support@accmarket.com">support@accmarket.com</a>
+            </p>
+            <p class="phone">+234 816 966 8409</p>
+
+            <div class="social-row">
+              <a
+                href="https://instagram.com"
+                target="_blank"
+                aria-label="Instagram"
+                ><i class="fab fa-instagram"></i
+              ></a>
+              <a
+                href="https://www.tiktok.com"
+                target="_blank"
+                aria-label="TikTok"
+                ><i class="fab fa-tiktok"></i
+              ></a>
+              <a
+                href="https://t.me/AccMarket_Support0"
+                target="_blank"
+                aria-label="Telegram"
+                ><i class="fab fa-telegram"></i
+              ></a>
+              <a
+                href="https://wa.me/2349067186235"
+                target="_blank"
+                aria-label="WhatsApp"
+                ><i class="fab fa-whatsapp"></i
+              ></a>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer-bottom">
+          <div class="container">
+            <p
+              style="
+                text-align: center;
+                font-size: 0.9rem;
+                color: var(--gray);
+                margin-top: 20px;
+              "
+            >
+              &copy; <span id="currentYear"></span> AccMarket. All rights
+              reserved.
+            </p>
+            <nav class="bottom-links">
+              <a href="terms.html">Privacy</a>
+              <a href="/support">Support</a>
+              <a href="terms.html">Refund Policy</a>
+            </nav>
+          </div>
+        </div>
+      </footer>
+    </main>
+  </body>
+  <!-- Back to Top Button -->
+  <button id="backToTop" class="back-to-top" title="Go to top">↑</button>
+  <script>
+    // Auto-update copyright year
+    document.getElementById("currentYear").textContent =
+      new Date().getFullYear();
+  </script>
+</html>

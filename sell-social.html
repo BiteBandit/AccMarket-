@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- 🔹 Basic SEO -->
+    <title>
+      Sell Your Account on AccMarket | Secure Escrow Account Selling
+    </title>
+
+    <meta
+      name="description"
+      content="Sell your digital accounts safely on AccMarket using our secure escrow system. List your account, set your price, and get paid only after the buyer confirms delivery."
+    />
+
+    <meta
+      name="keywords"
+      content="sell account, sell gaming account, sell Instagram account, sell TikTok account, sell Facebook account, account marketplace Nigeria, AccMarket seller page"
+    />
+
+    <meta name="author" content="AccMarket" />
+
+    <!-- 🔹 Open Graph -->
+    <meta property="og:title" content="Sell Your Account on AccMarket" />
+    <meta
+      property="og:description"
+      content="List and sell your account securely using AccMarket's escrow protection. Get verified, set your price, and receive safe payments."
+    />
+    <meta
+      property="og:image"
+      content="https://accmarket.name.ng/images/logo.png"
+    />
+    <meta property="og:url" content="https://accmarket.name.ng/sell.html" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="AccMarket" />
+
+    <!-- 🔹 Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Sell Your Account on AccMarket" />
+    <meta
+      name="twitter:description"
+      content="Register as a seller, verify your identity, and start selling digital accounts with full escrow protection."
+    />
+    <meta
+      name="twitter:image"
+      content="https://accmarket.name.ng/images/logo.png"
+    />
+
+    <!-- 🔹 Favicon -->
+    <link
+      rel="icon"
+      href="https://accmarket.name.ng/images/logo.png"
+      type="image/png"
+    />
+    <link
+      rel="shortcut icon"
+      href="https://accmarket.name.ng/images/logo.png"
+      type="image/png"
+    />
+    <link
+      rel="apple-touch-icon"
+      href="https://accmarket.name.ng/images/logo.png"
+    />
+
+    <meta name="apple-mobile-web-app-title" content="AccMarket" />
+    <meta name="theme-color" content="#0b1e5b" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="AccMarket" />
+
+    <!-- 🔹 Robots -->
+    <meta name="robots" content="index, follow" />
+
+    <!-- ✅ SCHEMA.ORG — SELL ACCOUNT PAGE (Structured Data) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        "name": "Sell Account on AccMarket",
+        "url": "https://accmarket.name.ng/sell.html",
+        "description": "List and sell your digital accounts using AccMarket's secure escrow system. Safe payouts and trusted seller tools.",
+        "mainEntity": {
+          "@type": "Offer",
+          "name": "Digital Account Selling",
+          "description": "Create a listing and sell your gaming or social media account on AccMarket.",
+          "category": "Digital Goods",
+          "url": "https://accmarket.name.ng/sell.html",
+          "seller": {
+            "@type": "Organization",
+            "name": "AccMarket",
+            "url": "https://accmarket.name.ng",
+            "logo": "https://accmarket.name.ng/images/logo.png"
+          }
+        },
+        "publisher": {
+          "@type": "Organization",
+          "name": "AccMarket",
+          "url": "https://accmarket.name.ng",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://accmarket.name.ng/images/logo.png"
+          }
+        }
+      }
+    </script>
+
+    <!-- Google Fonts -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Font Awesome for icons -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    />
+    <!-- CSS -->
+    <link rel="stylesheet" href="assets/css/sell-social.css" />
+    <!--JAVASCRIPT-->
+    <script type="module" src="assets/js/sell-social.js" ></script>
+    
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  </head>
+  <body>
+    <!-- HEADER -->
+    <header class="header container">
+      <div class="header-left">
+        <button
+          id="sidebarToggle"
+          class="hamburger"
+          aria-label="Toggle sidebar"
+        >
+          <i class="fas fa-bars"></i>
+        </button>
+      </div>
+
+      <div class="header-center">
+        <a href="#" class="brand" id="themeToggle">
+          <i class="fas fa-shield-alt"></i> AccMarket
+        </a>
+      </div>
+
+      <div class="header-right">
+        <button
+          id="profileToggle"
+          class="profile-btn"
+          aria-label="Open profile menu"
+        >
+          <i class="fas fa-user-circle"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- LEFT SIDEBAR -->
+    <aside id="leftSidebar" class="sidebar left">
+      <button class="close-btn" id="closeLeft">&times;</button>
+      <div class="search-box">
+        <form onsubmit="return false;">
+          <!-- prevents page reload -->
+          <input type="text" placeholder="Search..." />
+          <button type="submit"><i class="fas fa-search"></i></button>
+        </form>
+      </div>
+      <div class="categories">
+        <h4>Categories</h4>
+        <ul id="categoryList" class="category-list">
+          <li><a href="#">FACEBOOK</a></li>
+          <li><a href="#">TIKTOK</a></li>
+          <li><a href="#">INSTAGRAM</a></li>
+          <li><a href="#">TWITTER </a></li>
+          <li><a href="#">SNAPCHAT</a></li>
+          <li><a href="#">LINKEDIN</a></li>
+          <li><a href="#">REDDIT</a></li>
+          <li><a href="#">MAILS</a></li>
+          <li><a href="#">PINTEREST</a></li>
+          <li><a href="#">DISCORD</a></li>
+          <li><a href="#">TWITCH</a></li>
+          <li><a href="#">QOURA</a></li>
+          <li><a href="#">VKONTAKTE</a></li>
+          <li><a href="#">DEEPSEEK</a></li>
+          <li><a href="#">CHATGPT</a></li>
+          <li><a href="#">ESTY.COM</a></li>
+          <li><a href="#">YELP.COM</a></li>
+          <li><a href="#">PLAYSTATION</a></li>
+          <li><a href="#">STEAM</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- RIGHT SIDEBAR -->
+    <aside id="rightSidebar" class="sidebar right">
+      <button class="close-btn" id="closeRight">&times;</button>
+      <h2>Quick Access</h2>
+
+      <ul class="quick-list">
+        <li>
+          <a href="dashboard.html"><i class="fas fa-home"></i> Dashboard</a>
+        </li>
+
+        <li>
+          <a href="wallet.html"><i class="fas fa-wallet"></i> Wallet</a>
+        </li>
+        <li class="seller-only" style="display: none">
+          <a href="sell.html"><i class="fas fa-coins"></i> Sell Account</a>
+        </li>
+        <li>
+          <a href="chats.html"><i class="fas fa-message"></i> My Chats</a>
+        </li>
+        <li style="position: relative">
+          <a href="notification.html" class="notification-link">
+            <i class="fas fa-bell"></i>
+            <span
+              id="notification-count"
+              class="notification-badge"
+              aria-live="polite"
+              title="Unread notifications"
+              >0</span
+            >
+            Notifications
+          </a>
+        </li>
+        <li class="analytics-only" style="display: none">
+          <a href="analytics.html"
+            ><i class="fas fa-chart-line"></i> Analytics</a
+          >
+        </li>
+        <li>
+          <a href="orders.html"><i class="fas fa-box"></i> My Orders</a>
+        </li>
+        <li>
+          <a href="support.html"><i class="fas fa-headset"></i> Support</a>
+        </li>
+        <li>
+          <a href="settings.html"><i class="fas fa-cog"></i> Settings</a>
+        </li>
+        <li>
+          <a href="#" class="logout"
+            ><i class="fas fa-sign-out-alt"></i> Logout</a
+          >
+        </li>
+      </ul>
+    </aside>
+
+    <!--MAIN-->
+
+    <main class="sell-account-page">
+      <section class="sell-container">
+        <h2>Sell an Account</h2>
+        <p class="subtitle">
+          Upload your account details securely in a few steps.
+        </p>
+
+        <!-- Progress Bar -->
+        <div class="progress-bar">
+          <div class="step active"></div>
+          <div class="step"></div>
+          <div class="step"></div>
+          <div class="step"></div>
+          <div class="step"></div>
+        </div>
+
+        <form id="sellAccountForm">
+          <!-- STEP 1: Account Information -->
+          <div class="form-step active">
+            <h3>Account Information</h3>
+
+            <label>Category</label>
+            <select id="category" required>
+              <option value="">Select Category</option>
+              <option value="instagram">Instagram</option>
+              <option value="tiktok">TikTok</option>
+              <option value="linkedin">Linkedin</option>
+              <option value="snapchat">Snapchat</option>
+              <option value="reddit">Reddit</option>
+              <option value="facebook">Facebook</option>
+              <option value="twitter">Twitter</option>
+              <option value="pinterest">Pinterest</option>
+              <option value="discord">Discord</option>
+              <option value="twitch">Twitch</option>
+            </select>
+
+            <label>Country of Account</label>
+            <input
+              type="text"
+              id="country"
+              placeholder="e.g. Nigeria"
+              required
+            />
+
+            <label>Profile Link (Optional)</label>
+            <input
+              type="url"
+              id="profileLink"
+              placeholder="https://example.com/user"
+            />
+
+            <label>Account Username</label>
+            <input type="text" id="username" required />
+
+            <label>Account Password</label>
+            <input type="password" id="password" required />
+
+            <label>Account Format / Example</label>
+            <textarea
+              id="accountFormat"
+              placeholder="e.g. username\password\email\emailPassword\2FA"
+              required
+            ></textarea>
+
+            <label>Description</label>
+            <textarea
+              id="description"
+              placeholder="e.g., Empty TikTok Netherlands account, no phone linked, fresh account, 500 Followers, 200k likes."
+            ></textarea>
+
+            <button type="button" class="next-btn">Next</button>
+          </div>
+
+          <!-- STEP 2: Email Access Information -->
+          <div class="form-step">
+            <h3>Email Access Information</h3>
+
+            <label>Email Used For The Account</label>
+            <input type="text" id="email" required />
+
+            <label>Email Password</label>
+            <input type="password" id="emailPassword" required />
+
+            <label>Recovery Email / Phone (Optional)</label>
+            <input
+              type="text"
+              id="recoveryContact"
+              placeholder="Enter recovery email or phone"
+            />
+
+            <button type="button" class="prev-btn">Back</button>
+            <button type="button" class="next-btn">Next</button>
+          </div>
+
+          <!-- STEP 3: Security Section -->
+          <div class="form-step">
+            <h3>Security Section</h3>
+
+            <label>2FA Enabled?</label>
+            <select id="twoFA" required>
+              <option value="No">No</option>
+              <option value="Yes">Yes</option>
+            </select>
+
+            <div id="backupCodesBox" class="hidden">
+              <label>2FA Backup Codes</label>
+              <textarea
+                id="backupCodes"
+                placeholder="Enter backup codes..."
+              ></textarea>
+            </div>
+
+            <p id="securityNotice" class="notice hidden">
+              Disable 2FA before uploading if you cannot provide backup codes.
+            </p>
+
+            <button type="button" class="prev-btn">Back</button>
+            <button type="button" class="next-btn">Next</button>
+          </div>
+
+          <!-- STEP 4: Pricing & Delivery -->
+          <div class="form-step">
+            <h3>Pricing & Delivery</h3>
+
+            <label>Price (₦)</label>
+            <input type="number" id="price" required />
+
+            <label>Discount (Optional)</label>
+            <input type="number" id="discount" placeholder="₦" />
+
+            <label>
+              <input type="checkbox" id="confirmOwnership" required />
+              I confirm I own this account and I agree not to reclaim it after
+              sale.
+            </label>
+
+            <p class="notice">
+              By submitting, you agree to follow all security guidelines and
+              ensure accurate account information.
+            </p>
+
+            <button type="button" class="prev-btn">Back</button>
+            <button type="button" class="next-btn">Next</button>
+          </div>
+          <!-- STEP 5: Review & Submit -->
+          <div class="form-step">
+            <h3>Review Your Submission</h3>
+            <p>Make sure all details are correct.</p>
+
+            <ul class="review-list">
+              <li>
+                <strong>Category:</strong> <span id="reviewCategory"></span>
+              </li>
+              <li>
+                <strong>Country:</strong> <span id="reviewCountry"></span>
+              </li>
+              <li>
+                <strong>Profile Link:</strong> <span id="reviewProfile"></span>
+              </li>
+              <li>
+                <strong>Username:</strong> <span id="reviewUsername"></span>
+              </li>
+              <li>
+                <strong>Password:</strong> <span id="reviewPassword"></span>
+              </li>
+              <li>
+                <strong>Account Format:</strong>
+                <span id="reviewAccountFormat"></span>
+              </li>
+              <li>
+                <strong>Description:</strong>
+                <span id="reviewDescription"></span>
+              </li>
+              <li><strong>Email:</strong> <span id="reviewEmail"></span></li>
+              <li>
+                <strong>Email Password:</strong>
+                <span id="reviewEmailPass"></span>
+              </li>
+              <li>
+                <strong>Recovery Contact:</strong>
+                <span id="reviewRecovery"></span>
+              </li>
+              <li><strong>2FA:</strong> <span id="review2fa"></span></li>
+              <li>
+                <strong>Backup Codes:</strong> <span id="reviewBackup"></span>
+              </li>
+              <li><strong>Price:</strong> <span id="reviewPrice"></span></li>
+              <li>
+                <strong>Discount:</strong> <span id="reviewDiscount"></span>
+              </li>
+            </ul>
+
+            <button type="button" class="prev-btn">Back</button>
+            <button type="submit" class="submit-btn">Submit Listing</button>
+          </div>
+        </form>
+      </section>
+    </main>
+  </body>
+</html>

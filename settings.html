@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- ✅ SEO Meta Tags for Settings Page -->
+    <title>Settings | AccMarket</title>
+<meta
+  name="description"
+  content="Manage your account settings, profile information, notifications, and security preferences easily on AccMarket."
+/>
+<meta
+  name="keywords"
+  content="AccMarket settings, account settings, profile management, security settings, notifications, account preferences, AccMarket Nigeria"
+/>
+<meta name="author" content="AccMarket" />
+
+<!-- 🔹 Open Graph (Social Media Previews) -->
+<meta property="og:title" content="AccMarket Settings" />
+<meta
+  property="og:description"
+  content="Update your profile, manage notifications, and customize security settings on AccMarket Settings page."
+/>
+<meta property="og:image" content="https://accmarket.name.ng/images/logo.png" />
+<meta property="og:url" content="https://accmarket.name.ng/settings.html" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="AccMarket" />
+
+<!-- 🔹 Twitter Card -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="AccMarket Settings" />
+<meta
+  name="twitter:description"
+  content="Control your account preferences, update profile details, and manage security settings easily with AccMarket."
+/>
+<meta name="twitter:image" content="https://accmarket.name.ng/images/logo.png" />
+
+<!-- ✅ Favicon & App Icons -->
+<link rel="icon" href="https://accmarket.name.ng/images/logo.png" type="image/png" />
+<link rel="shortcut icon" href="https://accmarket.name.ng/images/logo.png" type="image/png" />
+<link rel="apple-touch-icon" href="https://accmarket.name.ng/images/logo.png" />
+<meta name="apple-mobile-web-app-title" content="AccMarket" />
+<meta name="theme-color" content="#0b1e5b" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="application-name" content="AccMarket" />
+
+<!-- 🔹 Robots -->
+<meta name="robots" content="index, follow" />
+    <!-- Google Fonts -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Font Awesome for icons -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    />
+    <!-- CSS -->
+    <link rel="stylesheet" href="assets/css/settings.css" />
+    <!--JAVASCRIPT-->
+     <script type="module" src="assets/js/settings.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  </head>
+  <body>
+    <!-- HEADER -->
+    <header class="header container">
+      <div class="header-left">
+        <button
+          id="sidebarToggle"
+          class="hamburger"
+          aria-label="Toggle sidebar"
+        >
+          <i class="fas fa-bars"></i>
+        </button>
+      </div>
+
+      <div class="header-center">
+        <a href="#" class="brand" id="themeToggle">
+          <i class="fas fa-shield-alt"></i> AccMarket
+        </a>
+      </div>
+
+      <div class="header-right">
+        <button
+          id="profileToggle"
+          class="profile-btn"
+          aria-label="Open profile menu"
+        >
+          <i class="fas fa-user-circle"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- LEFT SIDEBAR -->
+    <aside id="leftSidebar" class="sidebar left">
+      <button class="close-btn" id="closeLeft">&times;</button>
+      <div class="search-box">
+        <form onsubmit="return false;">
+          <!-- prevents page reload -->
+          <input type="text" placeholder="Search..." />
+          <button type="submit"><i class="fas fa-search"></i></button>
+        </form>
+      </div>
+      <div class="categories">
+        <h4>Categories</h4>
+        <ul id="categoryList" class="category-list">
+          <li><a href="#">FACEBOOK</a></li>
+          <li><a href="#">TIKTOK</a></li>
+          <li><a href="#">INSTAGRAM</a></li>
+          <li><a href="#">TWITTER </a></li>
+          <li><a href="#">SNAPCHAT</a></li>
+          <li><a href="#">LINKEDIN</a></li>
+          <li><a href="#">REDDIT</a></li>
+          <li><a href="#">MAILS</a></li>
+          <li><a href="#">PINTEREST</a></li>
+          <li><a href="#">DISCORD</a></li>
+          <li><a href="#">TWITCH</a></li>
+          <li><a href="#">QOURA</a></li>
+          <li><a href="#">VKONTAKTE</a></li>
+          <li><a href="#">DEEPSEEK</a></li>
+          <li><a href="#">CHATGPT</a></li>
+          <li><a href="#">ESTY.COM</a></li>
+          <li><a href="#">YELP.COM</a></li>
+          <li><a href="#">PLAYSTATION</a></li>
+          <li><a href="#">STEAM</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- RIGHT SIDEBAR -->
+    <aside id="rightSidebar" class="sidebar right">
+      <button class="close-btn" id="closeRight">&times;</button>
+      <h2>Quick Access</h2>
+
+      <ul class="quick-list">
+        <li>
+          <a href="dashboard.html"><i class="fas fa-home"></i> Dashboard</a>
+        </li>
+
+        <li>
+          <a href="wallet.html"><i class="fas fa-wallet"></i> Wallet</a>
+        </li>
+        <li class="seller-only" style="display: none">
+          <a href="sell.html"><i class="fas fa-coins"></i> Sell Account</a>
+        </li>
+        <li>
+          <a href="chats.html"><i class="fas fa-message"></i> My Chats</a>
+        </li>
+        <li style="position: relative">
+          <a href="notification.html" class="notification-link">
+            <i class="fas fa-bell"></i>
+            <span
+              id="notification-count"
+              class="notification-badge"
+              aria-live="polite"
+              title="Unread notifications"
+              >0</span
+            >
+            Notifications
+          </a>
+        </li>
+        <li class="analytics-only" style="display: none">
+          <a href="analytics.html"
+            ><i class="fas fa-chart-line"></i> Analytics</a
+          >
+        </li>
+        <li>
+          <a href="orders.html"><i class="fas fa-box"></i> My Orders</a>
+        </li>
+        <li>
+          <a href="support.html"><i class="fas fa-headset"></i> Support</a>
+        </li>
+        <li>
+          <a href="settings.html"><i class="fas fa-cog"></i> Settings</a>
+        </li>
+        <li>
+          <a href="#" class="logout"
+            ><i class="fas fa-sign-out-alt"></i> Logout</a
+          >
+        </li>
+      </ul>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <section class="settings-page container">
+      <h2>Settings</h2>
+
+      <!-- Account Section -->
+      <div class="settings-group">
+        <h3>Account</h3>
+
+        <div class="settings-item editable">
+          <div class="info">
+            <h4>Full Name</h4>
+            <p id="fullName" contenteditable="true">Loading...</p>
+          </div>
+        </div>
+
+        <div class="settings-item editable">
+          <div class="info">
+            <h4>Username</h4>
+            <p id="username" contenteditable="true">@username</p>
+          </div>
+        </div>
+
+        <div class="settings-item">
+          <div class="info">
+            <h4>Email</h4>
+            <p id="email" class="readonly">Loading...</p>
+          </div>
+        </div>
+
+        <div class="settings-item editable">
+          <div class="info">
+            <h4>Phone Number</h4>
+            <div class="phone-wrapper">
+              <span id="countryCode">+000</span>
+              <p id="phoneNumber" contenteditable="true">Loading...</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-item">
+          <div class="info">
+            <h4>Country</h4>
+            <p id="country">Loading...</p>
+          </div>
+        </div>
+
+        <div class="settings-item">
+          <div class="info">
+            <h4>About</h4>
+            <p id="about" contenteditable="true">Hey there! 👋</p>
+          </div>
+        </div>
+
+        <div class="settings-item">
+          <div class="info">
+            <h4>Telegram Chat ID</h4>
+            <p id="telegram_chat_id" class="readonly">Loading...</p>
+          </div>
+        </div>
+
+        <div class="settings-item">
+          <div class="info">
+            <h4>UID</h4>
+            <p id="telegram_user_id" class="readonly">Loading...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Preferences Section -->
+      <div class="settings-group">
+        <h3>Preferences</h3>
+
+        <div class="settings-item toggle">
+          <div class="info">
+            <h4>Account Role</h4>
+            <p id="roleText">Buyer</p>
+            <p id="roleNote" class="small-text">
+              Switch to Seller after completing KYC verification.
+            </p>
+          </div>
+          <button id="switchRole" class="switch-btn">Switch</button>
+        </div>
+
+        <div class="settings-item locked">
+          <div class="info">
+            <h4>In-App Notifications</h4>
+            <p>Enabled by default</p>
+          </div>
+          <i class="fas fa-lock lock-icon" title="Locked setting"></i>
+        </div>
+
+        <div class="settings-item locked">
+          <div class="info">
+            <h4>Sound Alerts</h4>
+            <p>On by default</p>
+          </div>
+          <i class="fas fa-lock lock-icon" title="Locked setting"></i>
+        </div>
+
+        <div class="settings-item toggle">
+          <div class="info">
+            <h4>Telegram Alerts</h4>
+          </div>
+          <label class="switch">
+            <input
+              type="checkbox"
+              id="telegramAlertsToggle"
+              name="telegramAlertsToggle"
+            />
+            <span class="slider round"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <h3>Privacy Control</h3>
+
+        <div class="settings-item toggle">
+          <div class="info">
+            <h4>Show Online Status</h4>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="showOnlineToggle" />
+            <span class="slider round"></span>
+          </label>
+        </div>
+
+        <div class="settings-item toggle">
+          <div class="info">
+            <h4>Show Last Seen</h4>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="showLastSeenToggle" />
+            <span class="slider round"></span>
+          </label>
+        </div>
+
+        <div class="settings-item toggle">
+          <div class="info">
+            <h4>Public Profile</h4>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="publicProfileToggle" />
+            <span class="slider round"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Security Section -->
+      <div class="settings-group">
+        <h3>Security</h3>
+
+        <div class="settings-item danger">
+          <div class="info">
+            <h4>Delete Account</h4>
+            <p>Remove your account permanently</p>
+          </div>
+          <i class="fas fa-trash-alt"></i>
+        </div>
+
+        <div class="settings-item info">
+          <div class="info">
+            <h4>Account Created On</h4>
+            <p id="accountCreated">Loading...</p>
+          </div>
+        </div>
+      </div>
+    </section>
+   
+  </body>
+</html>
