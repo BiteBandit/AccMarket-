@@ -153,35 +153,60 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     });
 
-    // ---------------- ACTION BUTTONS (LIVE + JSON) ----------------
-    const updateStatus = async (newStatus) => {
-      try {
-        const updatedData = { ...account, status: newStatus };
-        const { error } = await supabase
-          .from("verifications")
-          .update({ status: newStatus, data: updatedData })
-          .eq("id", accountRow.id);
+const updateStatus = async (newStatus) => {
+  try {
+    console.log("[UpdateStatus] Updating listing:", accountRow.id, "to", newStatus);
 
-        if (error) throw error;
+    // 1️⃣ Update the database
+    const { error: dbError } = await supabase
+      .from("verifications")
+      .update({ status: newStatus, data: { ...account, status: newStatus } })
+      .eq("id", accountRow.id);
 
-        statusEl.textContent = newStatus;
-        statusEl.className = "status " + newStatus.toLowerCase();
-        account.status = newStatus;
+    if (dbError) throw dbError;
+    console.log("[UpdateStatus] Database updated successfully");
 
-        Swal.fire({
-          icon: "success",
-          title: newStatus.charAt(0).toUpperCase() + newStatus.slice(1) + "!",
-          text: "Account status updated successfully.",
-          timer: 1500,
-          toast: true,
-          position: "top-end",
-          showConfirmButton: false
-        });
-      } catch (err) {
-        console.error(err);
-        Swal.fire("Error", "Failed to update status.", "error");
-      }
-    };
+    // 2️⃣ Call Edge Function directly via fetch with anon key
+    const edgeUrl = "https://qihzvglznpkytolxkuxz.supabase.co/functions/v1/send-approval-email";
+    const anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpaHp2Z2x6bnBreXRvbHhrdXh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk5NTc4NDIsImV4cCI6MjA3NTUzMzg0Mn0.VHyy3_Amr-neYoudHudoW-TJwNPfhkRV2TTCfVgY_zM"; // <-- put your anon or service key here
+
+    const res = await fetch(edgeUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${anonKey}`,
+      },
+      body: JSON.stringify({ listingId: accountRow.id, status: newStatus }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      console.error("[UpdateStatus] Edge Function failed:", data);
+      Swal.fire("Warning", "Status updated but email failed.", "warning");
+    } else {
+      console.log("[UpdateStatus] Edge Function success:", data);
+      Swal.fire({
+        icon: "success",
+        title: newStatus.charAt(0).toUpperCase() + newStatus.slice(1) + "!",
+        text: "Account status updated & seller notified.",
+        timer: 1800,
+        toast: true,
+        position: "top-end",
+        showConfirmButton: false,
+      });
+    }
+
+    // 3️⃣ Update UI
+    statusEl.textContent = newStatus;
+    statusEl.className = "status " + newStatus.toLowerCase();
+    account.status = newStatus;
+
+  } catch (err) {
+    console.error("[UpdateStatus] Error:", err);
+    Swal.fire("Error", "Failed to update status.", "error");
+  }
+};
+
 
     document.getElementById("approve-btn")?.addEventListener("click", () => updateStatus("approved"));
     document.getElementById("reject-btn")?.addEventListener("click", () => updateStatus("rejected"));

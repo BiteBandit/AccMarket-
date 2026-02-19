@@ -306,50 +306,43 @@ function initActionButtons() {
       }
     }
   });
-  // Reset Password (send reset email with redirect)
-  resetBtn.addEventListener("click", async () => {
-    if (!user) {
-      return Swal.fire("Error", "No user selected.", "error");
-    }
+resetBtn.addEventListener("click", async () => {
+  if (!user) {
+    return Swal.fire("Error", "No user selected.", "error");
+  }
 
-    const result = await Swal.fire({
-      title: `Reset Password for ${user.full_name}?`,
-      text: `A reset link will be sent to ${user.email}`,
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: "Send Reset Link",
+  const result = await Swal.fire({
+    title: `Reset Password for ${user.full_name}?`,
+    text: `A reset link will be sent to ${user.email}`,
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Send Reset Link",
+  });
+
+  if (!result.isConfirmed) return;
+
+  try {
+    const { data, error } = await supabase.auth.resetPasswordForEmail(user.email, {
+      redirectTo: "https://accmarket.name.ng/reset"
     });
 
-    if (!result.isConfirmed) return;
-
-    try {
-      const { data, error } = await supabase.auth.resetPasswordForEmail(
-        user.email,
-        {
-          redirectTo: "https://accmarket.name.ng/reset", // ← set your reset page here
-        }
-      );
-
-      if (error) {
-        console.error("resetPasswordForEmail error:", error);
-        Swal.fire("Error", "Failed to send reset link.", "error");
-        return;
-      }
-
-      Swal.fire(
-        "Success",
-        `Password reset link sent to ${user.email}`,
-        "success"
-      );
-    } catch (err) {
-      console.error("Unexpected error sending reset link:", err);
-      Swal.fire(
-        "Error",
-        "Something went wrong while sending the reset link.",
-        "error"
-      );
+    if (error) {
+      console.error("Reset error:", error);
+      Swal.fire("Error", "Failed to send reset link", "error");
+      return;
     }
-  });
+
+    Swal.fire(
+      "Success",
+      `Password reset link sent to ${user.email}`,
+      "success"
+    );
+
+  } catch (err) {
+    console.error("Unexpected error:", err);
+    Swal.fire("Error", "Something went wrong while sending the reset link.", "error");
+  }
+});
 
   // --- Magic Link (Send one-time login link to user email) ---
   magicLinkBtn.addEventListener("click", async () => {
@@ -1314,37 +1307,44 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (error) throw error;
 
     const tableBody = document.querySelector("#seller-accounts-table tbody");
-    tableBody.innerHTML = ""; // clear table
+    tableBody.innerHTML = "";
 
-    // Filter out approved listings
-    const filteredListings = listings.filter(l => l.status !== "approved");
+// Filter out approved and rejected listings (show only pending)
+const filteredListings = listings.filter(
+  l => (l.status || "").toLowerCase() === "pending"
+);
 
     if (!filteredListings || filteredListings.length === 0) {
-      tableBody.innerHTML = `<tr><td colspan="6">No pending or rejected listings.</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="7">No pending listings.</td></tr>`;
       return;
     }
 
     filteredListings.forEach((listing, index) => {
-      const account = listing.data;
+      const account = listing.data || {};
 
-      // Set color for status word only
-      let statusColor = "";
-      if (listing.status === "pending") statusColor = "orange";
-      else if (listing.status === "rejected") statusColor = "red";
+      // Safe normalized status
+      let status = "pending";
+      if (listing && listing.status) {
+        status = String(listing.status).toLowerCase();
+      }
 
       const tr = document.createElement("tr");
 
       tr.innerHTML = `
-        <td>${index + 1}</td>               <!-- # -->
-        <td>${listing.user_id}</td>         <!-- User ID -->
-        <td>${account.platform}</td>        <!-- Platform -->
-        <td>${account.username}</td>        <!-- Username -->
-        <td>${account.followers || 0}</td>  <!-- Followers -->
-        <td style="color: ${statusColor}; font-weight: 600;">${listing.status}</td> <!-- Status -->
+        <td>${index + 1}</td>
+        <td>${listing.user_id}</td>
+        <td>${account.platform || "-"}</td>
+        <td>${account.username || "-"}</td>
+        <td>${account.followers || 0}</td>
+        <td class="status-cell"></td>
         <td>
           <button class="view-btn" data-id="${listing.id}">View</button>
         </td>
       `;
+
+      // Insert animated status badge safely
+      const statusCell = tr.querySelector(".status-cell");
+      statusCell.innerHTML = `<span class="status ${status}">${status}</span>`;
 
       tableBody.appendChild(tr);
     });

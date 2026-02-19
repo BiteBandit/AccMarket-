@@ -1140,3 +1140,51 @@ body {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+
+.status {
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+  display: inline-block;
+  animation: pulse 1.8s infinite;
+}
+
+/* Approved */
+.status.approved {
+  background: #d4edda;
+  color: #155724;
+  box-shadow: 0 0 0 rgba(40,167,69,0.6);
+}
+
+/* Rejected */
+.status.rejected {
+  background: #f8d7da;
+  color: #721c24;
+  box-shadow: 0 0 0 rgba(220,53,69,0.6);
+}
+
+/* Pending */
+.status.pending {
+  background: #fff3cd;
+  color: #856404;
+  box-shadow: 0 0 0 rgba(255,193,7,0.6);
+}
+
+/* Pulse Animation */
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 currentColor;
+  }
+  70% {
+    transform: scale(1.05);
+    box-shadow: 0 0 10px 6px transparent;
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
