@@ -130,6 +130,7 @@ detailsContainer.innerHTML = `
   <p><strong>Category:</strong> ${account.category}</p>
   <p><strong>Login Formats:</strong> ${account.login_formats?.join(", ") || "-"}</p>
   <p><strong>Description:</strong> ${account.description || "-"}</p>
+  <p><strong>Price:</strong> ₦${account.price?.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"}</p>
   <p><strong>Verification Code:</strong> ${account.verification_code || "-"}</p>
   <p><strong>Status:</strong> 
     <span class="status ${status?.toLowerCase()}">${status}</span>

@@ -114,7 +114,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     platformTitle.textContent = `View ${account.platform} Account`;
 
     detailsContainer.innerHTML = `
-      <p><strong>User ID:</strong> <span id="userid">${accountRow.id}</span></p>
+      <p><strong>Seller ID:</strong> <span id="sellerid">${accountRow.user_id || "-"}</span></p>
+      <p><strong>Account ID:</strong> <span id="accountid">${accountRow.id}</span></p>
       <p><strong>Platform:</strong> <span id="platform">${account.platform}</span></p>
       <p><strong>Username:</strong> <span id="username" contenteditable="true">${account.username || ""}</span></p>
       <p><strong>Profile Link:</strong> <a id="profile-link" href="${account.profile_link || "#"}" target="_blank">${account.profile_link || "Visit"}</a></p>
@@ -124,6 +125,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       <p><strong>Category:</strong> <span id="category">${account.category || ""}</span></p>
       <p><strong>Login Formats:</strong> <span id="login-formats">${(account.login_formats || []).join(", ")}</span></p>
       <p><strong>Description:</strong> <span id="description" contenteditable="true">${account.description || ""}</span></p>
+      <p><strong>Price:</strong> ₦${account.price?.toFixed(2) || "0.00"}</p>
       <p><strong>Verification Code:</strong> <span id="verification-code">${account.verification_code || ""}</span></p>
       <p><strong>Status:</strong> <span id="status" class="status ${status?.toLowerCase()}">${status || ""}</span></p>
       <p><strong>Submitted At:</strong> <span id="submitted-at">${account.submitted_at || ""}</span></p>

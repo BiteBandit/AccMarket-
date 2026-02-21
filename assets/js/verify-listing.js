@@ -123,6 +123,19 @@ document.addEventListener("DOMContentLoaded", async () => {
       Swal.fire("Too Many Selected", "You can select a maximum of 2 login formats.", "warning");
       return;
     }
+    
+    // ---------------- PRICE VALIDATION ----------------
+  const priceInput = document.getElementById("price").value.trim();
+  const price = parseFloat(priceInput);
+
+  if (!priceInput || isNaN(price) || price < 0) {
+    Swal.fire(
+      "Invalid Price",
+      "Please enter a valid price (0 or greater).",
+      "warning"
+    );
+    return;
+  }
 
     verificationCode = "ACCMARKET-" + Math.random().toString(36).substring(2, 8).toUpperCase();
 
@@ -135,6 +148,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       region: document.getElementById("region").value.trim(),
       login_formats: selectedFormats,
       description: document.getElementById("description").value.trim(),
+      price: parseFloat(document.getElementById("price").value),
       category: document.getElementById("category").value,
       status: "pending",
       verification_code: verificationCode,
