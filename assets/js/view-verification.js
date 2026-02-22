@@ -187,6 +187,52 @@ const updateStatus = async (newStatus) => {
       Swal.fire("Warning", "Status updated but email failed.", "warning");
     } else {
       console.log("[UpdateStatus] Edge Function success:", data);
+      
+      // 4️⃣ Telegram notification
+try {
+  // Get seller profile using listing user_id
+  const { data: sellerProfile, error: profileError } = await supabase
+    .from("profiles")
+    .select("telegram_chat_id, telegram_alerts, username")
+    .eq("id", accountRow.user_id)
+    .single();
+
+  if (profileError) throw profileError;
+
+  // Check if telegram alerts enabled
+  if (sellerProfile?.telegram_alerts && sellerProfile?.telegram_chat_id) {
+    const botToken = "8436841265:AAHIh50C2bEamKqB649Dx_CRy7l8X6f2yqg"; // ← replace
+    const chatId = sellerProfile.telegram_chat_id;
+
+    const message = `📢 *Account Listing Update*
+
+Hello *${sellerProfile.username || "Seller"}*,
+
+Your account listing has been *${newStatus.toUpperCase()}* ✅
+
+🆔 *Listing ID:* \`${accountRow.id}\`  
+💻 *Platform:* _${account.platform || "N/A"}_
+
+Thank you for using our marketplace 🚀`;
+
+    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message,
+        parse_mode: "Markdown",
+      }),
+    });
+
+    console.log("[Telegram] Notification sent");
+  } else {
+    console.log("[Telegram] Alerts disabled or no chat ID");
+  }
+} catch (tgErr) {
+  console.error("[Telegram] Error:", tgErr);
+}
+
       Swal.fire({
         icon: "success",
         title: newStatus.charAt(0).toUpperCase() + newStatus.slice(1) + "!",
