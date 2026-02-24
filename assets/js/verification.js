@@ -76,7 +76,7 @@ async function startVerification() {
       console.warn("Profile fetch failed, using default info:", profileError);
     }
 
-// 4. Unique Reference (Simplified)
+// 4. Unique Reference 
 // We use a shorter prefix 'K' and ensure the ID and Time are separated clearly
 const reference = `K_${user.id}_${Math.floor(Date.now() / 1000)}`; 
 
