@@ -81,21 +81,22 @@ async function startVerification() {
 const reference = `K_${user.id}_${Math.floor(Date.now() / 1000)}`; 
 
 
-    // 5. Initialize Kora
-    window.Korapay.initialize({
-      key: "pk_test_umoW2niQcStCghyfTodmw2PQHgD3yXLtoXYwiXPK",
-      reference: reference,
-      amount: 22000, // Do NOT multiply by 100 for Korapay
-      currency: "NGN",
-      customer: {
-        name: profile?.username || user.email || "Customer", // Fallback to avoid null
-        email: user.email || "test@example.com" // Fallback to avoid null
-      },
-      
-metadata: {
-        user_id: String(user.id),
-        telegram_chat_id: String(profile?.telegram_chat_id || "not_provided")
-      },
+
+window.Korapay.initialize({
+  key: "pk_test_umoW2niQcStCghyfTodmw2PQHgD3yXLtoXYwiXPK",
+  reference: reference,
+  amount: 22000,
+  currency: "NGN",
+  customer: {
+    name: String(profile?.username || "Customer"),
+    email: String(user.email)
+  },
+  // We explicitly name these keys for the backend to find
+  metadata: {
+    user_id: String(user.id),
+    email: String(user.email), 
+    telegram: String(profile?.telegram_chat_id || "not_provided")
+  },
             onSuccess: function (response) {
         console.log("Payment Success:", response);
         
