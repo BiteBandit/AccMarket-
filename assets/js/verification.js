@@ -77,7 +77,7 @@ async function startVerification() {
     }
 
     // 4. Unique Reference
-    const reference = `KYC-${user.id.substring(0, 8)}-${Date.now()}`;
+    const reference = `KYC_${user.id}_${Date.now()}`; 
 
     // 5. Initialize Kora
     window.Korapay.initialize({
@@ -90,9 +90,10 @@ async function startVerification() {
         email: user.email || "test@example.com" // Fallback to avoid null
       },
       metadata: {
-        user_id: String(user.id),
-        telegram_chat_id: String(profile?.telegram_chat_id || "not_provided")
-      },
+  user_id: user.id, // Use the full ID here
+  telegram_chat_id: profile?.telegram_chat_id || "not_provided"
+}
+
             onSuccess: function (response) {
         console.log("Payment Success:", response);
         
