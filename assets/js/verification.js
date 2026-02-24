@@ -76,8 +76,10 @@ async function startVerification() {
       console.warn("Profile fetch failed, using default info:", profileError);
     }
 
-    // 4. Unique Reference
-    const reference = `KYC_${user.id}_${Date.now()}`; 
+// 4. Unique Reference (Simplified)
+// We use a shorter prefix 'K' and ensure the ID and Time are separated clearly
+const reference = `K_${user.id}_${Math.floor(Date.now() / 1000)}`; 
+
 
     // 5. Initialize Kora
     window.Korapay.initialize({
@@ -89,11 +91,11 @@ async function startVerification() {
         name: profile?.username || user.email || "Customer", // Fallback to avoid null
         email: user.email || "test@example.com" // Fallback to avoid null
       },
-      metadata: {
-  user_id: user.id, // Use the full ID here
-  telegram_chat_id: profile?.telegram_chat_id || "not_provided"
-},
-
+      
+metadata: {
+        user_id: String(user.id),
+        telegram_chat_id: String(profile?.telegram_chat_id || "not_provided")
+      },
             onSuccess: function (response) {
         console.log("Payment Success:", response);
         
