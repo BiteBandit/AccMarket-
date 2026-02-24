@@ -92,7 +92,7 @@ async function startVerification() {
       metadata: {
   user_id: user.id, // Use the full ID here
   telegram_chat_id: profile?.telegram_chat_id || "not_provided"
-}
+},
 
             onSuccess: function (response) {
         console.log("Payment Success:", response);
