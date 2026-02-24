@@ -48,136 +48,105 @@ import { supabase } from './supabase-config.js';
 console.log("Supabase is ready to use!", supabase);
 
 
-document.addEventListener("DOMContentLoaded", async () => {
-  const startDiditBtn = document.getElementById("startDidit");
+document.getElementById("startDidit").addEventListener("click", startVerification);
 
-  // ✅ Get current logged-in user
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError || !userData.user) {
-    startDiditBtn.disabled = true;
-    Swal.fire({
-      icon: "warning",
-      title: "Login Required",
-      text: "You must be logged in to start verification.",
-    });
-    return;
-  }
-
-  const userId = userData.user.id;
-  const email = userData.user.email;
-
-  // ✅ Function to display SweetAlert based on status
-  const showStatusAlert = (status) => {
-    switch (status) {
-      case "requested":
-        Swal.fire({
-          icon: "info",
-          title: "Verification Requested",
-          text: "Your verification request has been received. Please wait for the link.",
-        });
-        startDiditBtn.disabled = true;
-        break;
-      case "pending":
-        Swal.fire({
-          icon: "info",
-          title: "Verification Pending",
-          text: "Your verification is in progress. Please check your email or Telegram for the link.",
-        });
-        startDiditBtn.disabled = true;
-        break;
-      case "verified":
-        Swal.fire({
-          icon: "success",
-          title: "Congratulations!",
-          text: "Your account is verified. You are now a seller!",
-        });
-        startDiditBtn.style.display = "none";
-        break;
-      case "failed":
-        Swal.fire({
-          icon: "error",
-          title: "Verification Failed",
-          text: "Your previous verification attempt failed. Click start to retry.",
-        });
-        startDiditBtn.disabled = false;
-        break;
+async function startVerification() {
+  try {
+    // 1. Check if SDK is ready
+    if (typeof window.Korapay === 'undefined') {
+      alert("Payment system is still loading. Please refresh the page.");
+      return;
     }
-  };
 
-  // ✅ Check current verification status on page load
-  const { data: verificationData } = await supabase
-    .from("user_verifications")
-    .select("*")
-    .eq("user_id", userId)
-    .single();
+    // 2. Get User from Supabase
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      alert("Please login to continue.");
+      return;
+    }
 
-  if (verificationData) {
-    showStatusAlert(verificationData.status);
-  }
+    // 3. Get Profile
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("username, telegram_chat_id")
+      .eq("id", user.id)
+      .single();
 
-  // ✅ Start verification button logic
-  startDiditBtn.addEventListener("click", async () => {
-    try {
-      startDiditBtn.disabled = true;
-      startDiditBtn.textContent = "Starting...";
+    if (profileError) {
+      console.warn("Profile fetch failed, using default info:", profileError);
+    }
 
-      // Fetch latest verification row
-      const { data: existingData } = await supabase
-        .from("user_verifications")
-        .select("*")
-        .eq("user_id", userId)
-        .single();
+    // 4. Unique Reference
+    const reference = `KYC-${user.id.substring(0, 8)}-${Date.now()}`;
 
-      if (existingData) {
-        if (existingData.status === "failed") {
-          // Retry failed → update to requested
-          await supabase
-            .from("user_verifications")
-            .update({
-              status: "requested",
-              updated_at: new Date().toISOString(),
-            })
-            .eq("user_id", userId);
-
-          Swal.fire({
-            icon: "info",
-            title: "Verification Requested",
-            text: "Your verification request has been sent. You will receive a link soon.",
-          });
-        } else {
-          // If status is requested or pending
-          Swal.fire({
-            icon: "info",
-            title: "Verification In Progress",
-            text: "Your verification request is already in progress. Please check your email or Telegram.",
-          });
-        }
-      } else {
-        // Create new verification row
-        await supabase.from("user_verifications").insert({
-          user_id: userId,
-          email: email,
-          status: "requested",
-        });
-
+    // 5. Initialize Kora
+    window.Korapay.initialize({
+      key: "pk_test_umoW2niQcStCghyfTodmw2PQHgD3yXLtoXYwiXPK",
+      reference: reference,
+      amount: 22000, // Do NOT multiply by 100 for Korapay
+      currency: "NGN",
+      customer: {
+        name: profile?.username || user.email || "Customer", // Fallback to avoid null
+        email: user.email || "test@example.com" // Fallback to avoid null
+      },
+      metadata: {
+        user_id: String(user.id),
+        telegram_chat_id: String(profile?.telegram_chat_id || "not_provided")
+      },
+            onSuccess: function (response) {
+        console.log("Payment Success:", response);
+        
+        // 1. Show Top-Right Toast Loader
         Swal.fire({
-          icon: "info",
-          title: "Verification Requested",
-          text: "Your verification request has been sent. You will receive a link soon.",
+          title: 'Verifying Payment...',
+          icon: 'info',
+          position: 'top-end',
+          toast: true,
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
         });
+
+        // 2. Poll Supabase for the 'paid' status
+        const reference = response.reference;
+        const checkStatus = setInterval(async () => {
+          const { data, error } = await supabase
+            .from('user_verifications')
+            .select('status')
+            .eq('payment_reference', reference)
+            .single();
+
+          if (data && data.status === 'paid') {
+            clearInterval(checkStatus);
+            
+            // Success Toast
+            Swal.fire({
+              icon: 'success',
+              title: 'Verified ✅',
+              text: 'KYC link is being sent!',
+              position: 'top-end',
+              toast: true,
+              timer: 5000,
+              showConfirmButton: false
+            });
+          }
+        }, 3000); // Check every 3 seconds
+      },
+      onClose: function () {
+        console.log("User closed the modal");
       }
-    } catch (error) {
-      Swal.fire({
-        icon: "error",
-        title: "Something Went Wrong",
-        text: error.message,
-      });
-    } finally {
-      startDiditBtn.disabled = false;
-      startDiditBtn.textContent = "Start Verification with Didit";
-    }
-  });
-});
+    });
+
+  } catch (err) {
+    console.error("Verification start error:", err);
+    alert("Critical Error: " + err.message);
+  }
+}
+
+
+
 
 // ✅ Get unread notification count for current user (fixed)
 async function loadNotificationCount() {

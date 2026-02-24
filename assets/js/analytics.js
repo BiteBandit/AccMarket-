@@ -211,101 +211,77 @@ function initActionButtons() {
   // Upgrade User
   // --- Upgrade User (Buyer → Seller, deduct ₦1,000, verify KYC, send notification) ---
   upgradeBtn.addEventListener("click", async () => {
-    if (!user) return Swal.fire("Error", "No user selected.", "error");
+  if (!user) return Swal.fire("Error", "No user selected.", "error");
 
-    // Check if user is already a verified seller
-    if (user.role === "seller" && user.kyc_status === "verified") {
-      return Swal.fire(
-        "Notice",
-        `${user.full_name} is already a verified Seller.`,
-        "info"
-      );
-    }
-
-    const result = await Swal.fire({
-      title: "Upgrade User?",
-      text: `This will upgrade ${user.full_name} from Buyer to Seller, deduct ₦1,000, and verify KYC.`,
-      icon: "question",
-      showCancelButton: true,
-      confirmButtonText: "Upgrade",
-    });
-
-    if (result.isConfirmed) {
-      if (Number(user.balance) < 1000) {
-        Swal.fire(
-          "Error",
-          `${user.full_name} does not have enough balance.`,
-          "error"
-        );
-        return;
-      }
-
-      // Update user in profiles
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          role: "seller",
-          balance: Number(user.balance) - 1000,
-          kyc_status: "verified", // <-- KYC updated
-        })
-        .eq("id", user.id);
-
-      if (error) {
-        Swal.fire("Error", "Failed to upgrade user.", "error");
-        return;
-      }
-
-      // Save revenue record
-      await supabase.from("revenue").insert([
-        {
-          user_id: user.id,
-          type: "upgrade_fee",
-          amount: 1000,
-          notes: `${user.full_name} upgraded to seller`,
-          created_at: new Date().toISOString(),
-        },
-      ]);
-
-      // Update local object and UI
-      user.role = "seller";
-      user.balance -= 1000;
-      user.kyc_status = "verified";
-
-      userRole.textContent = user.role;
-      walletBalance.textContent = `₦${user.balance.toLocaleString()}`;
-      verifyStatus.textContent = "Verified";
-      verifyStatus.className = "verify-tag verified";
-
-      // Send notification
-      const { error: notifError } = await supabase
-        .from("notifications")
-        .insert([
-          {
-            user_id: user.id,
-            title: "Account Upgraded",
-            message: `Congratulations ${user.full_name}! You are now a Seller. ₦1,000 has been deducted from your balance and your KYC is now verified.`,
-            is_read: false,
-            type: "info",
-            created_at: new Date().toISOString(),
-          },
-        ]);
-
-      if (notifError) {
-        console.error("Notification Error:", notifError.message);
-        Swal.fire(
-          "Success",
-          `${user.full_name} is now a Seller! ₦1,000 deducted and KYC verified, but notification failed.`,
-          "warning"
-        );
-      } else {
-        Swal.fire(
-          "Success",
-          `${user.full_name} is now a Seller! ₦1,000 deducted, KYC verified, and notification sent.`,
-          "success"
-        );
-      }
-    }
+  const confirm = await Swal.fire({
+    title: "Upgrade User?",
+    text: `Upgrade ${user.full_name} to Seller?`,
+    icon: "question",
+    showCancelButton: true,
   });
+
+  if (!confirm.isConfirmed) return;
+
+  // 1️⃣ Upgrade via RPC
+  const { error } = await supabase.rpc("upgrade_user", {
+    target_user: user.id,
+  });
+
+  if (error) {
+    Swal.fire("Error", error.message, "error");
+    return;
+  }
+
+  // 2️⃣ In-app notification & revenue handled inside RPC (if your function does that)
+
+  // 3️⃣ Telegram notification
+  try {
+    const { data: sellerProfile, error: profileError } = await supabase
+      .from("profiles")
+      .select("telegram_chat_id, telegram_alerts, username")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError) throw profileError;
+
+    if (sellerProfile?.telegram_alerts && sellerProfile?.telegram_chat_id) {
+      const botToken = "8436841265:AAHIh50C2bEamKqB649Dx_CRy7l8X6f2yqg"; // ← regenerate token for safety
+      const chatId = sellerProfile.telegram_chat_id;
+
+      const message = `🎉 *✨ Account Upgraded ✨*
+
+Hello *${sellerProfile.username || user.full_name}*,
+
+Your account has been successfully upgraded to a *Seller* ✅
+
+💸 *Balance Deduction:* ₦1,000  
+🆔 *User ID:* \`${user.id}\`  
+🛒 *Seller Privileges:* You can now list accounts for sale and reach verified buyers
+
+📜 *Important:* Please read the *Seller Terms & Conditions* to stay compliant and avoid restrictions.
+
+🚀 Thank you for being part of *AccMarket*!`;
+
+      await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: message,
+          parse_mode: "Markdown",
+        }),
+      });
+
+      console.log("[Telegram] Notification sent");
+    } else {
+      console.log("[Telegram] Alerts disabled or no chat ID");
+    }
+  } catch (tgErr) {
+    console.error("[Telegram] Error:", tgErr);
+  }
+
+  Swal.fire("Success", `${user.full_name} upgraded to Seller`, "success");
+});
 resetBtn.addEventListener("click", async () => {
   if (!user) {
     return Swal.fire("Error", "No user selected.", "error");

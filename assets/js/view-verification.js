@@ -167,6 +167,39 @@ const updateStatus = async (newStatus) => {
 
     if (dbError) throw dbError;
     console.log("[UpdateStatus] Database updated successfully");
+// 🔔 2️⃣ In-app notification
+try {
+  const sellerId = accountRow.user_id;
+
+  const notifTitle =
+    newStatus === "approved"
+      ? "Listing Approved"
+      : "Listing Rejected";
+
+  const notifMessage =
+    newStatus === "approved"
+      ? `Your ${account.platform || "account"} listing has been approved and is now live.`
+      : `Your ${account.platform || "account"} listing was rejected. Please review and resubmit.`;
+
+  const { error: notifError } = await supabase
+    .from("notifications")
+    .insert({
+      user_id: sellerId,
+      title: notifTitle,
+      message: notifMessage,
+      icon: "fas fa-store",
+      type: "listing",
+      is_read: false,
+    });
+
+  if (notifError) {
+    console.error("[Notification] Insert failed:", notifError);
+  } else {
+    console.log("[Notification] Created");
+  }
+} catch (e) {
+  console.error("[Notification] Error:", e);
+}
 
     // 2️⃣ Call Edge Function directly via fetch with anon key
     const edgeUrl = "https://qihzvglznpkytolxkuxz.supabase.co/functions/v1/send-approval-email";

@@ -83,7 +83,7 @@ async function getCurrentUser() {
 const iconMap = {
   payment: { icon: "fa-check-circle", color: "#22c55e" }, // green
   security: { icon: "fa-user-shield", color: "#f43f5e" }, // red
-  listing: { icon: "fa-bullhorn", color: "#0ea5e9" }, // blue
+  listing: { icon: "fas fa-store", color: "#158c0dff" }, // green
   system: { icon: "fa-cog", color: "#a855f7" }, // purple
   message: { icon: "fa-envelope", color: "#facc15" }, // yellow
   alert: { icon: "fa-exclamation-triangle", color: "#f87171" }, // light red
@@ -354,7 +354,7 @@ document.addEventListener("click", async (e) => {
   }
 });
 
-// ✅ Show Sell Account & Analytics only for Seller or Admin
+// ✅ Show Sell Account & Analytics links based on role
 async function showSellerAndAdminLinks() {
   try {
     // Get current logged-in user
@@ -384,14 +384,20 @@ async function showSellerAndAdminLinks() {
     const sellAccountLink = document.querySelector(".seller-only");
     const analyticsLink = document.querySelector(".analytics-only");
 
-    // Show links if role is seller or admin
+    // Sell Account → admin or seller
     if (profile.role === "seller" || profile.role === "admin") {
       if (sellAccountLink) sellAccountLink.style.display = "block";
-      if (analyticsLink) analyticsLink.style.display = "block";
     } else {
       if (sellAccountLink) sellAccountLink.style.display = "none";
+    }
+
+    // Analytics → admin only
+    if (profile.role === "admin") {
+      if (analyticsLink) analyticsLink.style.display = "block";
+    } else {
       if (analyticsLink) analyticsLink.style.display = "none";
     }
+
   } catch (err) {
     console.error("⚠️ Error checking role:", err);
   }
