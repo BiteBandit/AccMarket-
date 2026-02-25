@@ -222,65 +222,66 @@ function initActionButtons() {
 
   if (!confirm.isConfirmed) return;
 
-  // 1️⃣ Upgrade via RPC
-  const { error } = await supabase.rpc("upgrade_user", {
-    target_user: user.id,
-  });
-
-  if (error) {
-    Swal.fire("Error", error.message, "error");
-    return;
-  }
-
-  // 2️⃣ In-app notification & revenue handled inside RPC (if your function does that)
-
-  // 3️⃣ Telegram notification
   try {
+    // 1️⃣ Upgrade via RPC
+    const { error } = await supabase.rpc("upgrade_user", { target_user: user.id });
+    if (error) throw new Error(error.message);
+    console.log("[RPC] User upgraded successfully");
+
+    // 2️⃣ Fetch updated profile info (Telegram + Email)
     const { data: sellerProfile, error: profileError } = await supabase
       .from("profiles")
-      .select("telegram_chat_id, telegram_alerts, username")
+      .select("telegram_chat_id, telegram_alerts, username, email, full_name")
       .eq("id", user.id)
       .single();
-
     if (profileError) throw profileError;
 
+    // 3️⃣ Telegram notification
     if (sellerProfile?.telegram_alerts && sellerProfile?.telegram_chat_id) {
-      const botToken = "8436841265:AAHIh50C2bEamKqB649Dx_CRy7l8X6f2yqg"; // ← regenerate token for safety
+      const botToken = "8436841265:AAHIh50C2bEamKqB649Dx_CRy7l8X6f2yqg";
       const chatId = sellerProfile.telegram_chat_id;
-
-      const message = `🎉 *✨ Account Upgraded ✨*
-
-Hello *${sellerProfile.username || user.full_name}*,
-
-Your account has been successfully upgraded to a *Seller* ✅
-
-💸 *Balance Deduction:* ₦1,000  
-🆔 *User ID:* \`${user.id}\`  
-🛒 *Seller Privileges:* You can now list accounts for sale and reach verified buyers
-
-📜 *Important:* Please read the *Seller Terms & Conditions* to stay compliant and avoid restrictions.
-
-🚀 Thank you for being part of *AccMarket*!`;
+      const message = `🎉 *✨ Account Upgraded ✨*\n\nHello *${sellerProfile.username || user.full_name}*,\n\nYour account has been successfully upgraded to a Verified Seller ✅\n\n🆔 User ID: \`${user.id}\`\n🛒 Seller Privileges: You can now list accounts for sale and reach verified buyers\n📜 Important: Please read the Seller Terms & Conditions: https://accmarket.name.ng/terms#seller\n🚀 Thank you for being part of AccMarket!`;
 
       await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: message,
-          parse_mode: "Markdown",
-        }),
+        body: JSON.stringify({ chat_id: chatId, text: message, parse_mode: "Markdown" }),
       });
-
       console.log("[Telegram] Notification sent");
     } else {
       console.log("[Telegram] Alerts disabled or no chat ID");
     }
-  } catch (tgErr) {
-    console.error("[Telegram] Error:", tgErr);
-  }
 
-  Swal.fire("Success", `${user.full_name} upgraded to Seller`, "success");
+    // 4️⃣ Email notification via Edge Function
+    if (sellerProfile?.email) {
+      const edgeUrl = "https://qihzvglznpkytolxkuxz.supabase.co/functions/v1/smooth-endpoint";
+      const anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpaHp2Z2x6bnBreXRvbHhrdXh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk5NTc4NDIsImV4cCI6MjA3NTUzMzg0Mn0.VHyy3_Amr-neYoudHudoW-TJwNPfhkRV2TTCfVgY_zM";
+
+      const emailRes = await fetch(edgeUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${anonKey}`,
+        },
+        body: JSON.stringify({
+          email: sellerProfile.email,
+          full_name: sellerProfile.full_name,
+        }),
+      });
+
+      const emailData = await emailRes.json();
+      if (!emailRes.ok) {
+        console.error("[Email] Failed:", emailData);
+      } else {
+        console.log("[Email] Notification sent");
+      }
+    }
+
+    Swal.fire("Success", `${user.full_name} upgraded to Seller`, "success");
+  } catch (err) {
+    console.error("[Upgrade Error]", err);
+    Swal.fire("Error", err.message || "Something went wrong", "error");
+  }
 });
 resetBtn.addEventListener("click", async () => {
   if (!user) {

@@ -87,7 +87,7 @@ const iconMap = {
   system: { icon: "fa-cog", color: "#a855f7" }, // purple
   message: { icon: "fa-envelope", color: "#facc15" }, // yellow
   alert: { icon: "fa-exclamation-triangle", color: "#f87171" }, // light red
-  info: { icon: "fa-info-circle", color: "#3b82f6" }, // bright blue
+  info: { icon: "fa-award", color: "#FFD700" }, //  gold
   success: { icon: "fa-thumbs-up", color: "#22c55e" }, // green
   warning: { icon: "fa-exclamation-circle", color: "#fbbf24" }, // orange
   default: { icon: "fa-bell", color: "#6b7280" }, // gray fallback
