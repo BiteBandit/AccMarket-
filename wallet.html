@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<head>
+  <meta charset="UTF-8" />
+
+  <!-- ✅ MOBILE VIEW -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>AccMarket Wallet | Balance, Earnings & Withdraw Funds</title>
+
+  <meta
+    name="description"
+    content="Access your AccMarket wallet to view balance, track transactions, withdraw earnings, and manage your marketplace funds securely as a buyer or verified seller."
+  />
+
+  <meta
+    name="keywords"
+    content="AccMarket wallet, seller balance, withdraw earnings, account marketplace wallet, AccMarket transactions, seller funds Nigeria"
+  />
+
+  <meta name="author" content="AccMarket" />
+
+  <!-- 🔹 Open Graph (Facebook, WhatsApp, LinkedIn) -->
+  <meta property="og:title" content="AccMarket Wallet | Balance & Earnings" />
+  <meta
+    property="og:description"
+    content="View your AccMarket wallet balance, track transactions, and withdraw your marketplace earnings securely."
+  />
+  <meta property="og:image" content="https://accmarket.name.ng/images/logo.png" />
+  <meta property="og:url" content="https://accmarket.name.ng/wallet.html" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="AccMarket" />
+
+  <!-- 🔹 Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="AccMarket Wallet | Seller Earnings & Balance" />
+  <meta
+    name="twitter:description"
+    content="Manage your AccMarket wallet, view transactions, and withdraw seller earnings securely."
+  />
+  <meta name="twitter:image" content="https://accmarket.name.ng/images/logo.png" />
+
+  <!-- 🔹 Favicon & App Icons -->
+  <link rel="icon" href="https://accmarket.name.ng/images/logo.png" type="image/png" />
+  <link rel="shortcut icon" href="https://accmarket.name.ng/images/logo.png" type="image/png" />
+  <link rel="apple-touch-icon" href="https://accmarket.name.ng/images/logo.png" />
+  <meta name="apple-mobile-web-app-title" content="AccMarket" />
+  <meta name="theme-color" content="#0b1e5b" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="application-name" content="AccMarket" />
+
+  <!-- 🔹 Robots -->
+  <!-- Wallet is user dashboard → prevent indexing -->
+  <meta name="robots" content="noindex, nofollow" />
+
+  <!-- 🔹 Canonical -->
+  <link rel="canonical" href="https://accmarket.name.ng/wallet.html" />
+
+  <!-- Google Fonts -->
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- Font Awesome -->
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+  />
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="assets/css/wallet.css" />
+
+  <!-- JAVASCRIPT -->
+  <script type="module" src="assets/js/wallet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+      <!-- HEADER -->
+    <header class="header container">
+      <div class="header-left">
+        <button
+          id="sidebarToggle"
+          class="hamburger"
+          aria-label="Toggle sidebar"
+        >
+          <i class="fas fa-bars"></i>
+        </button>
+      </div>
+
+      <div class="header-center">
+        <a href="#" class="brand" id="themeToggle">
+          <i class="fas fa-shield-alt"></i> AccMarket
+        </a>
+      </div>
+
+      <div class="header-right">
+        <button
+          id="profileToggle"
+          class="profile-btn"
+          aria-label="Open profile menu"
+        >
+          <i class="fas fa-user-circle"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- LEFT SIDEBAR -->
+    <aside id="leftSidebar" class="sidebar left">
+      <button class="close-btn" id="closeLeft">&times;</button>
+      <div class="search-box">
+        <form onsubmit="return false;">
+          <!-- prevents page reload -->
+          <input type="text" placeholder="Search..." />
+          <button type="submit"><i class="fas fa-search"></i></button>
+        </form>
+      </div>
+      <div class="categories">
+        <h4>Categories</h4>
+        <ul id="categoryList" class="category-list">
+          <li><a href="#">FACEBOOK</a></li>
+          <li><a href="#">TIKTOK</a></li>
+          <li><a href="#">INSTAGRAM</a></li>
+          <li><a href="#">TWITTER </a></li>
+          <li><a href="#">SNAPCHAT</a></li>
+          <li><a href="#">LINKEDIN</a></li>
+          <li><a href="#">REDDIT</a></li>
+          <li><a href="#">MAILS</a></li>
+          <li><a href="#">PINTEREST</a></li>
+          <li><a href="#">DISCORD</a></li>
+          <li><a href="#">TWITCH</a></li>
+          <li><a href="#">QOURA</a></li>
+          <li><a href="#">VKONTAKTE</a></li>
+          <li><a href="#">DEEPSEEK</a></li>
+          <li><a href="#">CHATGPT</a></li>
+          <li><a href="#">ESTY.COM</a></li>
+          <li><a href="#">YELP.COM</a></li>
+          <li><a href="#">PLAYSTATION</a></li>
+          <li><a href="#">STEAM</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- RIGHT SIDEBAR -->
+    <aside id="rightSidebar" class="sidebar right">
+      <button class="close-btn" id="closeRight">&times;</button>
+      <h2>Quick Access</h2>
+
+      <ul class="quick-list">
+        <li>
+          <a href="dashboard.html"><i class="fas fa-home"></i> Dashboard</a>
+        </li>
+
+        <li>
+          <a href="wallet.html"><i class="fas fa-wallet"></i> Wallet</a>
+        </li>
+        <li class="seller-only" style="display: none">
+          <a href="sell.html"><i class="fas fa-coins"></i> Sell Account</a>
+        </li>
+        <li>
+          <a href="chats.html"><i class="fas fa-message"></i> My Chats</a>
+        </li>
+        <li style="position: relative">
+          <a href="notification.html" class="notification-link">
+            <i class="fas fa-bell"></i>
+            <span
+              id="notification-count"
+              class="notification-badge"
+              aria-live="polite"
+              title="Unread notifications"
+              >0</span
+            >
+            Notifications
+          </a>
+        </li>
+        <li class="analytics-only" style="display: none">
+          <a href="analytics.html"
+            ><i class="fas fa-chart-line"></i> Analytics</a
+          >
+        </li>
+        <li>
+          <a href="orders.html"><i class="fas fa-box"></i> My Orders</a>
+        </li>
+        <li>
+          <a href="support.html"><i class="fas fa-headset"></i> Support</a>
+        </li>
+        <li>
+          <a href="settings.html"><i class="fas fa-cog"></i> Settings</a>
+        </li>
+        <li>
+          <a href="#" class="logout"
+            ><i class="fas fa-sign-out-alt"></i> Logout</a
+          >
+        </li>
+      </ul>
+    </aside>
+
+<!-- MAIN CONTENT -->
+<div class="main-content">
+
+  <!-- PAGE HEADER -->
+  <div class="page-header">
+    <h1>Wallet</h1>
+    <p>Manage your balance, deposits and transactions</p>
+  </div>
+
+  <!-- WALLET BALANCE CARD -->
+  <div class="wallet-card">
+    <div class="wallet-left">
+      <h2>Wallet Balance</h2>
+      <div class="wallet-balance">₦<span id="walletBalance">0</span></div>
+    </div>
+
+    <div class="wallet-actions">
+      <button id="depositBtn" class="btn-primary">Deposit</button>
+      <button id="withdrawBtn" class="btn-secondary">Withdraw</button>
+    </div>
+  </div>
+
+  <!-- TRANSACTIONS -->
+  <div class="content-card">
+    <div class="card-header">
+      <h3>Transactions</h3>
+    </div>
+
+    <div class="table-wrapper">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Type</th>
+            <th>Amount</th>
+            <th>Note</th>
+            <th>Status</th>
+            <th>Reference</th>
+          </tr>
+        </thead>
+        <tbody id="walletTransactions">
+          <!-- JS inserts rows -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+  <!-- Begin of Chaport Live Chat code -->
+<script type="text/javascript">
+(function(w,d,v3){
+  w.chaportConfig = { appId : '69a2b912792ca319060b4fd7' };
+  if(w.chaport) return;
+  v3=w.chaport={}; v3._q=[]; v3._l={};
+  v3.q=function(){v3._q.push(arguments)};
+  v3.on=function(e,fn){if(!v3._l[e])v3._l[e]=[];v3._l[e].push(fn)};
+  var s=d.createElement('script'); s.type='text/javascript'; s.async=true;
+  s.src='https://app.chaport.com/javascripts/insert.js';
+  var ss=d.getElementsByTagName('script')[0]; ss.parentNode.insertBefore(s,ss)
+})(window, document);
+</script>
+<!-- End of Chaport Live Chat code -->
+</body>
+</html>
