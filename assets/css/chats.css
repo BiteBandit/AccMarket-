@@ -122,14 +122,15 @@ body { background: var(--bg-main); height: 100vh; display: flex; align-items: ce
 
 /* --- INPUT AREA --- */
 .chat-input-area { 
-    flex-shrink: 0; /* 🎯 CRITICAL: This stops the footer from being pushed off-screen */
-    padding: 15px 25px; 
+    flex-shrink: 0;
+    padding: 15px 25px;
+    padding-bottom: calc(15px + env(safe-area-inset-bottom));
     border-top: 1px solid var(--border); 
     display: flex; 
     gap: 12px; 
     align-items: center; 
     background: white; 
-    z-index: 10;
+    min-height: 70px;
 }
 
 /* REUSABLE UI ELEMENTS */
@@ -189,4 +190,11 @@ body { background: var(--bg-main); height: 100vh; display: flex; align-items: ce
     .app-container.chat-open .chat-window { transform: translateX(0); z-index: 20; }
     .app-container.chat-open .sidebar { display: none; }
     .back-btn { display: flex !important; margin-right: 10px; font-size: 1.5rem; }
+}
+
+@media (max-width: 768px) {
+    body,
+    .app-container {
+        height: 100dvh;
+    }
 }
