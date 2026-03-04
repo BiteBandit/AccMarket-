@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Accmarket Messages</title>
     <link rel="stylesheet" href="assets/css/chats.css">
     <script type="module" src="assets/js/chats.js"></script>
@@ -112,4 +112,23 @@
     </div>
 
 </body>
+<script>
+function setAppContainerHeight() {
+    const app = document.querySelector('.app-container');
+    if (!app) return;
+    
+    // Use the actual visible height in Chrome/Android
+    const vh = window.innerHeight;
+    app.style.height = `${vh}px`;
+}
+
+// Initial load
+window.addEventListener('load', setAppContainerHeight);
+
+// On resize (keyboard, rotation, nav bar changes)
+window.addEventListener('resize', setAppContainerHeight);
+
+// Optional: on orientation change
+window.addEventListener('orientationchange', setAppContainerHeight);
+</script>
 </html>
