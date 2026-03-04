@@ -24,16 +24,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (backBtn) {
         backBtn.onclick = async () => {
             document.querySelector('.app-container').classList.remove('chat-open');
-            
             if (activeChatId) await markMessagesAsRead(activeChatId);
-            
             activeChatId = null;
             if (messageSubscription) supabase.removeChannel(messageSubscription);
             
             const newUrl = new URL(window.location);
             newUrl.searchParams.delete('id');
             window.history.pushState({}, '', newUrl);
-            
             await loadSidebar();
         };
     }
@@ -84,10 +81,10 @@ async function loadSidebar(filter = "") {
         
         if (filter && !otherUser.username.toLowerCase().includes(filter.toLowerCase())) return;
 
-        const hasUnread = chat.messages.some(m => !m.is_read && m.sender_id !== currentUser.id);
+        const unreadMessages = chat.messages.filter(m => !m.is_read && m.sender_id !== currentUser.id);
+        const hasUnread = unreadMessages.length > 0;
         const isActive = chat.id === activeChatId ? 'active' : '';
 
-        // 🎯 TIME SWAP: Format the conversation timestamp for the sidebar
         const lastUpdated = new Date(chat.updated_at);
         const timeDisplay = lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -148,7 +145,9 @@ async function initChatWindow() {
         .order('created_at', { ascending: true });
 
     container.innerHTML = ''; 
-    if (messages) messages.forEach(msg => appendMessageUI(msg));
+    if (messages) {
+        messages.forEach(msg => appendMessageUI(msg));
+    }
 }
 
 // --- 4. HELPERS ---
@@ -165,10 +164,14 @@ function appendMessageUI(msg) {
     const container = document.querySelector('.message-container');
     if (!container) return;
     
+    // 🎯 DUPLICATE PREVENTION: Check if ID already exists in the DOM
+    if (document.getElementById(`msg-${msg.id}`)) return;
+
     const isMe = msg.sender_id === currentUser.id;
     const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     const div = document.createElement('div');
+    div.id = `msg-${msg.id}`; // 🎯 Assign the database ID to the HTML element
     div.className = `message ${isMe ? 'outgoing' : 'incoming'}`;
     div.innerHTML = `
         <div class="msg-bubble">
@@ -187,6 +190,8 @@ async function handleSendMessage() {
 
     input.value = ''; 
 
+    // 🎯 We don't call appendMessageUI here.
+    // The Realtime subscription will handle it for us automatically.
     const { error: msgError } = await supabase
         .from('messages')
         .insert([{
@@ -204,8 +209,6 @@ async function handleSendMessage() {
                 updated_at: new Date().toISOString()
             })
             .eq('id', activeChatId);
-        
-        await loadSidebar();
     }
 }
 
@@ -219,13 +222,13 @@ function subscribeToMessages() {
             table: 'messages', 
             filter: `conversation_id=eq.${activeChatId}` 
         }, async (payload) => {
+            // 🎯 appendMessageUI now double-checks ID to prevent double bubbles
             appendMessageUI(payload.new);
             
             if (payload.new.sender_id !== currentUser.id) {
                 await markMessagesAsRead(activeChatId);
             }
             
-            // 🎯 Refresh sidebar to update time and dot in real-time
             await loadSidebar();
         })
         .subscribe();
