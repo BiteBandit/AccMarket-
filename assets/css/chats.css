@@ -80,18 +80,66 @@ body { background: var(--bg-main); height: 100vh; display: flex; align-items: ce
 }
 
 /* --- MAIN CHAT WINDOW --- */
-.chat-window { flex: 1; display: flex; flex-direction: column; background: var(--milk); min-width: 0; }
-.chat-header { padding: 15px 25px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.chat-window { 
+    flex: 1; 
+    display: flex; 
+    flex-direction: column; 
+    background: var(--milk); 
+    min-width: 0; 
+    height: 100%; /* 🎯 Ensures the window stays within the 90vh app-container */
+    overflow: hidden; /* 🎯 Prevents the whole window from scrolling */
+}
+
+.chat-header { 
+    flex-shrink: 0; /* 🎯 Prevents header from being squashed */
+    padding: 15px 25px; 
+    border-bottom: 1px solid var(--border); 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+}
+
 .user-details { display: flex; align-items: center; gap: 12px; }
 .user-details img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
 .user-details h3 { font-size: 1rem; }
 .status { font-size: 0.75rem; color: var(--success); }
 
-.icon-btn { background: none; border: none; font-size: 1.4rem; cursor: pointer; color: var(--gray); display: flex; align-items: center; }
+/* Ensure the sub-bars also don't squash the messages */
+.product-context-bar, .escrow-status-bar {
+    flex-shrink: 0;
+}
+
+/* --- MESSAGES AREA --- */
+.message-container { 
+    flex: 1; /* 🎯 Takes up all remaining space between header and footer */
+    padding: 20px; 
+    overflow-y: auto; /* 🎯 Enables scrolling ONLY inside the message area */
+    display: flex; 
+    flex-direction: column; 
+    gap: 12px; 
+    background: #fdfdfd; 
+}
+
+/* --- INPUT AREA --- */
+.chat-input-area { 
+    flex-shrink: 0; /* 🎯 CRITICAL: This stops the footer from being pushed off-screen */
+    padding: 15px 25px; 
+    border-top: 1px solid var(--border); 
+    display: flex; 
+    gap: 12px; 
+    align-items: center; 
+    background: white; 
+    z-index: 10;
+}
+
+/* REUSABLE UI ELEMENTS */
+.icon-btn { background: none; border: none; font-size: 1.4rem; cursor: pointer; color: var(--gray); display: flex; align-items: center; transition: 0.2s; }
+.icon-btn:hover { color: var(--dark-blue); }
 .back-btn { display: none; }
 
 .btn-dispute { padding: 8px 16px; border: 1px solid var(--danger); color: var(--danger); border-radius: 8px; background: transparent; cursor: pointer; font-weight: 600; transition: 0.2s; }
 .btn-dispute:hover { background: var(--danger); color: white; }
+
 
 /* --- PRODUCT & ESCROW --- */
 .product-context-bar { padding: 10px 25px; background: #fff; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 15px; }

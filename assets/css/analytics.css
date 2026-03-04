@@ -973,7 +973,7 @@ body {
 /* Show Button */
 .show-btn {
   padding: 12px 20px;
-  background-color: #007bff;
+  background-color: var(--dark-blue);
   color: white;
   border: none;
   border-radius: 8px;
@@ -982,7 +982,7 @@ body {
 }
 
 .show-btn:hover {
-  background-color: #0056b3;
+  background-color: var(--dark-blue);
 }
 
 /* Modal background */
