@@ -21,11 +21,14 @@
 body { background: var(--bg-main); height: 100svh; display: flex; align-items: center; justify-content: center; color: var(--text-dark); overflow: hidden; }
 
 .app-container {
-    width: 95vw; height: 90vh;
+    width: 95vw;
+    height: 100svh; /* 🔥 FIX */
     background: var(--bg-white);
-    display: flex; border-radius: 12px;
+    display: flex;
+    border-radius: 12px;
     box-shadow: 0 10px 25px rgba(0,0,0,0.05);
-    overflow: hidden; position: relative;
+    overflow: hidden;
+    position: relative;
 }
 
 /* --- SIDEBAR --- */
