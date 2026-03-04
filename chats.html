@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accmarket Messages</title>
+    <link rel="stylesheet" href="assets/css/chats.css">
+    <script type="module" src="assets/js/chats.js"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+<body>
+
+    <div class="app-container">
+        <aside class="sidebar">
+            <header class="sidebar-header">
+                <h2>Messages</h2>
+                <button class="icon-btn"><i class="ph ph-note-pencil"></i></button>
+            </header>
+            <div class="search-bar">
+                <i class="ph ph-magnifying-glass"></i>
+                <input type="text" id="chatSearch" placeholder="Search chats...">
+            </div>
+            <div class="chat-list"></div>
+        </aside>
+
+        <main class="chat-window">
+            <header class="chat-header">
+                <div class="user-details">
+                    <button class="icon-btn back-btn" id="backToList"><i class="ph ph-caret-left"></i></button>
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" id="headerAvatar" alt="User">
+                    <div>
+                        <h3 id="headerName">Select a Chat</h3>
+                        <p class="status" id="headerStatus">Online</p>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn-dispute" id="raiseDisputeBtn">Raise Dispute</button>
+                    <button class="icon-btn"><i class="ph ph-dots-three-vertical"></i></button>
+                </div>
+            </header>
+
+            <div class="product-context-bar">
+                <img src="https://api.dicebear.com/7.x/shapes/svg?seed=Apex" id="productImg" alt="Item">
+                <div class="product-details">
+                    <span class="product-name" id="productTitle">Product Name</span>
+                    <span class="product-price" id="productPrice">$0.00</span>
+                </div>
+                <button class="view-listing-btn">View Listing</button>
+            </div>
+
+            <div class="escrow-status-bar">
+                <div class="status-step completed"><i class="ph ph-wallet"></i><span>Paid</span></div>
+                <div class="status-line active"></div>
+                <div class="status-step active" id="stepDelivery"><i class="ph ph-key"></i><span>Delivery</span></div>
+                <div class="status-line" id="lineRelease"></div>
+                <div class="status-step" id="stepRelease"><i class="ph ph-check-circle"></i><span>Release</span></div>
+            </div>
+
+            <section class="message-container"></section>
+
+            <div class="escrow-actions-area"></div>
+
+            <footer class="chat-input-area">
+                <button class="icon-btn"><i class="ph ph-paperclip"></i></button>
+                <div class="input-wrapper">
+                    <input type="text" id="messageInput" placeholder="Type a message...">
+                    <button class="icon-btn"><i class="ph ph-smiley"></i></button>
+                </div>
+                <button class="send-btn" id="sendMessageBtn"><i class="ph ph-paper-plane-right"></i></button>
+            </footer>
+        </main>
+    </div>
+
+    <div class="modal-overlay" id="disputeModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3><i class="ph ph-warning-octagon"></i> Raise a Dispute</h3>
+                <button class="close-modal" id="closeDispute">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Funds will be frozen. A moderator will join this chat.</p>
+                <label>Reason</label>
+                <select id="disputeReason">
+                    <option value="no_delivery">Seller hasn't sent details</option>
+                    <option value="wrong_acc">Account is not as described</option>
+                    <option value="recovered">Account was recovered</option>
+                </select>
+                <textarea id="disputeDetails" placeholder="Explain what happened..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="cancelDispute">Cancel</button>
+                <button class="btn-danger" id="submitDispute">Freeze Funds</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="ratingModal">
+        <div class="modal-card">
+            <div class="modal-header"><h3>Rate Transaction</h3></div>
+            <div class="modal-body" style="text-align: center;">
+                <div class="percent-circle">
+                    <span id="percentValue">100</span>%
+                </div>
+                <p id="percentLabel" style="color:#10b981; font-weight:bold;">Excellent</p>
+                <input type="range" min="0" max="100" value="100" class="percent-slider" id="ratingSlider">
+                <textarea id="ratingComment" placeholder="Write a review (optional)..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-danger" id="submitRating" style="background: #0b1e5b; width: 100%;">Submit Feedback</button>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
