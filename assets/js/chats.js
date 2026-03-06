@@ -4,6 +4,8 @@ import { supabase } from './supabase-config.js';
 let activeChatId = new URLSearchParams(window.location.search).get('id'); 
 let currentUser = null;
 let messageSubscription = null;
+let statusSubscription = null; 
+let heartbeatInterval = null;
 
 // --- 1. INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', async () => {
@@ -12,21 +14,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (authError || !user) return;
     currentUser = user;
 
+    // Start the Heartbeat (Checks privacy column automatically)
+    await initUserPresence();
     await loadSidebar();
+    initSettingsToggle(); 
 
     if (activeChatId) {
         document.querySelector('.app-container').classList.add('chat-open');
         initChatWindow();
     }
 
-    // --- BACK BUTTON LOGIC ---
+    // --- BACK BUTTON ---
     const backBtn = document.getElementById('backToList');
     if (backBtn) {
         backBtn.onclick = async () => {
             document.querySelector('.app-container').classList.remove('chat-open');
             if (activeChatId) await markMessagesAsRead(activeChatId);
+            
             activeChatId = null;
             if (messageSubscription) supabase.removeChannel(messageSubscription);
+            if (statusSubscription) supabase.removeChannel(statusSubscription);
             
             const newUrl = new URL(window.location);
             newUrl.searchParams.delete('id');
@@ -55,7 +62,58 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-// --- 2. THE CHAT LIST (SIDEBAR) ---
+// --- 2. THE HEARTBEAT (SELF) ---
+async function initUserPresence() {
+    if (heartbeatInterval) clearInterval(heartbeatInterval);
+
+    const updateStatus = async () => {
+        // Fetch current privacy setting
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('show_online')
+            .eq('id', currentUser.id)
+            .single();
+
+        // Only update timestamp if toggle is TRUE
+        if (profile?.show_online) {
+            await supabase
+                .from('profiles')
+                .update({ last_seen: new Date().toISOString() })
+                .eq('id', currentUser.id);
+        }
+    };
+
+    await updateStatus(); 
+    heartbeatInterval = setInterval(updateStatus, 20000); // 20-second heartbeat
+}
+
+// --- 3. THE TOGGLE SETTING ---
+async function initSettingsToggle() {
+    const toggle = document.getElementById('onlineStatusToggle'); 
+    if (!toggle) return;
+
+    // Initial fetch to set toggle state
+    const { data } = await supabase.from('profiles').select('show_online').eq('id', currentUser.id).single();
+    toggle.checked = data?.show_online ?? true;
+
+    toggle.onchange = async () => {
+        const isEnabled = toggle.checked;
+        
+        await supabase
+            .from('profiles')
+            .update({ show_online: isEnabled })
+            .eq('id', currentUser.id);
+        
+        // If they turn it off, we clear their last_seen so they go offline immediately
+        if (!isEnabled) {
+            await supabase.from('profiles').update({ last_seen: null }).eq('id', currentUser.id);
+        }
+        
+        initUserPresence(); // Refresh heartbeat state
+    };
+}
+
+// --- 4. THE SIDEBAR ---
 async function loadSidebar(filter = "") {
     const chatList = document.querySelector('.chat-list');
     if (!chatList || !currentUser) return;
@@ -64,29 +122,25 @@ async function loadSidebar(filter = "") {
         .from('conversations')
         .select(`
             id, last_message, updated_at, buyer_id, seller_id,
-            seller:profiles!conversations_seller_id_fkey(username, avatar_url),
-            buyer:profiles!conversations_buyer_id_fkey(username, avatar_url),
+            seller:profiles!conversations_seller_id_fkey(id, username, avatar_url, last_seen, show_online),
+            buyer:profiles!conversations_buyer_id_fkey(id, username, avatar_url, last_seen, show_online),
             messages(is_read, sender_id)
         `)
         .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id}`)
         .order('updated_at', { ascending: false });
 
-    if (error) return console.error("Sidebar Error:", error);
+    if (error) return;
 
     chatList.innerHTML = '';
-
     conversations.forEach(chat => {
         const isMeBuyer = chat.buyer_id === currentUser.id;
         const otherUser = isMeBuyer ? chat.seller : chat.buyer;
         
         if (filter && !otherUser.username.toLowerCase().includes(filter.toLowerCase())) return;
 
-        const unreadMessages = chat.messages.filter(m => !m.is_read && m.sender_id !== currentUser.id);
-        const hasUnread = unreadMessages.length > 0;
+        const hasUnread = chat.messages.some(m => !m.is_read && m.sender_id !== currentUser.id);
         const isActive = chat.id === activeChatId ? 'active' : '';
-
-        const lastUpdated = new Date(chat.updated_at);
-        const timeDisplay = lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const timeDisplay = new Date(chat.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
         const item = document.createElement('div');
         item.className = `chat-item ${isActive} ${hasUnread ? 'unread-item' : ''}`;
@@ -107,7 +161,6 @@ async function loadSidebar(filter = "") {
             activeChatId = chat.id;
             window.history.pushState({}, '', `?id=${chat.id}`);
             document.querySelector('.app-container').classList.add('chat-open');
-            
             await markMessagesAsRead(chat.id);
             await loadSidebar(filter); 
             initChatWindow(); 
@@ -116,7 +169,7 @@ async function loadSidebar(filter = "") {
     });
 }
 
-// --- 3. THE CHAT WINDOW ---
+// --- 5. THE CHAT WINDOW ---
 async function initChatWindow() {
     const container = document.querySelector('.message-container');
     const headerName = document.getElementById('headerName');
@@ -128,7 +181,9 @@ async function initChatWindow() {
 
     const { data: chat } = await supabase
         .from('conversations')
-        .select(`*, seller:profiles!conversations_seller_id_fkey(username, avatar_url), buyer:profiles!conversations_buyer_id_fkey(username, avatar_url)`)
+        .select(`*, 
+            seller:profiles!conversations_seller_id_fkey(id, username, avatar_url, last_seen, show_online), 
+            buyer:profiles!conversations_buyer_id_fkey(id, username, avatar_url, last_seen, show_online)`)
         .eq('id', activeChatId)
         .single();
 
@@ -136,6 +191,8 @@ async function initChatWindow() {
         const otherUser = chat.buyer_id === currentUser.id ? chat.seller : chat.buyer;
         headerName.innerText = otherUser.username;
         headerAvatar.src = otherUser.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUser.username}`;
+        
+        watchPartnerPresence(otherUser);
     }
 
     const { data: messages } = await supabase
@@ -145,38 +202,75 @@ async function initChatWindow() {
         .order('created_at', { ascending: true });
 
     container.innerHTML = ''; 
-    if (messages) {
-        messages.forEach(msg => appendMessageUI(msg));
-    }
+    if (messages) messages.forEach(msg => appendMessageUI(msg));
 }
 
-// --- 4. HELPERS ---
+// --- 6. PARTNER STATUS WATCHER (Timestamp Logic) ---
+function watchPartnerPresence(partner) {
+    const statusLabel = document.getElementById('headerStatus');
+    
+    const calculateStatus = (lastSeenStr, showOnline) => {
+        // If they opted out of showing status, hide it
+        if (!showOnline || !lastSeenStr) {
+            statusLabel.innerText = ""; 
+            return;
+        }
 
-async function markMessagesAsRead(convId) {
-    if (!convId || !currentUser) return;
-    await supabase.from('messages')
-        .update({ is_read: true })
-        .eq('conversation_id', convId)
-        .neq('sender_id', currentUser.id);
+        const lastSeen = new Date(lastSeenStr);
+        const now = new Date();
+        const diffInSeconds = Math.floor((now - lastSeen) / 1000);
+
+        // If updated within 45 seconds (allowing for minor network lag), they are Online
+        if (diffInSeconds < 45) {
+            statusLabel.innerText = "Online";
+            statusLabel.style.color = "#10b981"; // Green
+        } else {
+            const timeStr = lastSeen.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            statusLabel.innerText = `Last seen today at ${timeStr}`;
+            statusLabel.style.color = "#9ca3af"; // Grey
+        }
+    };
+
+    // Initial check
+    calculateStatus(partner.last_seen, partner.show_online);
+
+    // Live update when partner's row changes
+    if (statusSubscription) supabase.removeChannel(statusSubscription);
+    
+    statusSubscription = supabase.channel(`status-${partner.id}`)
+        .on('postgres_changes', { 
+            event: 'UPDATE', 
+            schema: 'public', 
+            table: 'profiles', 
+            filter: `id=eq.${partner.id}` 
+        }, (payload) => {
+            calculateStatus(payload.new.last_seen, payload.new.show_online);
+        })
+        .subscribe();
 }
+
+// --- 7. MESSAGING HELPERS ---
 
 function appendMessageUI(msg) {
     const container = document.querySelector('.message-container');
-    if (!container) return;
-    
-    // 🎯 DUPLICATE PREVENTION: Check if ID already exists in the DOM
-    if (document.getElementById(`msg-${msg.id}`)) return;
+    if (!container || document.getElementById(`msg-${msg.id}`)) return;
 
     const isMe = msg.sender_id === currentUser.id;
     const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+    // Consistent grey minimal ticks
+    const tickIcon = msg.is_read ? 'ph-checks' : 'ph-check';
+
     const div = document.createElement('div');
-    div.id = `msg-${msg.id}`; // 🎯 Assign the database ID to the HTML element
+    div.id = `msg-${msg.id}`;
     div.className = `message ${isMe ? 'outgoing' : 'incoming'}`;
     div.innerHTML = `
         <div class="msg-bubble">
-            <p class="content">${msg.content}</p>
-            <span class="time">${time}</span>
+            <p class="content" style="margin:0;">${msg.content}</p>
+            <div class="msg-status" style="display:flex; align-items:center; justify-content:flex-end; gap:4px; margin-top:4px;">
+                <span class="time" style="font-size:0.65rem; color:#9ca3af;">${time}</span>
+                ${isMe ? `<i class="ph ${tickIcon}" id="icon-${msg.id}" style="font-size:0.9rem; color:#9ca3af;"></i>` : ''}
+            </div>
         </div>`;
     
     container.appendChild(div);
@@ -190,8 +284,6 @@ async function handleSendMessage() {
 
     input.value = ''; 
 
-    // 🎯 We don't call appendMessageUI here.
-    // The Realtime subscription will handle it for us automatically.
     const { error: msgError } = await supabase
         .from('messages')
         .insert([{
@@ -204,10 +296,7 @@ async function handleSendMessage() {
     if (!msgError) {
         await supabase
             .from('conversations')
-            .update({ 
-                last_message: content,
-                updated_at: new Date().toISOString()
-            })
+            .update({ last_message: content, updated_at: new Date().toISOString() })
             .eq('id', activeChatId);
     }
 }
@@ -222,14 +311,32 @@ function subscribeToMessages() {
             table: 'messages', 
             filter: `conversation_id=eq.${activeChatId}` 
         }, async (payload) => {
-            // 🎯 appendMessageUI now double-checks ID to prevent double bubbles
             appendMessageUI(payload.new);
-            
             if (payload.new.sender_id !== currentUser.id) {
                 await markMessagesAsRead(activeChatId);
             }
-            
             await loadSidebar();
         })
+        .on('postgres_changes', {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'messages',
+            filter: `conversation_id=eq.${activeChatId}`
+        }, (payload) => {
+            const icon = document.getElementById(`icon-${payload.new.id}`);
+            if (icon && payload.new.is_read) {
+                icon.className = 'ph ph-checks';
+                icon.style.color = '#9ca3af';
+            }
+        })
         .subscribe();
+}
+
+async function markMessagesAsRead(convId) {
+    if (!convId || !currentUser) return;
+    await supabase.from('messages')
+        .update({ is_read: true })
+        .eq('conversation_id', convId)
+        .neq('sender_id', currentUser.id)
+        .eq('is_read', false); 
 }

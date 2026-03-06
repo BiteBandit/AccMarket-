@@ -165,10 +165,36 @@ body { background: var(--bg-main); height: 100svh; display: flex; align-items: c
 .incoming { align-items: flex-start; }
 .outgoing { align-items: flex-end; }
 
-.msg-bubble { max-width: 70%; padding: 12px 16px; border-radius: 15px; font-size: 0.92rem; line-height: 1.4; position: relative; }
+.msg-bubble { max-width: 70%; padding: 12px 16px; border-radius: 15px; font-size: 0.92rem; line-height: 1.4; position: relative; min-width: 80px; }
 .incoming .msg-bubble { background: var(--light-gray); color: var(--black); border-bottom-left-radius: 2px; }
 .outgoing .msg-bubble { background: var(--dark-blue); color: white; border-bottom-right-radius: 2px; }
-.message .time { font-size: 0.65rem; color: var(--gray); margin-top: 4px; }
+
+/* --- TICK & TIME STYLING --- */
+.msg-status {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    margin-top: 4px;
+    background: none !important; /* Forces no background */
+    border: none !important;
+}
+
+.message .time { 
+    font-size: 0.65rem; 
+    color: var(--gray); 
+    margin: 0; 
+}
+
+/* 🎯 This keeps BOTH styles identical: grey and no box */
+.msg-status i {
+    font-size: 0.9rem;
+    color: #9ca3af !important; /* Same grey for both */
+    line-height: 1;
+    background: transparent !important;
+}
+
+
 
 /* --- INPUT AREA --- */
 .chat-input-area { padding: 15px 25px; border-top: 1px solid var(--border); display: flex; gap: 12px; align-items: center; background: white; }
