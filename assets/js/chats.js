@@ -6,6 +6,8 @@ let currentUser = null;
 let messageSubscription = null;
 let statusSubscription = null; 
 let heartbeatInterval = null;
+let lastTypingSent = 0; // Throttle tracker
+let typingTimeout = null; // UI revert tracker
 
 // --- 1. INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', async () => {
@@ -14,7 +16,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (authError || !user) return;
     currentUser = user;
 
-    // Start the Heartbeat (Checks privacy column automatically)
     await initUserPresence();
     await loadSidebar();
     initSettingsToggle(); 
@@ -42,7 +43,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
     }
 
-    // --- SEND MESSAGE LOGIC ---
+    // --- SEND MESSAGE & TYPING LOGIC ---
     const sendBtn = document.getElementById('sendMessageBtn'); 
     const messageInput = document.getElementById('messageInput');
 
@@ -52,6 +53,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 handleSendMessage();
+            }
+        });
+
+        // 📡 Typing Throttler
+        messageInput.addEventListener('input', () => {
+            const now = Date.now();
+            if (now - lastTypingSent > 2000) { // Send signal every 2 seconds
+                console.log("📡 Outgoing: Sending 'typing' signal to Supabase...");
+                sendTypingSignal();
+                lastTypingSent = now;
             }
         });
     }
@@ -67,14 +78,12 @@ async function initUserPresence() {
     if (heartbeatInterval) clearInterval(heartbeatInterval);
 
     const updateStatus = async () => {
-        // Fetch current privacy setting
         const { data: profile } = await supabase
             .from('profiles')
             .select('show_online')
             .eq('id', currentUser.id)
             .single();
 
-        // Only update timestamp if toggle is TRUE
         if (profile?.show_online) {
             await supabase
                 .from('profiles')
@@ -84,7 +93,7 @@ async function initUserPresence() {
     };
 
     await updateStatus(); 
-    heartbeatInterval = setInterval(updateStatus, 20000); // 20-second heartbeat
+    heartbeatInterval = setInterval(updateStatus, 20000); 
 }
 
 // --- 3. THE TOGGLE SETTING ---
@@ -92,24 +101,17 @@ async function initSettingsToggle() {
     const toggle = document.getElementById('onlineStatusToggle'); 
     if (!toggle) return;
 
-    // Initial fetch to set toggle state
     const { data } = await supabase.from('profiles').select('show_online').eq('id', currentUser.id).single();
     toggle.checked = data?.show_online ?? true;
 
     toggle.onchange = async () => {
         const isEnabled = toggle.checked;
+        await supabase.from('profiles').update({ show_online: isEnabled }).eq('id', currentUser.id);
         
-        await supabase
-            .from('profiles')
-            .update({ show_online: isEnabled })
-            .eq('id', currentUser.id);
-        
-        // If they turn it off, we clear their last_seen so they go offline immediately
         if (!isEnabled) {
             await supabase.from('profiles').update({ last_seen: null }).eq('id', currentUser.id);
         }
-        
-        initUserPresence(); // Refresh heartbeat state
+        initUserPresence(); 
     };
 }
 
@@ -135,7 +137,6 @@ async function loadSidebar(filter = "") {
     conversations.forEach(chat => {
         const isMeBuyer = chat.buyer_id === currentUser.id;
         const otherUser = isMeBuyer ? chat.seller : chat.buyer;
-        
         if (filter && !otherUser.username.toLowerCase().includes(filter.toLowerCase())) return;
 
         const hasUnread = chat.messages.some(m => !m.is_read && m.sender_id !== currentUser.id);
@@ -147,10 +148,7 @@ async function loadSidebar(filter = "") {
         item.innerHTML = `
             <img src="${otherUser.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUser.username}`}">
             <div class="chat-info">
-                <div class="chat-top">
-                    <span class="user-name">${otherUser.username}</span>
-                    <span class="time">${timeDisplay}</span>
-                </div>
+                <div class="chat-top"><span class="user-name">${otherUser.username}</span><span class="time">${timeDisplay}</span></div>
                 <div class="chat-bottom">
                     <p class="last-msg">${chat.last_message || 'New Deal Started'}</p>
                     ${hasUnread ? '<span class="unread-dot"></span>' : ''}
@@ -191,74 +189,86 @@ async function initChatWindow() {
         const otherUser = chat.buyer_id === currentUser.id ? chat.seller : chat.buyer;
         headerName.innerText = otherUser.username;
         headerAvatar.src = otherUser.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUser.username}`;
-        
         watchPartnerPresence(otherUser);
     }
 
     const { data: messages } = await supabase
         .from('messages')
-        .select('*')
-        .eq('conversation_id', activeChatId)
-        .order('created_at', { ascending: true });
+        .select('*').eq('conversation_id', activeChatId).order('created_at', { ascending: true });
 
     container.innerHTML = ''; 
     if (messages) messages.forEach(msg => appendMessageUI(msg));
 }
 
-// --- 6. PARTNER STATUS WATCHER (Timestamp Logic) ---
+// --- 6. PRESENCE & TYPING WATCHERS ---
 function watchPartnerPresence(partner) {
     const statusLabel = document.getElementById('headerStatus');
     
     const calculateStatus = (lastSeenStr, showOnline) => {
-        // If they opted out of showing status, hide it
+        // Only update if not currently showing "Typing..."
+        if (statusLabel.innerText === "Typing...") return;
+
         if (!showOnline || !lastSeenStr) {
-            statusLabel.innerText = ""; 
+            statusLabel.innerText = "Offline"; 
+            statusLabel.style.color = "#9ca3af";
             return;
         }
 
         const lastSeen = new Date(lastSeenStr);
-        const now = new Date();
-        const diffInSeconds = Math.floor((now - lastSeen) / 1000);
+        const diffInSeconds = Math.floor((new Date() - lastSeen) / 1000);
 
-        // If updated within 45 seconds (allowing for minor network lag), they are Online
         if (diffInSeconds < 45) {
             statusLabel.innerText = "Online";
-            statusLabel.style.color = "#10b981"; // Green
+            statusLabel.style.color = "#10b981";
         } else {
-            const timeStr = lastSeen.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            statusLabel.innerText = `Last seen today at ${timeStr}`;
-            statusLabel.style.color = "#9ca3af"; // Grey
+            statusLabel.innerText = `Last seen at ${lastSeen.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+            statusLabel.style.color = "#9ca3af";
         }
     };
 
-    // Initial check
     calculateStatus(partner.last_seen, partner.show_online);
 
-    // Live update when partner's row changes
     if (statusSubscription) supabase.removeChannel(statusSubscription);
-    
     statusSubscription = supabase.channel(`status-${partner.id}`)
-        .on('postgres_changes', { 
-            event: 'UPDATE', 
-            schema: 'public', 
-            table: 'profiles', 
-            filter: `id=eq.${partner.id}` 
-        }, (payload) => {
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${partner.id}` }, (payload) => {
             calculateStatus(payload.new.last_seen, payload.new.show_online);
         })
         .subscribe();
 }
 
-// --- 7. MESSAGING HELPERS ---
+async function sendTypingSignal() {
+    if (!activeChatId || !currentUser) return;
+    const channel = supabase.channel(`chat-${activeChatId}`);
+    await channel.send({ type: 'broadcast', event: 'typing', payload: { userId: currentUser.id } });
+}
 
+function handlePartnerTyping(typingUserId) {
+    if (typingUserId === currentUser.id) return; // Ignore self
+
+    const statusLabel = document.getElementById('headerStatus');
+    console.log("📥 Incoming: Typing signal received from partner.");
+
+    const originalStatus = statusLabel.innerText;
+    const originalColor = statusLabel.style.color;
+
+    statusLabel.innerText = "Typing...";
+    statusLabel.style.color = "#10b981";
+
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => {
+        console.log("⏲️ Typing stopped: Reverting status.");
+        statusLabel.innerText = originalStatus;
+        statusLabel.style.color = originalColor;
+    }, 3500);
+}
+
+// --- 7. MESSAGING HELPERS ---
 function appendMessageUI(msg) {
     const container = document.querySelector('.message-container');
     if (!container || document.getElementById(`msg-${msg.id}`)) return;
 
     const isMe = msg.sender_id === currentUser.id;
     const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    // Consistent grey minimal ticks
     const tickIcon = msg.is_read ? 'ph-checks' : 'ph-check';
 
     const div = document.createElement('div');
@@ -283,21 +293,12 @@ async function handleSendMessage() {
     if (!content || !activeChatId) return;
 
     input.value = ''; 
-
-    const { error: msgError } = await supabase
-        .from('messages')
-        .insert([{
-            conversation_id: activeChatId,
-            sender_id: currentUser.id,
-            content: content,
-            is_read: false
-        }]);
+    const { error: msgError } = await supabase.from('messages').insert([{
+        conversation_id: activeChatId, sender_id: currentUser.id, content: content, is_read: false
+    }]);
 
     if (!msgError) {
-        await supabase
-            .from('conversations')
-            .update({ last_message: content, updated_at: new Date().toISOString() })
-            .eq('id', activeChatId);
+        await supabase.from('conversations').update({ last_message: content, updated_at: new Date().toISOString() }).eq('id', activeChatId);
     }
 }
 
@@ -305,38 +306,28 @@ function subscribeToMessages() {
     if (messageSubscription) supabase.removeChannel(messageSubscription);
 
     messageSubscription = supabase.channel(`chat-${activeChatId}`)
-        .on('postgres_changes', { 
-            event: 'INSERT', 
-            schema: 'public', 
-            table: 'messages', 
-            filter: `conversation_id=eq.${activeChatId}` 
-        }, async (payload) => {
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${activeChatId}` }, async (payload) => {
             appendMessageUI(payload.new);
-            if (payload.new.sender_id !== currentUser.id) {
-                await markMessagesAsRead(activeChatId);
-            }
+            if (payload.new.sender_id !== currentUser.id) await markMessagesAsRead(activeChatId);
             await loadSidebar();
         })
-        .on('postgres_changes', {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'messages',
-            filter: `conversation_id=eq.${activeChatId}`
-        }, (payload) => {
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `conversation_id=eq.${activeChatId}` }, (payload) => {
             const icon = document.getElementById(`icon-${payload.new.id}`);
             if (icon && payload.new.is_read) {
                 icon.className = 'ph ph-checks';
                 icon.style.color = '#9ca3af';
             }
         })
-        .subscribe();
+        .on('broadcast', { event: 'typing' }, (payload) => {
+            handlePartnerTyping(payload.payload.userId);
+        })
+        .subscribe((status) => {
+            if (status === 'SUBSCRIBED') console.log("✅ Chat channel ready.");
+        });
 }
 
 async function markMessagesAsRead(convId) {
     if (!convId || !currentUser) return;
-    await supabase.from('messages')
-        .update({ is_read: true })
-        .eq('conversation_id', convId)
-        .neq('sender_id', currentUser.id)
-        .eq('is_read', false); 
+    await supabase.from('messages').update({ is_read: true })
+        .eq('conversation_id', convId).neq('sender_id', currentUser.id).eq('is_read', false); 
 }
