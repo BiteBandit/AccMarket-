@@ -204,6 +204,7 @@ function watchPartnerPresence(partner) {
     const statusLabel = document.getElementById('headerStatus');
     
     const calculateStatus = (lastSeenStr, showOnline) => {
+        // Stop the heartbeat from overwriting the "Typing..." text
         if (statusLabel.innerText === "Typing...") return;
 
         if (!showOnline || !lastSeenStr) {
@@ -249,25 +250,31 @@ async function sendTypingSignal() {
 }
 
 function handlePartnerTyping(typingUserId) {
-    // ⚠️ IMPORTANT: To test on one phone, comment out the line below temporarily
+    // ⚠️ For testing on one device, comment out the line below!
     if (typingUserId === currentUser.id) return; 
 
     const statusLabel = document.getElementById('headerStatus');
-    console.log("📥 Incoming: Typing signal received from partner.");
+    if (!statusLabel) return;
 
-    const originalStatus = statusLabel.innerText;
-    const originalColor = statusLabel.style.color;
+    console.log("📥 Incoming: Partner is typing...");
+
+    // Store original text if we aren't already in typing mode
+    if (statusLabel.innerText !== "Typing...") {
+        statusLabel.dataset.preTypingStatus = statusLabel.innerText;
+        statusLabel.dataset.preTypingColor = statusLabel.style.color;
+    }
 
     statusLabel.innerText = "Typing...";
     statusLabel.style.color = "#10b981";
-    statusLabel.classList.add('typing-text'); // Pulse animation
+    statusLabel.classList.add('typing-text'); 
 
     clearTimeout(typingTimeout);
     typingTimeout = setTimeout(() => {
         console.log("⏲️ Typing stopped: Reverting status.");
-        statusLabel.innerText = originalStatus;
-        statusLabel.style.color = originalColor;
         statusLabel.classList.remove('typing-text');
+        // Revert to exactly what was there before
+        statusLabel.innerText = statusLabel.dataset.preTypingStatus || "Online";
+        statusLabel.style.color = statusLabel.dataset.preTypingColor || "#9ca3af";
     }, 3500);
 }
 
@@ -275,35 +282,39 @@ function handlePartnerTyping(typingUserId) {
 function subscribeToMessages() {
     if (messageSubscription) supabase.removeChannel(messageSubscription);
 
-    messageSubscription = supabase.channel(`chat-${activeChatId}`)
-        .on('postgres_changes', { 
-            event: 'INSERT', 
-            schema: 'public', 
-            table: 'messages', 
-            filter: `conversation_id=eq.${activeChatId}` 
-        }, async (payload) => {
-            appendMessageUI(payload.new);
-            if (payload.new.sender_id !== currentUser.id) await markMessagesAsRead(activeChatId);
-            await loadSidebar();
-        })
-        .on('postgres_changes', { 
-            event: 'UPDATE', 
-            schema: 'public', 
-            table: 'messages', 
-            filter: `conversation_id=eq.${activeChatId}` 
-        }, (payload) => {
-            const icon = document.getElementById(`icon-${payload.new.id}`);
-            if (icon && payload.new.is_read) {
-                icon.className = 'ph ph-checks';
-                icon.style.color = '#9ca3af';
-            }
-        })
-        .on('broadcast', { event: 'typing' }, (payload) => {
-            handlePartnerTyping(payload.payload.userId);
-        })
-        .subscribe((status) => {
-            if (status === 'SUBSCRIBED') console.log("✅ Joined Chat Room:", activeChatId);
-        });
+    messageSubscription = supabase.channel(`chat-${activeChatId}`, {
+        config: {
+            broadcast: { self: false },
+        }
+    })
+    .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'messages', 
+        filter: `conversation_id=eq.${activeChatId}` 
+    }, async (payload) => {
+        appendMessageUI(payload.new);
+        if (payload.new.sender_id !== currentUser.id) await markMessagesAsRead(activeChatId);
+        await loadSidebar();
+    })
+    .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'messages', 
+        filter: `conversation_id=eq.${activeChatId}` 
+    }, (payload) => {
+        const icon = document.getElementById(`icon-${payload.new.id}`);
+        if (icon && payload.new.is_read) {
+            icon.className = 'ph ph-checks';
+            icon.style.color = '#9ca3af';
+        }
+    })
+    .on('broadcast', { event: 'typing' }, (payload) => {
+        handlePartnerTyping(payload.payload.userId);
+    })
+    .subscribe((status) => {
+        if (status === 'SUBSCRIBED') console.log("✅ Joined Chat Room:", activeChatId);
+    });
 }
 
 function appendMessageUI(msg) {

@@ -293,3 +293,18 @@ input:checked + .slider {
 input:checked + .slider:before {
     transform: translateX(18px);
 }
+
+/* Existing status style */
+.status {
+    font-size: 0.8rem;
+    color: #9ca3af;
+    margin: 0;
+    transition: all 0.2s ease;
+}
+
+/* New Typing class that the JS will trigger */
+.status.typing-active {
+    color: #10b981 !important; /* WhatsApp Green */
+    font-weight: 600;
+    font-style: italic;
+}
