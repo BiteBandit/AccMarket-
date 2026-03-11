@@ -6,8 +6,8 @@ let currentUser = null;
 let messageSubscription = null;
 let statusSubscription = null; 
 let heartbeatInterval = null;
-let lastTypingSent = 0; // Throttle tracker
-let typingTimeout = null; // UI revert tracker
+let lastTypingSent = 0; 
+let typingTimeout = null; 
 
 // --- 1. INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', async () => {
@@ -56,11 +56,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
 
-        // 📡 Typing Throttler
+        // 📡 Throttled Typing Signal
         messageInput.addEventListener('input', () => {
             const now = Date.now();
-            if (now - lastTypingSent > 2000) { // Send signal every 2 seconds
-                console.log("📡 Outgoing: Sending 'typing' signal to Supabase...");
+            if (now - lastTypingSent > 2000) { 
                 sendTypingSignal();
                 lastTypingSent = now;
             }
@@ -205,7 +204,6 @@ function watchPartnerPresence(partner) {
     const statusLabel = document.getElementById('headerStatus');
     
     const calculateStatus = (lastSeenStr, showOnline) => {
-        // Only update if not currently showing "Typing..."
         if (statusLabel.innerText === "Typing...") return;
 
         if (!showOnline || !lastSeenStr) {
@@ -236,14 +234,23 @@ function watchPartnerPresence(partner) {
         .subscribe();
 }
 
+// 📡 Send signal using the ACTIVE global subscription
 async function sendTypingSignal() {
-    if (!activeChatId || !currentUser) return;
-    const channel = supabase.channel(`chat-${activeChatId}`);
-    await channel.send({ type: 'broadcast', event: 'typing', payload: { userId: currentUser.id } });
+    if (!activeChatId || !currentUser || !messageSubscription) return;
+
+    if (messageSubscription.state === 'joined') {
+        console.log("📡 Outgoing: Broadcasting typing signal...");
+        await messageSubscription.send({
+            type: 'broadcast',
+            event: 'typing',
+            payload: { userId: currentUser.id }
+        });
+    }
 }
 
 function handlePartnerTyping(typingUserId) {
-    if (typingUserId === currentUser.id) return; // Ignore self
+    // ⚠️ IMPORTANT: To test on one phone, comment out the line below temporarily
+    if (typingUserId === currentUser.id) return; 
 
     const statusLabel = document.getElementById('headerStatus');
     console.log("📥 Incoming: Typing signal received from partner.");
@@ -253,16 +260,52 @@ function handlePartnerTyping(typingUserId) {
 
     statusLabel.innerText = "Typing...";
     statusLabel.style.color = "#10b981";
+    statusLabel.classList.add('typing-text'); // Pulse animation
 
     clearTimeout(typingTimeout);
     typingTimeout = setTimeout(() => {
         console.log("⏲️ Typing stopped: Reverting status.");
         statusLabel.innerText = originalStatus;
         statusLabel.style.color = originalColor;
+        statusLabel.classList.remove('typing-text');
     }, 3500);
 }
 
 // --- 7. MESSAGING HELPERS ---
+function subscribeToMessages() {
+    if (messageSubscription) supabase.removeChannel(messageSubscription);
+
+    messageSubscription = supabase.channel(`chat-${activeChatId}`)
+        .on('postgres_changes', { 
+            event: 'INSERT', 
+            schema: 'public', 
+            table: 'messages', 
+            filter: `conversation_id=eq.${activeChatId}` 
+        }, async (payload) => {
+            appendMessageUI(payload.new);
+            if (payload.new.sender_id !== currentUser.id) await markMessagesAsRead(activeChatId);
+            await loadSidebar();
+        })
+        .on('postgres_changes', { 
+            event: 'UPDATE', 
+            schema: 'public', 
+            table: 'messages', 
+            filter: `conversation_id=eq.${activeChatId}` 
+        }, (payload) => {
+            const icon = document.getElementById(`icon-${payload.new.id}`);
+            if (icon && payload.new.is_read) {
+                icon.className = 'ph ph-checks';
+                icon.style.color = '#9ca3af';
+            }
+        })
+        .on('broadcast', { event: 'typing' }, (payload) => {
+            handlePartnerTyping(payload.payload.userId);
+        })
+        .subscribe((status) => {
+            if (status === 'SUBSCRIBED') console.log("✅ Joined Chat Room:", activeChatId);
+        });
+}
+
 function appendMessageUI(msg) {
     const container = document.querySelector('.message-container');
     if (!container || document.getElementById(`msg-${msg.id}`)) return;
@@ -300,30 +343,6 @@ async function handleSendMessage() {
     if (!msgError) {
         await supabase.from('conversations').update({ last_message: content, updated_at: new Date().toISOString() }).eq('id', activeChatId);
     }
-}
-
-function subscribeToMessages() {
-    if (messageSubscription) supabase.removeChannel(messageSubscription);
-
-    messageSubscription = supabase.channel(`chat-${activeChatId}`)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${activeChatId}` }, async (payload) => {
-            appendMessageUI(payload.new);
-            if (payload.new.sender_id !== currentUser.id) await markMessagesAsRead(activeChatId);
-            await loadSidebar();
-        })
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `conversation_id=eq.${activeChatId}` }, (payload) => {
-            const icon = document.getElementById(`icon-${payload.new.id}`);
-            if (icon && payload.new.is_read) {
-                icon.className = 'ph ph-checks';
-                icon.style.color = '#9ca3af';
-            }
-        })
-        .on('broadcast', { event: 'typing' }, (payload) => {
-            handlePartnerTyping(payload.payload.userId);
-        })
-        .subscribe((status) => {
-            if (status === 'SUBSCRIBED') console.log("✅ Chat channel ready.");
-        });
 }
 
 async function markMessagesAsRead(convId) {
