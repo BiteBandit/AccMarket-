@@ -6,8 +6,6 @@ let currentUser = null;
 let messageSubscription = null;
 let statusSubscription = null; 
 let heartbeatInterval = null;
-let lastTypingSent = 0; 
-let typingTimeout = null; 
 
 // --- 1. INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', async () => {
@@ -25,7 +23,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         initChatWindow();
     }
 
-    // --- BACK BUTTON ---
+    // --- ATTACHMENT LISTENERS ---
+    const attachBtn = document.getElementById('attachBtn');
+    const fileInput = document.getElementById('fileInput');
+
+    if (attachBtn && fileInput) {
+        attachBtn.onclick = () => fileInput.click();
+        fileInput.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                await handleFileUpload(file);
+                fileInput.value = ''; 
+            }
+        };
+    }
+
+    // --- NAVIGATION & INPUT ---
     const backBtn = document.getElementById('backToList');
     if (backBtn) {
         backBtn.onclick = async () => {
@@ -43,10 +56,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
     }
 
-    // --- SEND MESSAGE & TYPING LOGIC ---
     const sendBtn = document.getElementById('sendMessageBtn'); 
     const messageInput = document.getElementById('messageInput');
-
     if (sendBtn) sendBtn.onclick = handleSendMessage;
     if (messageInput) {
         messageInput.addEventListener('keypress', (e) => {
@@ -55,24 +66,67 @@ document.addEventListener('DOMContentLoaded', async () => {
                 handleSendMessage();
             }
         });
-
-        // 📡 Throttled Typing Signal
-        messageInput.addEventListener('input', () => {
-            const now = Date.now();
-            if (now - lastTypingSent > 2000) { 
-                sendTypingSignal();
-                lastTypingSent = now;
-            }
-        });
     }
 
     const searchBar = document.getElementById('chatSearch');
-    if(searchBar) {
-        searchBar.oninput = (e) => loadSidebar(e.target.value);
-    }
+    if(searchBar) searchBar.oninput = (e) => loadSidebar(e.target.value);
 });
 
-// --- 2. THE HEARTBEAT (SELF) ---
+// --- 2. THE UPLOAD LOGIC (REFINED) ---
+async function handleFileUpload(file) {
+    if (!activeChatId || !currentUser) return;
+
+    try {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+        const filePath = `${activeChatId}/${fileName}`;
+
+        // 1. Upload to Storage
+        const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('chat-attachments')
+            .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        // 2. Get Public URL
+        const { data: { publicUrl } } = supabase.storage
+            .from('chat-attachments')
+            .getPublicUrl(filePath);
+
+        // 3. Insert into Messages table 
+        // NOTE: We wrap this in a clear error check to see why the row isn't creating
+        const { data: msgData, error: msgError } = await supabase
+            .from('messages')
+            .insert([{
+                conversation_id: activeChatId,
+                sender_id: currentUser.id,
+                content: publicUrl,
+                type: 'image', 
+                is_read: false
+            }])
+            .select(); // Requesting data back to confirm creation
+
+        if (msgError) {
+            console.error("DATABASE INSERT FAILED:", msgError);
+            alert(`Row not created: ${msgError.message}`);
+            return;
+        }
+
+        // 4. Update the Sidebar
+        await supabase.from('conversations')
+            .update({ 
+                last_message: '📷 Image', 
+                updated_at: new Date().toISOString() 
+            })
+            .eq('id', activeChatId);
+
+    } catch (err) {
+        console.error("UPLOAD PROCESS ERROR:", err);
+        alert(`Process failed: ${err.message}`);
+    }
+}
+
+// --- 3. THE HEARTBEAT (SELF) ---
 async function initUserPresence() {
     if (heartbeatInterval) clearInterval(heartbeatInterval);
 
@@ -93,25 +147,6 @@ async function initUserPresence() {
 
     await updateStatus(); 
     heartbeatInterval = setInterval(updateStatus, 20000); 
-}
-
-// --- 3. THE TOGGLE SETTING ---
-async function initSettingsToggle() {
-    const toggle = document.getElementById('onlineStatusToggle'); 
-    if (!toggle) return;
-
-    const { data } = await supabase.from('profiles').select('show_online').eq('id', currentUser.id).single();
-    toggle.checked = data?.show_online ?? true;
-
-    toggle.onchange = async () => {
-        const isEnabled = toggle.checked;
-        await supabase.from('profiles').update({ show_online: isEnabled }).eq('id', currentUser.id);
-        
-        if (!isEnabled) {
-            await supabase.from('profiles').update({ last_seen: null }).eq('id', currentUser.id);
-        }
-        initUserPresence(); 
-    };
 }
 
 // --- 4. THE SIDEBAR ---
@@ -199,14 +234,11 @@ async function initChatWindow() {
     if (messages) messages.forEach(msg => appendMessageUI(msg));
 }
 
-// --- 6. PRESENCE & TYPING WATCHERS ---
+// --- 6. PARTNER STATUS WATCHER ---
 function watchPartnerPresence(partner) {
     const statusLabel = document.getElementById('headerStatus');
     
     const calculateStatus = (lastSeenStr, showOnline) => {
-        // Stop the heartbeat from overwriting the "Typing..." text
-        if (statusLabel.innerText === "Typing...") return;
-
         if (!showOnline || !lastSeenStr) {
             statusLabel.innerText = "Offline"; 
             statusLabel.style.color = "#9ca3af";
@@ -235,86 +267,34 @@ function watchPartnerPresence(partner) {
         .subscribe();
 }
 
-// 📡 Send signal using the ACTIVE global subscription
-async function sendTypingSignal() {
-    if (!activeChatId || !currentUser || !messageSubscription) return;
-
-    if (messageSubscription.state === 'joined') {
-        console.log("📡 Outgoing: Broadcasting typing signal...");
-        await messageSubscription.send({
-            type: 'broadcast',
-            event: 'typing',
-            payload: { userId: currentUser.id }
-        });
-    }
-}
-
-function handlePartnerTyping(typingUserId) {
-    // ⚠️ For testing on one device, comment out the line below!
-    if (typingUserId === currentUser.id) return; 
-
-    const statusLabel = document.getElementById('headerStatus');
-    if (!statusLabel) return;
-
-    console.log("📥 Incoming: Partner is typing...");
-
-    // Store original text if we aren't already in typing mode
-    if (statusLabel.innerText !== "Typing...") {
-        statusLabel.dataset.preTypingStatus = statusLabel.innerText;
-        statusLabel.dataset.preTypingColor = statusLabel.style.color;
-    }
-
-    statusLabel.innerText = "Typing...";
-    statusLabel.style.color = "#10b981";
-    statusLabel.classList.add('typing-text'); 
-
-    clearTimeout(typingTimeout);
-    typingTimeout = setTimeout(() => {
-        console.log("⏲️ Typing stopped: Reverting status.");
-        statusLabel.classList.remove('typing-text');
-        // Revert to exactly what was there before
-        statusLabel.innerText = statusLabel.dataset.preTypingStatus || "Online";
-        statusLabel.style.color = statusLabel.dataset.preTypingColor || "#9ca3af";
-    }, 3500);
-}
-
 // --- 7. MESSAGING HELPERS ---
 function subscribeToMessages() {
     if (messageSubscription) supabase.removeChannel(messageSubscription);
 
-    messageSubscription = supabase.channel(`chat-${activeChatId}`, {
-        config: {
-            broadcast: { self: false },
-        }
-    })
-    .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'messages', 
-        filter: `conversation_id=eq.${activeChatId}` 
-    }, async (payload) => {
-        appendMessageUI(payload.new);
-        if (payload.new.sender_id !== currentUser.id) await markMessagesAsRead(activeChatId);
-        await loadSidebar();
-    })
-    .on('postgres_changes', { 
-        event: 'UPDATE', 
-        schema: 'public', 
-        table: 'messages', 
-        filter: `conversation_id=eq.${activeChatId}` 
-    }, (payload) => {
-        const icon = document.getElementById(`icon-${payload.new.id}`);
-        if (icon && payload.new.is_read) {
-            icon.className = 'ph ph-checks';
-            icon.style.color = '#9ca3af';
-        }
-    })
-    .on('broadcast', { event: 'typing' }, (payload) => {
-        handlePartnerTyping(payload.payload.userId);
-    })
-    .subscribe((status) => {
-        if (status === 'SUBSCRIBED') console.log("✅ Joined Chat Room:", activeChatId);
-    });
+    messageSubscription = supabase.channel(`chat-${activeChatId}`)
+        .on('postgres_changes', { 
+            event: 'INSERT', 
+            schema: 'public', 
+            table: 'messages', 
+            filter: `conversation_id=eq.${activeChatId}` 
+        }, async (payload) => {
+            appendMessageUI(payload.new);
+            if (payload.new.sender_id !== currentUser.id) await markMessagesAsRead(activeChatId);
+            await loadSidebar();
+        })
+        .on('postgres_changes', { 
+            event: 'UPDATE', 
+            schema: 'public', 
+            table: 'messages', 
+            filter: `conversation_id=eq.${activeChatId}` 
+        }, (payload) => {
+            const icon = document.getElementById(`icon-${payload.new.id}`);
+            if (icon && payload.new.is_read) {
+                icon.className = 'ph ph-checks';
+                icon.style.color = '#10b981';
+            }
+        })
+        .subscribe();
 }
 
 function appendMessageUI(msg) {
@@ -328,12 +308,17 @@ function appendMessageUI(msg) {
     const div = document.createElement('div');
     div.id = `msg-${msg.id}`;
     div.className = `message ${isMe ? 'outgoing' : 'incoming'}`;
+    
+    const contentHTML = (msg.type === 'image') 
+        ? `<img src="${msg.content}" style="max-width: 250px; border-radius: 12px; display: block; margin-top: 5px;" loading="lazy">`
+        : `<p class="content" style="margin:0;">${msg.content}</p>`;
+
     div.innerHTML = `
         <div class="msg-bubble">
-            <p class="content" style="margin:0;">${msg.content}</p>
+            ${contentHTML}
             <div class="msg-status" style="display:flex; align-items:center; justify-content:flex-end; gap:4px; margin-top:4px;">
                 <span class="time" style="font-size:0.65rem; color:#9ca3af;">${time}</span>
-                ${isMe ? `<i class="ph ${tickIcon}" id="icon-${msg.id}" style="font-size:0.9rem; color:#9ca3af;"></i>` : ''}
+                ${isMe ? `<i class="ph ${tickIcon}" id="icon-${msg.id}" style="font-size:0.9rem; color:${msg.is_read ? '#10b981' : '#9ca3af'};"></i>` : ''}
             </div>
         </div>`;
     
@@ -348,7 +333,11 @@ async function handleSendMessage() {
 
     input.value = ''; 
     const { error: msgError } = await supabase.from('messages').insert([{
-        conversation_id: activeChatId, sender_id: currentUser.id, content: content, is_read: false
+        conversation_id: activeChatId, 
+        sender_id: currentUser.id, 
+        content: content, 
+        type: 'text',
+        is_read: false
     }]);
 
     if (!msgError) {
@@ -360,4 +349,19 @@ async function markMessagesAsRead(convId) {
     if (!convId || !currentUser) return;
     await supabase.from('messages').update({ is_read: true })
         .eq('conversation_id', convId).neq('sender_id', currentUser.id).eq('is_read', false); 
+}
+
+async function initSettingsToggle() {
+    const toggle = document.getElementById('onlineStatusToggle'); 
+    if (!toggle) return;
+
+    const { data } = await supabase.from('profiles').select('show_online').eq('id', currentUser.id).single();
+    toggle.checked = data?.show_online ?? true;
+
+    toggle.onchange = async () => {
+        const isEnabled = toggle.checked;
+        await supabase.from('profiles').update({ show_online: isEnabled }).eq('id', currentUser.id);
+        if (!isEnabled) await supabase.from('profiles').update({ last_seen: null }).eq('id', currentUser.id);
+        initUserPresence(); 
+    };
 }

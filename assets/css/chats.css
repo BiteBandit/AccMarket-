@@ -169,6 +169,22 @@ body { background: var(--bg-main); height: 100svh; display: flex; align-items: c
 .incoming .msg-bubble { background: var(--light-gray); color: var(--black); border-bottom-left-radius: 2px; }
 .outgoing .msg-bubble { background: var(--dark-blue); color: white; border-bottom-right-radius: 2px; }
 
+.msg-bubble img {
+    max-width: 250px;
+    max-height: 300px;
+    border-radius: 12px;
+    display: block;
+    cursor: pointer;
+    object-fit: cover;
+    margin-bottom: 5px;
+}
+
+/* Optional: a subtle pulse while uploading */
+.uploading {
+    opacity: 0.5;
+    filter: grayscale(1);
+}
+
 /* --- TICK & TIME STYLING --- */
 .msg-status {
     display: flex;
@@ -226,85 +242,4 @@ body { background: var(--bg-main); height: 100svh; display: flex; align-items: c
     .app-container {
         height: 100svh;
     }
-}
-
-/* Container for the status text in the header */
-#headerStatus {
-    font-size: 0.85rem;
-    transition: all 0.3s ease-in-out;
-    display: block;
-    height: 1.2rem; /* Prevents the header from jumping when text changes */
-}
-
-/* Specific styling for when the text is "Typing..." */
-.typing-text {
-    font-style: italic;
-    font-weight: 500;
-    animation: pulseTyping 1.5s infinite ease-in-out;
-}
-
-/* Subtle pulse animation to make it feel "Live" */
-@keyframes pulseTyping {
-    0% { opacity: 1; }
-    50% { opacity: 0.6; }
-    100% { opacity: 1; }
-}
-
-/* The Toggle Switch (For your Settings Page) */
-.switch {
-    position: relative;
-    display: inline-block;
-    width: 42px;
-    height: 24px;
-}
-
-.switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-}
-
-.slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background-color: #d1d5db; /* Grey when off */
-    transition: .4s;
-    border-radius: 34px;
-}
-
-.slider:before {
-    position: absolute;
-    content: "";
-    height: 18px;
-    width: 18px;
-    left: 3px;
-    bottom: 3px;
-    background-color: white;
-    transition: .4s;
-    border-radius: 50%;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-
-input:checked + .slider {
-    background-color: #10b981; /* Green when on */
-}
-
-input:checked + .slider:before {
-    transform: translateX(18px);
-}
-
-/* Existing status style */
-.status {
-    font-size: 0.8rem;
-    color: #9ca3af;
-    margin: 0;
-    transition: all 0.2s ease;
-}
-
-/* New Typing class that the JS will trigger */
-.status.typing-active {
-    color: #10b981 !important; /* WhatsApp Green */
-    font-weight: 600;
-    font-style: italic;
 }
