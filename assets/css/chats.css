@@ -232,6 +232,11 @@ body { background: var(--bg-main); height: 100svh; display: flex; align-items: c
 }
 
 
+.msg-bubble {
+    touch-action: manipulation; /* Disables double-tap-to-zoom so the event hits your code faster */
+    user-select: none;         /* Prevents text from being highlighted while tapping */
+    cursor: pointer;
+}
 
 
 /* --- TICK & TIME STYLING --- */
