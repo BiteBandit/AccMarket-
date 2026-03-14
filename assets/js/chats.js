@@ -6,13 +6,19 @@ let currentUser = null;
 let messageSubscription = null;
 let statusSubscription = null; 
 let heartbeatInterval = null;
+let replyingTo = null; 
 
 // --- 1. INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', async () => {
+    console.log("[INIT] App Starting...");
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
-    if (authError || !user) return;
+    if (authError || !user) {
+        console.error("[AUTH] No user found:", authError);
+        return;
+    }
     currentUser = user;
+    console.log("[AUTH] User authenticated:", currentUser.id);
 
     await initUserPresence();
     await loadSidebar();
@@ -23,7 +29,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         initChatWindow();
     }
 
-    // --- ATTACHMENT LISTENERS ---
+    // Attachment Listeners
     const attachBtn = document.getElementById('attachBtn');
     const fileInput = document.getElementById('fileInput');
 
@@ -38,7 +44,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
     }
 
-    // --- NAVIGATION & INPUT ---
+    // Navigation Logic
     const backBtn = document.getElementById('backToList');
     if (backBtn) {
         backBtn.onclick = async () => {
@@ -56,6 +62,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
     }
 
+    // Input Listeners
     const sendBtn = document.getElementById('sendMessageBtn'); 
     const messageInput = document.getElementById('messageInput');
     if (sendBtn) sendBtn.onclick = handleSendMessage;
@@ -72,7 +79,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if(searchBar) searchBar.oninput = (e) => loadSidebar(e.target.value);
 });
 
-// --- 2. THE UPLOAD LOGIC (REFINED) ---
+// --- 2. UPLOAD LOGIC ---
 async function handleFileUpload(file) {
     if (!activeChatId || !currentUser) return;
 
@@ -81,67 +88,51 @@ async function handleFileUpload(file) {
         const fileName = `${Date.now()}.${fileExt}`;
         const filePath = `${activeChatId}/${fileName}`;
 
-        // 1. Upload to Storage
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        console.log("[UPLOAD] Uploading to storage...");
+        const { error: uploadError } = await supabase.storage
             .from('chat-attachments')
             .upload(filePath, file);
 
         if (uploadError) throw uploadError;
 
-        // 2. Get Public URL
         const { data: { publicUrl } } = supabase.storage
             .from('chat-attachments')
             .getPublicUrl(filePath);
 
-        // 3. Insert into Messages table 
-        // NOTE: We wrap this in a clear error check to see why the row isn't creating
-        const { data: msgData, error: msgError } = await supabase
+        const replyId = replyingTo ? replyingTo.id : null;
+
+        const { error: msgError } = await supabase
             .from('messages')
             .insert([{
                 conversation_id: activeChatId,
                 sender_id: currentUser.id,
                 content: publicUrl,
                 type: 'image', 
-                is_read: false
-            }])
-            .select(); // Requesting data back to confirm creation
+                is_read: false,
+                reply_to_id: replyId
+            }]);
 
-        if (msgError) {
-            console.error("DATABASE INSERT FAILED:", msgError);
-            alert(`Row not created: ${msgError.message}`);
-            return;
-        }
+        if (msgError) throw msgError;
 
-        // 4. Update the Sidebar
+        cancelReplyUI();
         await supabase.from('conversations')
-            .update({ 
-                last_message: '📷 Image', 
-                updated_at: new Date().toISOString() 
-            })
+            .update({ last_message: '📷 Image', updated_at: new Date().toISOString() })
             .eq('id', activeChatId);
 
     } catch (err) {
-        console.error("UPLOAD PROCESS ERROR:", err);
-        alert(`Process failed: ${err.message}`);
+        console.error("[UPLOAD ERROR]", err);
+        alert(`Upload failed: ${err.message}`);
     }
 }
 
-// --- 3. THE HEARTBEAT (SELF) ---
+// --- 3. HEARTBEAT / PRESENCE ---
 async function initUserPresence() {
     if (heartbeatInterval) clearInterval(heartbeatInterval);
 
     const updateStatus = async () => {
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('show_online')
-            .eq('id', currentUser.id)
-            .single();
-
+        const { data: profile } = await supabase.from('profiles').select('show_online').eq('id', currentUser.id).single();
         if (profile?.show_online) {
-            await supabase
-                .from('profiles')
-                .update({ last_seen: new Date().toISOString() })
-                .eq('id', currentUser.id);
+            await supabase.from('profiles').update({ last_seen: new Date().toISOString() }).eq('id', currentUser.id);
         }
     };
 
@@ -149,7 +140,7 @@ async function initUserPresence() {
     heartbeatInterval = setInterval(updateStatus, 20000); 
 }
 
-// --- 4. THE SIDEBAR ---
+// --- 4. SIDEBAR LOGIC ---
 async function loadSidebar(filter = "") {
     const chatList = document.querySelector('.chat-list');
     if (!chatList || !currentUser) return;
@@ -201,7 +192,7 @@ async function loadSidebar(filter = "") {
     });
 }
 
-// --- 5. THE CHAT WINDOW ---
+// --- 5. CHAT WINDOW (WITH EXPLICIT JOIN) ---
 async function initChatWindow() {
     const container = document.querySelector('.message-container');
     const headerName = document.getElementById('headerName');
@@ -209,6 +200,7 @@ async function initChatWindow() {
 
     if (!container || !activeChatId) return;
 
+    console.log("[CHAT] Refreshing view for:", activeChatId);
     subscribeToMessages();
 
     const { data: chat } = await supabase
@@ -226,9 +218,27 @@ async function initChatWindow() {
         watchPartnerPresence(otherUser);
     }
 
-    const { data: messages } = await supabase
-        .from('messages')
-        .select('*').eq('conversation_id', activeChatId).order('created_at', { ascending: true });
+    // 🎯 Use 'reply_link' constraint hint to solve ambiguity
+    const { data: messages, error } = await supabase
+    .from('messages')
+    .select(`
+        *, 
+        reply_to:messages!reply_to_id(
+            id, 
+            content, 
+            type, 
+            sender_id,
+            sender:profiles(username)
+        )
+    `)
+    .eq('conversation_id', activeChatId)
+    .order('created_at', { ascending: true });
+
+
+
+    if (error) {
+        console.error("[CHAT] Fetch messages error:", error);
+    }
 
     container.innerHTML = ''; 
     if (messages) messages.forEach(msg => appendMessageUI(msg));
@@ -237,7 +247,8 @@ async function initChatWindow() {
 // --- 6. PARTNER STATUS WATCHER ---
 function watchPartnerPresence(partner) {
     const statusLabel = document.getElementById('headerStatus');
-    
+    if (!statusLabel) return;
+
     const calculateStatus = (lastSeenStr, showOnline) => {
         if (!showOnline || !lastSeenStr) {
             statusLabel.innerText = "Offline"; 
@@ -248,7 +259,7 @@ function watchPartnerPresence(partner) {
         const lastSeen = new Date(lastSeenStr);
         const diffInSeconds = Math.floor((new Date() - lastSeen) / 1000);
 
-        if (diffInSeconds < 45) {
+        if (diffInSeconds < 60) {
             statusLabel.innerText = "Online";
             statusLabel.style.color = "#10b981";
         } else {
@@ -278,7 +289,20 @@ function subscribeToMessages() {
             table: 'messages', 
             filter: `conversation_id=eq.${activeChatId}` 
         }, async (payload) => {
-            appendMessageUI(payload.new);
+            console.log("[REALTIME] New message incoming...");
+            
+            // Re-fetch to get parent message details for the reply bubble
+            const { data: fullMsg } = await supabase
+    .from('messages')
+    .select(`
+        *, 
+        reply_to:messages!reply_to_id(id, content, type, sender_id)
+    `) // 🎯 Changed !reply_link to !reply_to_id
+    .eq('id', payload.new.id)
+    .single();
+
+
+            appendMessageUI(fullMsg || payload.new);
             if (payload.new.sender_id !== currentUser.id) await markMessagesAsRead(activeChatId);
             await loadSidebar();
         })
@@ -297,51 +321,169 @@ function subscribeToMessages() {
         .subscribe();
 }
 
-function appendMessageUI(msg) {
+// 🎯 UPDATED REPLY LOGIC WITH INNER CSS
+function setReplyUI(msg) {
+    replyingTo = msg;
+    
+    const footer = document.querySelector('.chat-footer');
+    if (!footer) {
+        console.error("Chat footer wrapper not found!");
+        return;
+    }
+
+    // Add Styles if they don't exist yet
+    if (!document.getElementById('reply-style-tag')) {
+        const style = document.createElement('style');
+        style.id = 'reply-style-tag';
+        style.innerHTML = `
+            #reply-preview-bar {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                background: #f8fafc;
+                border-left: 4px solid #10b981;
+                padding: 8px 15px;
+                width: 100%;
+                box-sizing: border-box;
+                border-bottom: 1px solid #eee;
+                animation: slideUp 0.2s ease-out;
+            }
+            .reply-content-wrapper {
+                flex: 1;
+                overflow: hidden;
+                padding-right: 10px;
+            }
+            .reply-content-wrapper small {
+                color: #10b981;
+                font-weight: bold;
+                font-size: 0.75rem;
+                display: block;
+                margin-bottom: 2px;
+            }
+            .reply-content-wrapper p {
+                margin: 0;
+                font-size: 0.85rem;
+                color: #64748b;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .close-reply-btn {
+                background: none;
+                border: none;
+                color: #94a3b8;
+                font-size: 1.25rem;
+                cursor: pointer;
+                padding: 5px;
+                line-height: 1;
+            }
+            .close-reply-btn:hover { color: #ef4444; }
+            
+            @keyframes slideUp {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    let bar = document.getElementById('reply-preview-bar');
+    if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'reply-preview-bar';
+        footer.prepend(bar); 
+    }
+
+    const text = msg.type === 'image' ? '📷 Image' : msg.content;
+    const name = msg.sender?.username || (msg.sender_id === currentUser.id ? 'You' : 'User');
+
+    bar.innerHTML = `
+        <div class="reply-content-wrapper">
+            <small>Replying to ${name}</small>
+            <p>${text}</p>
+        </div>
+        <button type="button" class="close-reply-btn" onclick="cancelReplyUI()">✕</button>
+    `;
+    
+    document.getElementById('messageInput')?.focus();
+}
+
+function cancelReplyUI() {
+    replyingTo = null;
+    document.getElementById('reply-preview-bar')?.remove();
+}
+window.cancelReplyUI = cancelReplyUI;
+
+   
+
+ function appendMessageUI(msg) {
     const container = document.querySelector('.message-container');
     if (!container || document.getElementById(`msg-${msg.id}`)) return;
 
     const isMe = msg.sender_id === currentUser.id;
     const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const tickIcon = msg.is_read ? 'ph-checks' : 'ph-check';
+    
+    let replyHTML = '';
+    if (msg.reply_to && msg.reply_to_id) {
+        const text = msg.reply_to.type === 'image' ? '📷 Image' : msg.reply_to.content;
+        const replyUser = msg.reply_to.sender?.username || 'User';
+        
+        replyHTML = `
+            <div class="msg-reply-bubble">
+                <small>${replyUser}</small>
+                <p>${text}</p>
+            </div>`;
+    }
 
     const div = document.createElement('div');
     div.id = `msg-${msg.id}`;
     div.className = `message ${isMe ? 'outgoing' : 'incoming'}`;
     
     const contentHTML = (msg.type === 'image') 
-        ? `<img src="${msg.content}" style="max-width: 250px; border-radius: 12px; display: block; margin-top: 5px;" loading="lazy">`
-        : `<p class="content" style="margin:0;">${msg.content}</p>`;
+        ? `<img src="${msg.content}" class="chat-img" loading="lazy">`
+        : `<p class="content">${msg.content}</p>`;
 
     div.innerHTML = `
         <div class="msg-bubble">
+            ${replyHTML}
             ${contentHTML}
-            <div class="msg-status" style="display:flex; align-items:center; justify-content:flex-end; gap:4px; margin-top:4px;">
-                <span class="time" style="font-size:0.65rem; color:#9ca3af;">${time}</span>
-                ${isMe ? `<i class="ph ${tickIcon}" id="icon-${msg.id}" style="font-size:0.9rem; color:${msg.is_read ? '#10b981' : '#9ca3af'};"></i>` : ''}
+            <div class="msg-status">
+                <span class="time">${time}</span>
+                ${isMe ? `<i class="ph ${msg.is_read ? 'ph-checks' : 'ph-check'}" id="icon-${msg.id}"></i>` : ''}
             </div>
         </div>`;
     
+    // 🎯 Attachment to the bubble for double-click
+    div.querySelector('.msg-bubble').addEventListener('dblclick', () => setReplyUI(msg));
+
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
 }
+
+  
 
 async function handleSendMessage() {
     const input = document.getElementById('messageInput');
     const content = input.value.trim();
     if (!content || !activeChatId) return;
 
+    const replyId = replyingTo ? replyingTo.id : null;
     input.value = ''; 
+    cancelReplyUI();
+
     const { error: msgError } = await supabase.from('messages').insert([{
         conversation_id: activeChatId, 
         sender_id: currentUser.id, 
         content: content, 
         type: 'text',
-        is_read: false
+        is_read: false,
+        reply_to_id: replyId
     }]);
 
     if (!msgError) {
-        await supabase.from('conversations').update({ last_message: content, updated_at: new Date().toISOString() }).eq('id', activeChatId);
+        await supabase.from('conversations')
+            .update({ last_message: content, updated_at: new Date().toISOString() })
+            .eq('id', activeChatId);
     }
 }
 
