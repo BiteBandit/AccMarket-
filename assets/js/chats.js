@@ -454,7 +454,32 @@ window.cancelReplyUI = cancelReplyUI;
         </div>`;
     
     // 🎯 Attachment to the bubble for double-click
-    div.querySelector('.msg-bubble').addEventListener('dblclick', () => setReplyUI(msg));
+    // 🎯 Find and Replace that single dblclick line with this:
+const bubble = div.querySelector('.msg-bubble');
+
+// 1. Desktop: Double-click support
+bubble.addEventListener('dblclick', () => setReplyUI(msg));
+
+// 2. Mobile: Long-press support
+let pressTimer;
+
+bubble.addEventListener('touchstart', () => {
+    pressTimer = setTimeout(() => {
+        // Optional: Haptic feedback (vibration)
+        if (navigator.vibrate) navigator.vibrate(40);
+        setReplyUI(msg);
+    }, 500); 
+}, { passive: true });
+
+bubble.addEventListener('touchend', () => {
+    clearTimeout(pressTimer);
+});
+
+// 3. Cancel if scrolling
+bubble.addEventListener('touchmove', () => {
+    clearTimeout(pressTimer);
+});
+ 
 
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;

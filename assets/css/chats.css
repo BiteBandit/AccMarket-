@@ -230,13 +230,13 @@ body { background: var(--bg-main); height: 100svh; display: flex; align-items: c
     from { opacity: 0; transform: translateY(5px); }
     to { opacity: 1; transform: translateY(0); }
 }
-
-
 .msg-bubble {
-    touch-action: manipulation; /* Disables double-tap-to-zoom so the event hits your code faster */
-    user-select: none;         /* Prevents text from being highlighted while tapping */
-    cursor: pointer;
+    -webkit-touch-callout: none; /* Prevents the iOS 'copy/paste' menu */
+    -webkit-user-select: none;   /* Prevents text selection highlight */
+    user-select: none;
+    touch-action: manipulation;   /* Faster response times */
 }
+
 
 
 /* --- TICK & TIME STYLING --- */
