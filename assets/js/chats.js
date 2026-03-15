@@ -279,6 +279,7 @@ function watchPartnerPresence(partner) {
 }
 
 // --- 7. MESSAGING HELPERS ---
+// --- 7. MESSAGING HELPERS (FIXED) ---
 function subscribeToMessages() {
     if (messageSubscription) supabase.removeChannel(messageSubscription);
 
@@ -291,18 +292,30 @@ function subscribeToMessages() {
         }, async (payload) => {
             console.log("[REALTIME] New message incoming...");
             
-            // Re-fetch to get parent message details for the reply bubble
+            // 🎯 We MUST wait for the joined data, otherwise it shows "User" and "..."
             const { data: fullMsg } = await supabase
-    .from('messages')
-    .select(`
-        *, 
-        reply_to:messages!reply_to_id(id, content, type, sender_id)
-    `) // 🎯 Changed !reply_link to !reply_to_id
-    .eq('id', payload.new.id)
-    .single();
+                .from('messages')
+                .select(`
+                    *,
+                    reply_to:messages!reply_to_id (
+                        id,
+                        content,
+                        type,
+                        sender_id,
+                        sender:profiles (username)
+                    )
+                `)
+                .eq('id', payload.new.id)
+                .single();
 
-
-            appendMessageUI(fullMsg || payload.new);
+            // Only append if we successfully got the full message details
+            if (fullMsg) {
+                appendMessageUI(fullMsg);
+            } else {
+                // Fallback for non-replies
+                appendMessageUI(payload.new);
+            }
+            
             if (payload.new.sender_id !== currentUser.id) await markMessagesAsRead(activeChatId);
             await loadSidebar();
         })
@@ -321,8 +334,11 @@ function subscribeToMessages() {
         .subscribe();
 }
 
-// 🎯 UPDATED REPLY LOGIC WITH INNER CSS
+
+
+// 🎯 UPDATED REPLY LOGIC WITH DYNAMIC NAMES & ERROR PROTECTION
 function setReplyUI(msg) {
+    if (!msg) return;
     replyingTo = msg;
     
     const footer = document.querySelector('.chat-footer');
@@ -394,12 +410,22 @@ function setReplyUI(msg) {
         footer.prepend(bar); 
     }
 
-    const text = msg.type === 'image' ? '📷 Image' : msg.content;
-    const name = msg.sender?.username || (msg.sender_id === currentUser.id ? 'You' : 'User');
+    const text = msg.type === 'image' ? '📷 Image' : (msg.content || '');
+    
+    // 🎯 FIX: Correct logic for "You" vs "Username"
+    let displayName = "User";
+    if (msg.sender_id === currentUser.id) {
+        displayName = "You";
+    } else if (msg.sender && msg.sender.username) {
+        displayName = msg.sender.username;
+    } else {
+        // Fallback: Try to find the username from the chat header if the sender object is missing
+        displayName = document.getElementById('headerName')?.innerText || "User";
+    }
 
     bar.innerHTML = `
         <div class="reply-content-wrapper">
-            <small>Replying to ${name}</small>
+            <small>Replying to ${displayName}</small>
             <p>${text}</p>
         </div>
         <button type="button" class="close-reply-btn" onclick="cancelReplyUI()">✕</button>
@@ -410,13 +436,14 @@ function setReplyUI(msg) {
 
 function cancelReplyUI() {
     replyingTo = null;
-    document.getElementById('reply-preview-bar')?.remove();
+    const bar = document.getElementById('reply-preview-bar');
+    if (bar) bar.remove();
 }
 window.cancelReplyUI = cancelReplyUI;
 
    
 
- function appendMessageUI(msg) {
+  function appendMessageUI(msg) {
     const container = document.querySelector('.message-container');
     if (!container || document.getElementById(`msg-${msg.id}`)) return;
 
@@ -424,14 +451,16 @@ window.cancelReplyUI = cancelReplyUI;
     const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     
     let replyHTML = '';
-    if (msg.reply_to && msg.reply_to_id) {
-        const text = msg.reply_to.type === 'image' ? '📷 Image' : msg.reply_to.content;
-        const replyUser = msg.reply_to.sender?.username || 'User';
+    
+    // 🎯 COOL REPLACEMENT: A "Jump to Reference" Badge
+    if (msg.reply_to_id) {
+        // We show who you are replying to, or a generic "Previous Message"
+        const replyName = msg.reply_to?.sender?.username || (msg.reply_to_id ? 'Original Message' : '');
         
         replyHTML = `
-            <div class="msg-reply-bubble">
-                <small>${replyUser}</small>
-                <p>${text}</p>
+            <div class="reply-badge" onclick="scrollToMessage('${msg.reply_to_id}')">
+                <i class="ph ph-arrow-bend-up-left"></i>
+                <span>Replying to <b>${msg.reply_to_id === currentUser.id ? 'You' : replyName}</b></span>
             </div>`;
     }
 
@@ -453,37 +482,40 @@ window.cancelReplyUI = cancelReplyUI;
             </div>
         </div>`;
     
-    // 🎯 Attachment to the bubble for double-click
-    // 🎯 Find and Replace that single dblclick line with this:
-const bubble = div.querySelector('.msg-bubble');
+      // --- Interaction Listeners (Double-click & Long-press) ---
+    const bubble = div.querySelector('.msg-bubble');
+    
+    // Desktop Double Click
+    bubble.addEventListener('dblclick', () => setReplyUI(msg));
 
-// 1. Desktop: Double-click support
-bubble.addEventListener('dblclick', () => setReplyUI(msg));
+    // Mobile Long Press
+    let pressTimer;
+    bubble.addEventListener('touchstart', () => {
+        pressTimer = setTimeout(() => {
+            if (navigator.vibrate) navigator.vibrate(40);
+            setReplyUI(msg);
+        }, 500); 
+    }, { passive: true });
 
-// 2. Mobile: Long-press support
-let pressTimer;
-
-bubble.addEventListener('touchstart', () => {
-    pressTimer = setTimeout(() => {
-        // Optional: Haptic feedback (vibration)
-        if (navigator.vibrate) navigator.vibrate(40);
-        setReplyUI(msg);
-    }, 500); 
-}, { passive: true });
-
-bubble.addEventListener('touchend', () => {
-    clearTimeout(pressTimer);
-});
-
-// 3. Cancel if scrolling
-bubble.addEventListener('touchmove', () => {
-    clearTimeout(pressTimer);
-});
- 
+    bubble.addEventListener('touchend', () => clearTimeout(pressTimer));
+    bubble.addEventListener('touchmove', () => clearTimeout(pressTimer));
+    
 
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
 }
+
+// 🎯 COOL ADDITION: Function to jump to the message
+function scrollToMessage(id) {
+    const target = document.getElementById(`msg-${id}`);
+    if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        target.classList.add('highlight-msg');
+        setTimeout(() => target.classList.remove('highlight-msg'), 2000);
+    }
+}
+window.scrollToMessage = scrollToMessage;
+
 
   
 

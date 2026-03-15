@@ -237,6 +237,61 @@ body { background: var(--bg-main); height: 100svh; display: flex; align-items: c
     touch-action: manipulation;   /* Faster response times */
 }
 
+/* --- Updated Reply Badge with smooth transitions --- */
+.reply-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0, 0, 0, 0.06);
+    padding: 4px 10px;
+    border-radius: 12px;
+    margin-bottom: 6px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    color: #64748b;
+    width: fit-content;
+    /* Added smooth timing function */
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.outgoing .reply-badge {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+}
+
+.reply-badge:hover {
+    background: #10b981;
+    color: white;
+    /* Added a slight lift on hover */
+    transform: translateY(-1px);
+}
+
+/* --- Smooth Bubble logic --- */
+.msg-bubble {
+    /* This makes the long-press shrink effect feel buttery smooth */
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    will-change: transform;
+}
+
+/* --- Flash effect when you click the reply (Updated for smoothness) --- */
+.highlight-msg .msg-bubble {
+    animation: flashHighlight 2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes flashHighlight {
+    0% { 
+        background-color: rgba(16, 185, 129, 0.4); 
+        transform: scale(1);
+    }
+    15% {
+        transform: scale(1.03); /* Slight "pop" when jumping to it */
+    }
+    100% { 
+        background-color: transparent; 
+        transform: scale(1);
+    }
+}
+
 
 
 /* --- TICK & TIME STYLING --- */
