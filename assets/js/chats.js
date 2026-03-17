@@ -279,7 +279,7 @@ function watchPartnerPresence(partner) {
 }
 
 // --- 7. MESSAGING HELPERS ---
-// --- 7. MESSAGING HELPERS (FIXED) ---
+ // --- 7. MESSAGING HELPERS (UPDATED WITH DELETE SYNC) ---
 function subscribeToMessages() {
     if (messageSubscription) supabase.removeChannel(messageSubscription);
 
@@ -292,7 +292,6 @@ function subscribeToMessages() {
         }, async (payload) => {
             console.log("[REALTIME] New message incoming...");
             
-            // 🎯 We MUST wait for the joined data, otherwise it shows "User" and "..."
             const { data: fullMsg } = await supabase
                 .from('messages')
                 .select(`
@@ -308,11 +307,9 @@ function subscribeToMessages() {
                 .eq('id', payload.new.id)
                 .single();
 
-            // Only append if we successfully got the full message details
             if (fullMsg) {
                 appendMessageUI(fullMsg);
             } else {
-                // Fallback for non-replies
                 appendMessageUI(payload.new);
             }
             
@@ -325,14 +322,126 @@ function subscribeToMessages() {
             table: 'messages', 
             filter: `conversation_id=eq.${activeChatId}` 
         }, (payload) => {
+            // 🎯 1. Handle Read Status
             const icon = document.getElementById(`icon-${payload.new.id}`);
             if (icon && payload.new.is_read) {
                 icon.className = 'ph ph-checks';
                 icon.style.color = '#10b981';
             }
+
+            // 🎯 2. Handle Real-time Deletion UI
+            if (payload.new.type === 'deleted') {
+                const msgDiv = document.getElementById(`msg-${payload.new.id}`);
+                if (msgDiv) {
+                    // Snap the bubble back (hides the gap if someone was swiping)
+                    const bubble = msgDiv.querySelector('.msg-bubble');
+                    if (bubble) {
+                        bubble.style.transition = 'transform 0.4s ease';
+                        bubble.style.transform = 'translateX(0)';
+                    }
+
+                    // Update the text to "Deleted"
+                    const contentP = msgDiv.querySelector('.content');
+                    if (contentP) {
+                        contentP.innerText = payload.new.content;
+                        contentP.classList.add('deleted-text');
+                    }
+
+                    // Remove UI elements that are no longer valid for a deleted message
+                    msgDiv.querySelector('.reply-badge')?.remove();
+                    msgDiv.querySelector('.chat-img')?.remove();
+                    msgDiv.querySelector('.swipe-delete-btn')?.remove(); 
+                }
+            }
         })
         .subscribe();
 }
+
+
+// --- 9. DELETE LOGIC WITH SWEETALERT ---
+async function deleteMessage(msgId, senderId) {
+    if (senderId !== currentUser.id) return;
+
+    const result = await Swal.fire({
+        title: 'Delete Message?',
+        text: "This action cannot be undone!",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#0b1e5b',
+        cancelButtonColor: '#6b7280',
+        confirmButtonText: 'Yes, delete it!',
+        cancelButtonText: 'Cancel'
+    });
+
+    if (!result.isConfirmed) {
+        const msgDiv = document.getElementById(`msg-${msgId}`);
+        if (msgDiv) msgDiv.querySelector('.msg-bubble').style.transform = 'translateX(0)';
+        return;
+    }
+
+    try {
+        // 1. Get the content of the message BEFORE we delete it
+        const { data: msgToDelete } = await supabase
+            .from('messages')
+            .select('content, conversation_id')
+            .eq('id', msgId)
+            .single();
+
+        // 2. Update the message to 'deleted'
+        const { error: msgError } = await supabase
+            .from('messages')
+            .update({ 
+                content: '🚫 This message was deleted', 
+                type: 'deleted', 
+                reply_to_id: null 
+            })
+            .eq('id', msgId);
+
+        if (msgError) throw msgError;
+
+        // 3. 🎯 SMART SIDEBAR CHECK
+        // Fetch the conversation row you showed me
+        const { data: conv } = await supabase
+            .from('conversations')
+            .select('last_message')
+            .eq('id', msgToDelete.conversation_id)
+            .single();
+
+        // 4. If the sidebar text matches the message we just deleted...
+        if (conv && conv.last_message === msgToDelete.content) {
+            
+            // Check if there is any message newer than the one we just deleted
+            const { data: newerMsg } = await supabase
+                .from('messages')
+                .select('id')
+                .eq('conversation_id', msgToDelete.conversation_id)
+                .gt('created_at', msgToDelete.created_at) // Is there anything newer?
+                .limit(1);
+
+            // If no newer message exists, this WAS the last message. Update sidebar.
+            if (!newerMsg || newerMsg.length === 0) {
+                await supabase
+                    .from('conversations')
+                    .update({ last_message: '🚫 This message was deleted' })
+                    .eq('id', msgToDelete.conversation_id);
+                
+                console.log("Sidebar updated to 'Deleted'");
+            }
+        }
+
+        // UI Cleanup
+        const msgDiv = document.getElementById(`msg-${msgId}`);
+        if (msgDiv) msgDiv.querySelector('.msg-bubble').style.transform = 'translateX(0)';
+        
+        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Deleted', showConfirmButton: false, timer: 1500 });
+
+    } catch (err) {
+        console.error("[DELETE ERROR]", err.message);
+    }
+}
+
+// Ensure this is global!
+window.deleteMessage = deleteMessage;
 
 
 
@@ -449,30 +558,37 @@ window.cancelReplyUI = cancelReplyUI;
 
     const isMe = msg.sender_id === currentUser.id;
     const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    
+
+    // --- Reply badge ---
     let replyHTML = '';
-    
-    // 🎯 COOL REPLACEMENT: A "Jump to Reference" Badge
     if (msg.reply_to_id) {
-        // We show who you are replying to, or a generic "Previous Message"
-        const replyName = msg.reply_to?.sender?.username || (msg.reply_to_id ? 'Original Message' : '');
+        const otherName = document.getElementById('headerName')?.innerText || 'User';
+        const replyName = (msg.reply_to?.sender_id === currentUser.id) ? 'You' : (msg.reply_to?.sender?.username || otherName);
         
         replyHTML = `
             <div class="reply-badge" onclick="scrollToMessage('${msg.reply_to_id}')">
                 <i class="ph ph-arrow-bend-up-left"></i>
-                <span>Replying to <b>${msg.reply_to_id === currentUser.id ? 'You' : replyName}</b></span>
+                <span>Replying to <b>${replyName}</b></span>
             </div>`;
     }
 
-    const div = document.createElement('div');
-    div.id = `msg-${msg.id}`;
-    div.className = `message ${isMe ? 'outgoing' : 'incoming'}`;
-    
-    const contentHTML = (msg.type === 'image') 
-        ? `<img src="${msg.content}" class="chat-img" loading="lazy">`
-        : `<p class="content">${msg.content}</p>`;
 
+    // Change this line in appendMessageUI:
+const div = document.createElement('div');
+div.id = `msg-${msg.id}`;
+div.className = `message ${isMe ? 'outgoing' : 'incoming'}`; // Use 'message'
+
+
+    // 🎯 The Content Logic
+    const contentHTML = (msg.type === 'deleted')
+        ? `<p class="content deleted-text">${msg.content}</p>`
+        : (msg.type === 'image') 
+            ? `<img src="${msg.content}" class="chat-img" loading="lazy">`
+            : `<p class="content">${msg.content}</p>`;
+
+    // 🎯 The HTML Structure (Button sits UNDER the bubble)
     div.innerHTML = `
+        ${isMe ? `<div class="swipe-delete-btn" onclick="deleteMessage('${msg.id}', '${msg.sender_id}')"><i class="ph ph-trash"></i></div>` : ''}
         <div class="msg-bubble">
             ${replyHTML}
             ${contentHTML}
@@ -481,29 +597,61 @@ window.cancelReplyUI = cancelReplyUI;
                 ${isMe ? `<i class="ph ${msg.is_read ? 'ph-checks' : 'ph-check'}" id="icon-${msg.id}"></i>` : ''}
             </div>
         </div>`;
-    
-      // --- Interaction Listeners (Double-click & Long-press) ---
-    const bubble = div.querySelector('.msg-bubble');
-    
-    // Desktop Double Click
-    bubble.addEventListener('dblclick', () => setReplyUI(msg));
 
-    // Mobile Long Press
+    const bubble = div.querySelector('.msg-bubble');
+
+    // --- Interaction Logic ---
     let pressTimer;
-    bubble.addEventListener('touchstart', () => {
+    let startX = 0;
+    let currentX = 0;
+    let isSwiping = false;
+
+    bubble.addEventListener('touchstart', (e) => {
+        startX = e.touches[0].clientX;
+        currentX = 0;
+        isSwiping = false;
+        bubble.style.transition = 'none';
+
         pressTimer = setTimeout(() => {
-            if (navigator.vibrate) navigator.vibrate(40);
-            setReplyUI(msg);
-        }, 500); 
+            if (!isSwiping) { // Don't trigger reply if we are swiping
+                if (navigator.vibrate) navigator.vibrate(40);
+                setReplyUI(msg);
+            }
+        }, 600);
     }, { passive: true });
 
-    bubble.addEventListener('touchend', () => clearTimeout(pressTimer));
-    bubble.addEventListener('touchmove', () => clearTimeout(pressTimer));
-    
+    bubble.addEventListener('touchmove', (e) => {
+        currentX = e.touches[0].clientX - startX;
+
+        // If moved more than 10px, it's a swipe, not a long-press
+        if (Math.abs(currentX) > 10) {
+            clearTimeout(pressTimer);
+            isSwiping = true;
+        }
+
+        if (isMe && currentX < 0) {
+            // Drag the bubble to the left
+            const move = Math.max(currentX, -80); // Cap at 80px
+            bubble.style.transform = `translateX(${move}px)`;
+        }
+    }, { passive: true });
+
+    bubble.addEventListener('touchend', () => {
+        clearTimeout(pressTimer);
+        bubble.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+        
+        if (isMe) {
+            // If swiped past 40px, stay open, otherwise snap back
+            bubble.style.transform = currentX < -40 ? 'translateX(-70px)' : 'translateX(0)';
+        }
+    });
+
+    bubble.addEventListener('dblclick', () => setReplyUI(msg));
 
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
 }
+ 
 
 // 🎯 COOL ADDITION: Function to jump to the message
 function scrollToMessage(id) {

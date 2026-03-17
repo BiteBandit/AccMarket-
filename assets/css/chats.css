@@ -160,12 +160,59 @@ body { background: var(--bg-main); height: 100svh; display: flex; align-items: c
 .status-line.active { background: var(--success); }
 
 /* --- MESSAGES --- */
-.message-container { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; background: #fdfdfd; }
-.message { display: flex; width: 100%; flex-direction: column; }
+.message-container { 
+    flex: 1; 
+    padding: 20px; 
+    overflow-y: auto; 
+    display: flex; 
+    flex-direction: column; 
+    gap: 12px; 
+    background: #fdfdfd; 
+    overflow-x: hidden; /* 🎯 Prevents horizontal shifting */
+}
+
+.message { 
+    display: flex; 
+    width: 100%; 
+    flex-direction: column; 
+    position: relative; /* 🎯 This allows the icon to sit behind the bubble */
+}
+
 .incoming { align-items: flex-start; }
 .outgoing { align-items: flex-end; }
 
-.msg-bubble { max-width: 70%; padding: 12px 16px; border-radius: 15px; font-size: 0.92rem; line-height: 1.4; position: relative; min-width: 80px; }
+/* 🎯 THE DELETE ICON (No background, just red icon) */
+.swipe-delete-btn {
+    position: absolute;
+    right: 15px; /* 🎯 Position it where it should appear when swiped */
+    top: 50%;
+    transform: translateY(-50%);
+    width: 40px;
+    height: 40px;
+    background: none; /* 🎯 Removed red background */
+    border: none;     /* 🎯 Removed border */
+    color: #ef4444;   /* 🎯 Icon is red */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    z-index: 1;       /* 🎯 Sits behind the bubble */
+    cursor: pointer;
+}
+
+.msg-bubble { 
+    max-width: 70%; 
+    padding: 12px 16px; 
+    border-radius: 15px; 
+    font-size: 0.92rem; 
+    line-height: 1.4; 
+    position: relative; 
+    min-width: 80px; 
+    z-index: 2; /* 🎯 Sits ON TOP of the icon */
+    background: white; /* 🎯 Solid background covers the icon */
+    will-change: transform;
+}
+
 .incoming .msg-bubble { background: var(--light-gray); color: var(--black); border-bottom-left-radius: 2px; }
 .outgoing .msg-bubble { background: var(--dark-blue); color: white; border-bottom-right-radius: 2px; }
 
@@ -178,6 +225,43 @@ body { background: var(--bg-main); height: 100svh; display: flex; align-items: c
     object-fit: cover;
     margin-bottom: 5px;
 }
+/* 🎯 Force the bubble to wrap around the text instead of staying image-sized */
+.message:has(.deleted-text) .msg-bubble {
+    width: fit-content !important;
+    height: auto !important;
+    min-height: unset !important;
+    padding: 12px 16px !important;
+}
+
+/* Ensure the text is visible and styled */
+.deleted-text {
+    font-style: italic;
+    opacity: 0.7;
+    white-space: normal; /* Prevents text from staying on one long line */
+    word-break: break-word;
+}
+
+/* Hide any stray image styling if the type is now deleted */
+.message:has(.deleted-text) .chat-img {
+    display: none !important;
+}
+
+/* 1. Hide the button for deleted messages */
+.message:has(.deleted-text) .swipe-delete-btn {
+    display: none !important;
+}
+
+/* 2. Lock the bubble so it cannot slide */
+.message:has(.deleted-text) .msg-bubble {
+    transform: none !important;
+    pointer-events: none !important; /* This stops the swipe action */
+}
+
+/* 3. Optional: Make deleted messages look slightly faded */
+.message:has(.deleted-text) {
+    opacity: 0.7;
+}
+
 
 /* Optional: a subtle pulse while uploading */
 .uploading {
@@ -351,4 +435,20 @@ body { background: var(--bg-main); height: 100svh; display: flex; align-items: c
     .app-container {
         height: 100svh;
     }
+}
+
+
+/* Custom SweetAlert Styling to match your UI */
+.swal2-border-radius-fix {
+    border-radius: 16px !important;
+    font-family: 'Inter', sans-serif !important;
+}
+
+.swal2-styled.swal2-confirm {
+    border-radius: 8px !important;
+    font-weight: 600;
+}
+
+.swal2-styled.swal2-cancel {
+    border-radius: 8px !important;
 }
