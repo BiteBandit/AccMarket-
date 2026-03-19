@@ -152,13 +152,67 @@ body { background: var(--bg-main); height: 100svh; display: flex; align-items: c
 .product-price { color: var(--success); font-weight: bold; font-size: 0.85rem; }
 .view-listing-btn { margin-left: auto; font-size: 0.75rem; padding: 5px 12px; border: 1px solid var(--border); border-radius: 6px; background: white; cursor: pointer; }
 
-.escrow-status-bar { display: flex; align-items: center; padding: 15px 25px; background: white; border-bottom: 1px solid var(--border); }
-.status-step { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 0.7rem; color: var(--gray); min-width: 60px; }
-.status-step.active { color: var(--dark-blue); font-weight: bold; }
-.status-step.completed { color: var(--success); }
-.status-line { flex: 1; height: 2px; background: var(--light-gray); margin: 0 10px; margin-top: -15px; }
-.status-line.active { background: var(--success); }
+.escrow-status-bar { 
+    display: flex; 
+    align-items: center; 
+    padding: 15px 25px; 
+    background: white; 
+    border-bottom: 1px solid var(--border); 
+}
 
+.status-step { 
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    gap: 4px; 
+    font-size: 0.7rem; 
+    color: var(--gray); 
+    min-width: 60px; 
+    transition: all 0.3s ease; /* Adds a smooth color fade */
+}
+
+.status-step.active { 
+    color: var(--dark-blue); 
+    font-weight: bold; 
+}
+
+.status-step.completed { 
+    color: var(--success); 
+}
+
+.status-line { 
+    flex: 1; 
+    height: 2px; 
+    background: var(--light-gray); 
+    margin: 0 10px; 
+    margin-top: -15px; 
+    transition: background 0.3s ease;
+}
+
+/* 🎯 Updated to .completed to match the JavaScript logic */
+.status-line.completed { 
+    background: var(--success); 
+}
+.msg-system {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    margin: 15px 0;
+    pointer-events: none; /* User can't interact with system alerts */
+}
+
+.system-pill {
+    background: #f0fdf4; /* Light Green */
+    color: #166534;      /* Dark Green */
+    padding: 6px 20px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border: 1px solid #bbf7d0;
+    text-align: center;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+  
 /* --- MESSAGES --- */
 .message-container { 
     flex: 1; 

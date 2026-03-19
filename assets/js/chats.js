@@ -215,6 +215,15 @@ async function initChatWindow() {
         const otherUser = chat.buyer_id === currentUser.id ? chat.seller : chat.buyer;
         headerName.innerText = otherUser.username;
         headerAvatar.src = otherUser.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUser.username}`;
+
+        // 🎯 THE AUTO-START TRIGGER
+        if (chat.escrow_step === 0) {
+            console.log("[ESCROW] Initializing Step 1...");
+            await upgradeToStepOne(); 
+        } else {
+            updateEscrowUI(chat.escrow_step);
+        }
+
         watchPartnerPresence(otherUser);
     }
 
@@ -556,6 +565,17 @@ window.cancelReplyUI = cancelReplyUI;
     const container = document.querySelector('.message-container');
     if (!container || document.getElementById(`msg-${msg.id}`)) return;
 
+// 🎯 1. Handle System/Bank Messages
+    if (msg.type === 'system') {
+        const systemDiv = document.createElement('div');
+        systemDiv.id = `msg-${msg.id}`;
+        systemDiv.className = 'msg-system';
+        systemDiv.innerHTML = `<div class="system-pill">${msg.content}</div>`;
+        container.appendChild(systemDiv);
+        container.scrollTop = container.scrollHeight;
+        return; // Exit so it doesn't build a normal bubble
+    }
+
     const isMe = msg.sender_id === currentUser.id;
     const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -712,3 +732,62 @@ async function initSettingsToggle() {
         initUserPresence(); 
     };
 }
+
+// 🎯 AUTO-UPGRADE TO STEP 1
+ async function upgradeToStepOne() {
+    if (!activeChatId) return;
+
+    const systemText = "💰 Payment confirmed. Funds are now held in Escrow.";
+
+    // 1. Update the Conversation Table (Both the step AND the sidebar text)
+    await supabase.from('conversations')
+        .update({ 
+            escrow_step: 1, 
+            last_message: systemText, // 🎯 This updates the sidebar
+            updated_at: new Date().toISOString() 
+        })
+        .eq('id', activeChatId);
+
+    // 2. Insert the System Message for the chat history
+    await supabase.from('messages').insert([{
+        conversation_id: activeChatId,
+        sender_id: '00000000-0000-0000-0000-000000000000', 
+        content: systemText,
+        type: 'system' 
+    }]);
+
+    // 3. Update the visual bar
+    updateEscrowUI(1);
+    
+    // 4. Refresh the sidebar locally so you see the change immediately
+    await loadSidebar();
+}
+
+
+// 🎯 DYNAMIC UI UPDATE
+function updateEscrowUI(step) {
+    // Select your bar elements (Ensure these IDs/Classes exist in your HTML)
+    const stepPaid = document.querySelector('.status-step:nth-child(1)');
+    const lineDelivery = document.querySelector('.status-line:nth-child(2)');
+    const stepDelivery = document.getElementById('stepDelivery');
+    const lineRelease = document.getElementById('lineRelease');
+    const stepRelease = document.getElementById('stepRelease');
+
+    // Reset classes
+    [stepPaid, stepDelivery, stepRelease].forEach(el => el?.classList.remove('active', 'completed'));
+    [lineDelivery, lineRelease].forEach(el => el?.classList.remove('completed'));
+
+    if (step === 0) return;
+    
+    // Applying status based on the step number
+    if (step >= 1) stepPaid?.classList.add(step > 1 ? 'completed' : 'active');
+    if (step >= 2) {
+        lineDelivery?.classList.add('completed');
+        stepDelivery?.classList.add(step > 2 ? 'completed' : 'active');
+    }
+    if (step >= 3) {
+        lineRelease?.classList.add('completed');
+        stepRelease?.classList.add('active');
+    }
+}
+window.updateEscrowUI = updateEscrowUI;
