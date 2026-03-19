@@ -506,3 +506,38 @@ body { background: var(--bg-main); height: 100svh; display: flex; align-items: c
 .swal2-styled.swal2-cancel {
     border-radius: 8px !important;
 }
+
+ .header-actions{
+    position: relative;
+}
+
+.dropdown-menu{
+    position: absolute;
+    top: 45px;
+    right: 0;
+    background: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    display: none;
+    flex-direction: column;
+    min-width: 200px;
+    z-index: 1000;
+    overflow: hidden;
+}
+
+.dropdown-menu.show{
+    display: flex;
+}
+
+.menu-item{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.menu-item:hover{
+    background: #f3f4f6;
+}

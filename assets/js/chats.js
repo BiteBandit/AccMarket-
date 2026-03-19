@@ -224,6 +224,9 @@ async function initChatWindow() {
             updateEscrowUI(chat.escrow_step);
         }
 
+await refreshMenuVisibility();
+
+
         watchPartnerPresence(otherUser);
     }
 
@@ -301,25 +304,25 @@ function subscribeToMessages() {
         }, async (payload) => {
             console.log("[REALTIME] New message incoming...");
             
-            const { data: fullMsg } = await supabase
-                .from('messages')
-                .select(`
-                    *,
-                    reply_to:messages!reply_to_id (
-                        id,
-                        content,
-                        type,
-                        sender_id,
-                        sender:profiles (username)
-                    )
-                `)
-                .eq('id', payload.new.id)
-                .single();
-
-            if (fullMsg) {
-                appendMessageUI(fullMsg);
-            } else {
+            // 🎯 FIX: If it's a system message, skip the complex query and append immediately
+            if (payload.new.type === 'system') {
                 appendMessageUI(payload.new);
+            } else {
+                // Normal message logic
+                const { data: fullMsg } = await supabase
+                    .from('messages')
+                    .select(`
+                        *,
+                        reply_to:messages!reply_to_id (
+                            id, content, type, sender_id,
+                            sender:profiles (username)
+                        )
+                    `)
+                    .eq('id', payload.new.id)
+                    .single();
+
+                if (fullMsg) appendMessageUI(fullMsg);
+                else appendMessageUI(payload.new);
             }
             
             if (payload.new.sender_id !== currentUser.id) await markMessagesAsRead(activeChatId);
@@ -331,32 +334,27 @@ function subscribeToMessages() {
             table: 'messages', 
             filter: `conversation_id=eq.${activeChatId}` 
         }, (payload) => {
-            // 🎯 1. Handle Read Status
+            // Handle Read Status
             const icon = document.getElementById(`icon-${payload.new.id}`);
             if (icon && payload.new.is_read) {
                 icon.className = 'ph ph-checks';
                 icon.style.color = '#10b981';
             }
 
-            // 🎯 2. Handle Real-time Deletion UI
+            // Handle Real-time Deletion
             if (payload.new.type === 'deleted') {
                 const msgDiv = document.getElementById(`msg-${payload.new.id}`);
                 if (msgDiv) {
-                    // Snap the bubble back (hides the gap if someone was swiping)
                     const bubble = msgDiv.querySelector('.msg-bubble');
                     if (bubble) {
                         bubble.style.transition = 'transform 0.4s ease';
                         bubble.style.transform = 'translateX(0)';
                     }
-
-                    // Update the text to "Deleted"
                     const contentP = msgDiv.querySelector('.content');
                     if (contentP) {
                         contentP.innerText = payload.new.content;
                         contentP.classList.add('deleted-text');
                     }
-
-                    // Remove UI elements that are no longer valid for a deleted message
                     msgDiv.querySelector('.reply-badge')?.remove();
                     msgDiv.querySelector('.chat-img')?.remove();
                     msgDiv.querySelector('.swipe-delete-btn')?.remove(); 
@@ -365,6 +363,7 @@ function subscribeToMessages() {
         })
         .subscribe();
 }
+
 
 
 // --- 9. DELETE LOGIC WITH SWEETALERT ---
@@ -734,60 +733,235 @@ async function initSettingsToggle() {
 }
 
 // 🎯 AUTO-UPGRADE TO STEP 1
- async function upgradeToStepOne() {
-    if (!activeChatId) return;
+async function upgradeToStepOne() {
+    if (!activeChatId || !currentUser) return;
 
     const systemText = "💰 Payment confirmed. Funds are now held in Escrow.";
 
-    // 1. Update the Conversation Table (Both the step AND the sidebar text)
+    // 1. Update the Conversation Table
     await supabase.from('conversations')
         .update({ 
             escrow_step: 1, 
-            last_message: systemText, // 🎯 This updates the sidebar
+            last_message: systemText, 
             updated_at: new Date().toISOString() 
         })
         .eq('id', activeChatId);
 
-    // 2. Insert the System Message for the chat history
-    await supabase.from('messages').insert([{
+    // 2. Insert Message (FIXED: Using real currentUser.id to pass Foreign Key check)
+    const { error } = await supabase.from('messages').insert([{
         conversation_id: activeChatId,
-        sender_id: '00000000-0000-0000-0000-000000000000', 
+        sender_id: currentUser.id, 
         content: systemText,
         type: 'system' 
     }]);
 
+    if (error) console.error("[DATABASE ERROR] Message not saved:", error.message);
+
     // 3. Update the visual bar
     updateEscrowUI(1);
     
-    // 4. Refresh the sidebar locally so you see the change immediately
+    // 4. Refresh the sidebar
     await loadSidebar();
 }
+ 
 
 
 // 🎯 DYNAMIC UI UPDATE
 function updateEscrowUI(step) {
-    // Select your bar elements (Ensure these IDs/Classes exist in your HTML)
     const stepPaid = document.querySelector('.status-step:nth-child(1)');
     const lineDelivery = document.querySelector('.status-line:nth-child(2)');
     const stepDelivery = document.getElementById('stepDelivery');
     const lineRelease = document.getElementById('lineRelease');
     const stepRelease = document.getElementById('stepRelease');
 
-    // Reset classes
+    // Reset everything
     [stepPaid, stepDelivery, stepRelease].forEach(el => el?.classList.remove('active', 'completed'));
     [lineDelivery, lineRelease].forEach(el => el?.classList.remove('completed'));
 
     if (step === 0) return;
     
-    // Applying status based on the step number
-    if (step >= 1) stepPaid?.classList.add(step > 1 ? 'completed' : 'active');
-    if (step >= 2) {
+    // --- STEP 1: PAID ---
+    if (step >= 1) {
+        // Force 'completed' to ensure it uses the green background style
+        stepPaid?.classList.add('completed'); 
         lineDelivery?.classList.add('completed');
-        stepDelivery?.classList.add(step > 2 ? 'completed' : 'active');
     }
-    if (step >= 3) {
+
+    // --- STEP 2: DELIVERY ---
+    if (step >= 2) {
+        stepDelivery?.classList.add('completed');
         lineRelease?.classList.add('completed');
-        stepRelease?.classList.add('active');
+    }
+
+    // --- STEP 3: RELEASE ---
+    if (step >= 3) {
+        stepRelease?.classList.add('completed');
     }
 }
 window.updateEscrowUI = updateEscrowUI;
+
+
+
+/**
+ * 🎯 1. THE TOGGLE 
+ * This fixes the 'not defined' error by attaching to window.
+ */
+window.toggleStatusMenu = async function(e) {
+    if (e) e.stopPropagation();
+    
+    const menu = document.getElementById("statusMenu");
+    if (!menu) return;
+
+    // Toggle the 'show' class to open/close the box
+    menu.classList.toggle("show");
+    
+    console.log("--- [MENU CLICKED] ---");
+
+    // If the menu is now open, run the logic to show/hide the buttons
+    if (menu.classList.contains("show")) {
+        await refreshMenuVisibility();
+    }
+};
+
+/**
+ * 🎯 2. THE VISIBILITY LOGIC
+ * Only handles showing/hiding. No functions yet.
+ */
+async function refreshMenuVisibility() {
+    if (!activeChatId || !currentUser) return;
+
+    // Fetch the specific row for this chat
+    const { data: chat, error } = await supabase
+        .from("conversations")
+        .select("seller_id, buyer_id, escrow_step")
+        .eq("id", activeChatId)
+        .single();
+
+    if (error || !chat) {
+        console.error("Database Error:", error);
+        return;
+    }
+
+    const btnConfirm = document.getElementById("btnConfirmDelivery");
+    const btnRelease = document.getElementById("btnReleaseFunds");
+
+    // Hide both buttons by default
+    if (btnConfirm) btnConfirm.style.display = "none";
+    if (btnRelease) btnRelease.style.display = "none";
+
+    // ROLE CHECK
+    const isSeller = currentUser.id === chat.seller_id;
+    const isBuyer = currentUser.id === chat.buyer_id;
+
+    // LOGS (Check these in F12)
+    console.log("My User ID:  ", currentUser.id);
+    console.log("Seller ID:   ", chat.seller_id);
+    console.log("Buyer ID:    ", chat.buyer_id);
+    console.log("Am I Seller? ", isSeller);
+    console.log("Am I Buyer?  ", isBuyer);
+    console.log("Current Step:", chat.escrow_step);
+
+    // 🕵️ SHOW LOGIC
+    // If I am the Seller, show "Confirm Delivery"
+    if (isSeller) {
+        console.log("Result: Showing Seller Button");
+        if (btnConfirm) btnConfirm.style.display = "flex";
+    }
+
+    // If I am the Buyer, show "Release Funds"
+    if (isBuyer) {
+        console.log("Result: Showing Buyer Button");
+        if (btnRelease) btnRelease.style.display = "flex";
+    }
+}
+
+// Global empty functions so you don't get errors when clicking
+window.upgradeToStepTwo = () => console.log("Button clicked: Confirm Delivery");
+window.upgradeToStepThree = () => console.log("Button clicked: Release Funds");
+window.handleDispute = () => console.log("Button clicked: Dispute");
+
+// Close menu if clicking anywhere else
+document.addEventListener("click", () => {
+    document.getElementById("statusMenu")?.classList.remove("show");
+});
+
+
+window.upgradeToStepTwo = async function() {
+    if (!activeChatId || !currentUser) return;
+
+    const confirm = await Swal.fire({
+        title: 'Confirm Delivery?',
+        text: "Are you sure you have sent the item? This will notify the buyer.",
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, Delivered'
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    const systemText = "📦 Seller has marked the item as delivered. Buyer, please verify and release funds.";
+
+    // 1. Update Conversation Step
+    const { error: updateError } = await supabase.from('conversations')
+        .update({ 
+            escrow_step: 2, 
+            last_message: systemText, 
+            updated_at: new Date().toISOString() 
+        })
+        .eq('id', activeChatId);
+
+    if (updateError) return Swal.fire('Error', 'Update failed', 'error');
+
+    // 2. Insert System Message
+    await supabase.from('messages').insert([{
+        conversation_id: activeChatId,
+        sender_id: currentUser.id, 
+        content: systemText,
+        type: 'system' 
+    }]);
+
+    // 3. Refresh UI
+    updateEscrowUI(2); 
+    document.getElementById('statusMenu')?.classList.remove('show');
+    await loadSidebar(); // Refresh the preview text in sidebar
+};
+
+
+window.upgradeToStepThree = async function() {
+    if (!activeChatId || !currentUser) return;
+
+    const confirm = await Swal.fire({
+        title: 'Release Funds?',
+        text: "Only do this if you have received the item. This action cannot be undone!",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#22c55e',
+        confirmButtonText: 'Yes, Release Funds'
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    const systemText = "✅ Funds released! Transaction completed successfully.";
+
+    // 1. Update Conversation Step
+    await supabase.from('conversations')
+        .update({ 
+            escrow_step: 3, 
+            last_message: systemText, 
+            updated_at: new Date().toISOString() 
+        })
+        .eq('id', activeChatId);
+
+    // 2. Insert System Message
+    await supabase.from('messages').insert([{
+        conversation_id: activeChatId,
+        sender_id: currentUser.id, 
+        content: systemText,
+        type: 'system' 
+    }]);
+
+    // 3. Refresh UI
+    updateEscrowUI(3);
+    document.getElementById('statusMenu')?.classList.remove('show');
+    await loadSidebar();
+};
