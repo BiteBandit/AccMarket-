@@ -213,6 +213,12 @@ body { background: var(--bg-main); height: 100svh; display: flex; align-items: c
     box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
   
+.system-pill.dispute-alert {
+    background: #fff1f2 !important; /* Soft Red background */
+    color: #be123c !important;      /* Dark Red text */
+    border: 1px solid #fecdd3 !important;
+}
+
 /* --- MESSAGES --- */
 .message-container { 
     flex: 1; 
@@ -466,13 +472,252 @@ body { background: var(--bg-main); height: 100svh; display: flex; align-items: c
 .send-btn { background: var(--dark-blue); color: white; border: none; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
 
 /* --- MODALS --- */
-.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(11, 30, 91, 0.7); display: none; align-items: center; justify-content: center; z-index: 2000; backdrop-filter: blur(5px); }
-.modal-overlay.active { display: flex; }
-.modal-card { background: white; width: 90%; max-width: 400px; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
-.modal-header { padding: 15px 20px; background: var(--dark-blue); color: white; display: flex; justify-content: space-between; align-items: center; }
-.close-modal { background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; }
-.modal-body { padding: 20px; }
-.modal-footer { padding: 15px 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; }
+.modal-overlay { 
+    position: fixed; 
+    top: 0; 
+    left: 0; 
+    width: 100%; 
+    height: 100%; 
+    background: rgba(11, 30, 91, 0.7); 
+    display: none; 
+    align-items: center; 
+    justify-content: center; 
+    z-index: 2000; 
+    backdrop-filter: blur(5px); 
+}
+
+.modal-overlay.active { 
+    display: flex; 
+}
+
+.modal-card { 
+    background: white; 
+    width: 95%; 
+    max-width: 420px; 
+    border-radius: 20px; 
+    overflow: hidden; 
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); 
+    animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.modal-header { 
+    padding: 18px 24px; 
+    background: var(--dark-blue); 
+    color: white; 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.close-modal { 
+    background: rgba(255,255,255,0.1); 
+    border: none; 
+    color: white; 
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem; 
+    cursor: pointer; 
+    transition: 0.2s;
+}
+
+.close-modal:hover { background: rgba(255,255,255,0.2); }
+
+.modal-body { 
+    padding: 24px; 
+}
+
+.modal-body p {
+    color: #64748b;
+    font-size: 0.9rem;
+    margin-bottom: 20px;
+    line-height: 1.5;
+}
+
+.modal-body label {
+    display: block;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #1e293b;
+    margin-bottom: 8px;
+}
+
+/* Inputs & Selects */
+#disputeReason, #disputeDetails {
+    width: 100%;
+    padding: 12px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    margin-bottom: 15px;
+    transition: border-color 0.2s;
+}
+
+#disputeReason:focus, #disputeDetails:focus {
+    outline: none;
+    border-color: var(--dark-blue);
+}
+
+#disputeDetails {
+    height: 100px;
+    resize: none;
+}
+
+.modal-footer { 
+    padding: 15px 24px; 
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0; 
+    display: flex; 
+    gap: 12px; 
+    justify-content: flex-end; 
+}
+
+/* Modal Buttons */
+.btn-secondary {
+    background: #e2e8f0;
+    color: #475569;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-danger {
+    background: #ef4444;
+    color: white;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.2);
+}
+
+.btn-danger:hover {
+    background: #dc2626;
+}
+
+/* --- RATING SPECIFIC MODAL --- */
+.rating-modal-card { 
+    background: white; 
+    width: 95%; 
+    max-width: 400px; 
+    border-radius: 20px; 
+    overflow: hidden; 
+    box-shadow: 0 20px 40px rgba(0,0,0,0.2); 
+    animation: modalSlideIn 0.3s ease-out;
+}
+
+.rating-modal-header { 
+    padding: 18px 24px; 
+    background: var(--dark-blue); 
+    color: white; 
+    text-align: center;
+}
+
+.rating-modal-body { 
+    padding: 30px 24px; 
+    text-align: center;
+}
+
+.rating-modal-footer { 
+    padding: 15px 24px; 
+    border-top: 1px solid var(--border);
+}
+
+/* 🎯 Close Icon for Rating Modal */
+.close-rating {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: white;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: 0.2s;
+    position: absolute; /* Keeps it aligned in the header */
+    right: 20px;
+    top: 15px;
+}
+
+.close-rating:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Ensure the header can position the button absolutely */
+.rating-modal-header {
+    position: relative; 
+    padding: 18px 24px;
+    background: var(--dark-blue);
+    color: white;
+    text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+
+/* --- RATING ELEMENTS --- */
+.percent-circle {
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    background: #f0fdf4;
+    color: var(--success);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.6rem;
+    font-weight: 800;
+    margin: 0 auto 10px;
+    border: 3px solid var(--success);
+}
+
+.percent-slider {
+    width: 100%;
+    margin: 20px 0;
+    accent-color: var(--dark-blue);
+    cursor: pointer;
+}
+
+.btn-rating-submit {
+    background: var(--dark-blue);
+    color: white;
+    border: none;
+    padding: 12px;
+    border-radius: 12px;
+    font-weight: 600;
+    width: 100%;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.btn-rating-submit:hover {
+    opacity: 0.9;
+}
+
 
 /* --- MOBILE --- */
 @media (max-width: 768px) {
@@ -541,3 +786,21 @@ body { background: var(--bg-main); height: 100svh; display: flex; align-items: c
 .menu-item:hover{
     background: #f3f4f6;
 }
+
+/* Dispute Button Specific Styling */
+.menu-item.item-danger {
+    color: #ef4444; /* Bright Red */
+    font-weight: 600;
+}
+
+.menu-item.item-danger i {
+    color: #ef4444; /* Ensures the icon is also red */
+}
+
+/* Hover effect for the red button */
+.menu-item.item-danger:hover {
+    background: #fef2f2; /* Very light red/pink background on hover */
+    color: #dc2626;      /* Slightly darker red on hover */
+}
+
+

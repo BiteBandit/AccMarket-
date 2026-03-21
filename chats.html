@@ -50,9 +50,10 @@
             <i class="ph ph-hand-coins"></i> Release Funds
         </div>
 
-        <div id="btnDispute" class="menu-item" onclick="handleDispute()">
-            <i class="ph ph-warning-circle"></i> Dispute
-        </div>
+<div id="btnDispute" class="menu-item item-danger" onclick="handleDispute()">
+    <i class="ph ph-warning-circle"></i> Dispute
+</div>
+
     </div>
 </div>
 
@@ -108,36 +109,48 @@
             <div class="modal-body">
                 <p>Funds will be frozen. A moderator will join this chat.</p>
                 <label>Reason</label>
-                <select id="disputeReason">
-                    <option value="no_delivery">Seller hasn't sent details</option>
-                    <option value="wrong_acc">Account is not as described</option>
-                    <option value="recovered">Account was recovered</option>
-                </select>
+ <select id="disputeReason">
+    <option value="no_delivery">Seller hasn't sent details</option>
+    <option value="wrong_acc">Account is not as described</option>
+    <option value="recovered">Account was recovered</option>
+    <option value="invalid_login">Login details are not working</option>
+    <option value="email_not_changed">Email cannot be changed</option>
+    <option value="missing_items">Items/skins/levels promised are missing</option>
+    <option value="account_banned">Account is banned or restricted</option>
+    <option value="seller_not_responding">Seller stopped responding</option>
+    <option value="partial_delivery">Seller only delivered part of the deal</option>
+    <option value="security_issue">Account still linked to seller (phone/email)</option>
+    <option value="fake_account">Account appears fake or stolen</option>
+</select>
                 <textarea id="disputeDetails" placeholder="Explain what happened..."></textarea>
             </div>
             <div class="modal-footer">
                 <button class="btn-secondary" id="cancelDispute">Cancel</button>
-                <button class="btn-danger" id="submitDispute">Freeze Funds</button>
+                <button class="btn-danger" id="submitDispute">Raise dispute</button>
             </div>
         </div>
     </div>
 
     <div class="modal-overlay" id="ratingModal">
-        <div class="modal-card">
-            <div class="modal-header"><h3>Rate Transaction</h3></div>
-            <div class="modal-body" style="text-align: center;">
-                <div class="percent-circle">
-                    <span id="percentValue">100</span>%
-                </div>
-                <p id="percentLabel" style="color:#10b981; font-weight:bold;">Excellent</p>
-                <input type="range" min="0" max="100" value="100" class="percent-slider" id="ratingSlider">
-                <textarea id="ratingComment" placeholder="Write a review (optional)..."></textarea>
+    <div class="rating-modal-card">
+        <div class="rating-modal-header">
+            <h3>Rate Transaction</h3>
+            <button class="close-rating" id="closeRating">&times;</button>
+        </div>
+        <div class="rating-modal-body">
+            <div class="percent-circle">
+                <span id="percentValue">100</span>%
             </div>
-            <div class="modal-footer">
-                <button class="btn-danger" id="submitRating" style="background: #0b1e5b; width: 100%;">Submit Feedback</button>
-            </div>
+            <p id="percentLabel">Excellent</p>
+            <input type="range" min="0" max="100" value="100" class="percent-slider" id="ratingSlider">
+            <textarea id="ratingComment" placeholder="Write a review (optional)..."></textarea>
+        </div>
+        <div class="rating-modal-footer">
+            <button class="btn-rating-submit" id="submitRating">Submit Feedback</button>
         </div>
     </div>
+</div>
+
 
 
 

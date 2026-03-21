@@ -564,16 +564,26 @@ window.cancelReplyUI = cancelReplyUI;
     const container = document.querySelector('.message-container');
     if (!container || document.getElementById(`msg-${msg.id}`)) return;
 
-// 🎯 1. Handle System/Bank Messages
+    // 🎯 1. Handle System/Bank/Dispute Messages
     if (msg.type === 'system') {
         const systemDiv = document.createElement('div');
         systemDiv.id = `msg-${msg.id}`;
         systemDiv.className = 'msg-system';
-        systemDiv.innerHTML = `<div class="system-pill">${msg.content}</div>`;
+        
+        // Check if message is a dispute to apply red styling
+        const isDispute = msg.content.includes('DISPUTE') || msg.content.includes('⚠️');
+        
+        systemDiv.innerHTML = `
+            <div class="system-pill ${isDispute ? 'dispute-alert' : ''}">
+                ${msg.content}
+            </div>
+        `;
+        
         container.appendChild(systemDiv);
         container.scrollTop = container.scrollHeight;
-        return; // Exit so it doesn't build a normal bubble
+        return; 
     }
+
 
     const isMe = msg.sender_id === currentUser.id;
     const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -736,7 +746,7 @@ async function initSettingsToggle() {
 async function upgradeToStepOne() {
     if (!activeChatId || !currentUser) return;
 
-    const systemText = "💰 Payment confirmed. Funds are now held in Escrow.";
+    const systemText= "💰 Payment confirmed. Funds are now held in Escrow. Seller, please send the login details here so the buyer can verify the account.";
 
     // 1. Update the Conversation Table
     await supabase.from('conversations')
@@ -891,7 +901,7 @@ window.upgradeToStepTwo = async function() {
 
     const confirm = await Swal.fire({
         title: 'Confirm Delivery?',
-        text: "Are you sure you have sent the item? This will notify the buyer.",
+        text: "Are you sure you have sent the account logs? This will notify the buyer.",
         icon: 'question',
         showCancelButton: true,
         confirmButtonText: 'Yes, Delivered'
@@ -899,7 +909,7 @@ window.upgradeToStepTwo = async function() {
 
     if (!confirm.isConfirmed) return;
 
-    const systemText = "📦 Seller has marked the item as delivered. Buyer, please verify and release funds.";
+    const systemText= "📦 Seller has marked the logs as delivered. Buyer, please verify and release funds.";
 
     // 1. Update Conversation Step
     const { error: updateError } = await supabase.from('conversations')
@@ -932,7 +942,7 @@ window.upgradeToStepThree = async function() {
 
     const confirm = await Swal.fire({
         title: 'Release Funds?',
-        text: "Only do this if you have received the item. This action cannot be undone!",
+        text: "Only do this if you have received the logs. This action cannot be undone!",
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#22c55e',
@@ -964,4 +974,196 @@ window.upgradeToStepThree = async function() {
     updateEscrowUI(3);
     document.getElementById('statusMenu')?.classList.remove('show');
     await loadSidebar();
+
+    // 🎯 ADD THIS: Show the rating modal after everything is done
+    document.getElementById('ratingModal').classList.add('active'); 
 };
+
+
+/**
+ * 🎯 DISPUTE MODAL CONTROLLER
+ */
+window.handleDispute = function() {
+    const modal = document.getElementById('disputeModal');
+    if (modal) {
+        // Clear previous inputs
+        document.getElementById('disputeDetails').value = '';
+        modal.classList.add('active');
+    }
+};
+
+// Close logic for the (X) and Cancel buttons
+document.getElementById('closeDispute')?.addEventListener('click', () => {
+    document.getElementById('disputeModal').classList.remove('active');
+});
+
+document.getElementById('cancelDispute')?.addEventListener('click', () => {
+    document.getElementById('disputeModal').classList.remove('active');
+});
+
+/**
+ * 🎯 SUBMIT DISPUTE
+ */
+document.getElementById('submitDispute')?.addEventListener('click', async () => {
+    const reason = document.getElementById('disputeReason').value;
+    const details = document.getElementById('disputeDetails').value;
+    const submitBtn = document.getElementById('submitDispute');
+
+    if (!details.trim()) {
+        Swal.fire('Error', 'Please provide details about the issue.', 'error');
+        return;
+    }
+
+    // Disable button to prevent double-clicks
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="ph ph-circle-notch animate-spin"></i> Raising dispute...';
+
+    try {
+        const reasonLabel = document.querySelector(`#disputeReason option[value="${reason}"]`).text;
+        const systemMsg = `⚠️ DISPUTE OPENED\nReason: ${reasonLabel}\nDetails: ${details}`;
+
+        // 1. Update Conversation Status
+        const { error: convoError } = await supabase
+            .from('conversations')
+            .update({ 
+                status: 'disputed',
+                last_message: `Dispute: ${reasonLabel}` 
+            })
+            .eq('id', activeChatId);
+
+        if (convoError) throw convoError;
+
+        // 2. Insert System Message
+        const { error: msgError } = await supabase
+            .from('messages')
+            .insert([{
+                conversation_id: activeChatId,
+                sender_id: currentUser.id,
+                content: systemMsg,
+                type: 'system'
+            }]);
+
+        if (msgError) throw msgError;
+
+        // 3. Success UI
+        document.getElementById('disputeModal').classList.remove('active');
+        Swal.fire({
+            title: 'Dispute is open',
+            text: 'A moderator has been notified. Do not complete the trade until a decision is made.',
+            icon: 'success',
+            confirmButtonColor: '#0b1e5b'
+        });
+
+        // Optional: Refresh Sidebar to show "Dispute" status
+        if (typeof loadSidebar === 'function') loadSidebar();
+
+    } catch (error) {
+        console.error("Dispute failed:", error);
+        Swal.fire('System Error', 'Could not open dispute. Try again.', 'error');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerText = 'Freeze Funds';
+    }
+});
+
+// --- Handle Slider Movement ---
+const ratingSlider = document.getElementById('ratingSlider');
+if (ratingSlider) {
+    ratingSlider.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        const percentValue = document.getElementById('percentValue');
+        const percentLabel = document.getElementById('percentLabel');
+        
+        if (percentValue) percentValue.innerText = val;
+
+        if (val >= 90) {
+            percentLabel.innerText = "Excellent";
+            percentLabel.style.color = "#10b981";
+        } else if (val >= 50) {
+            percentLabel.innerText = "Good";
+            percentLabel.style.color = "#f59e0b";
+        } else {
+            percentLabel.innerText = "Poor";
+            percentLabel.style.color = "#ef4444";
+        }
+    });
+}
+
+// --- Handle Rating Submission (Using RPC to bypass RLS) ---
+document.getElementById('submitRating')?.addEventListener('click', async () => {
+    const slider = document.getElementById('ratingSlider');
+    const commentArea = document.getElementById('ratingComment');
+    const btn = document.getElementById('submitRating');
+
+    if (!activeChatId || !slider) return;
+
+    const ratingValue = parseInt(slider.value);
+    const comment = commentArea.value.trim();
+
+    // 1. Get Seller ID
+    const { data: chat } = await supabase
+        .from('conversations')
+        .select(`seller_id`)
+        .eq('id', activeChatId)
+        .single();
+
+    if (!chat?.seller_id) return;
+    const sellerId = chat.seller_id;
+
+    // 🎯 2. CALCULATE BOOST
+    let boost = 0;
+    if (ratingValue >= 90) boost = 1.5;
+    else if (ratingValue >= 50) boost = 0.5;
+    else boost = -3.0;
+
+    btn.disabled = true;
+    btn.innerText = "Updating...";
+
+    try {
+        // 3. Save the Review (The buyer is allowed to insert into 'reviews')
+        const { error: revError } = await supabase.from('reviews').insert([{
+            conversation_id: activeChatId,
+            reviewer_id: currentUser.id,
+            seller_id: sellerId,
+            rating: ratingValue,
+            comment: comment
+        }]);
+        if (revError) throw revError;
+
+        // 🎯 4. CALL THE DATABASE FUNCTION (Bypasses RLS)
+        const { error: rpcError } = await supabase.rpc('update_seller_trust', {
+            target_seller_id: sellerId,
+            boost_amount: boost
+        });
+
+        if (rpcError) throw rpcError;
+
+        // 5. Success & Reset
+        document.getElementById('ratingModal').classList.remove('active');
+        
+        // UI Reset
+        slider.value = 100;
+        commentArea.value = "";
+        document.getElementById('percentValue').innerText = "100";
+        document.getElementById('percentLabel').innerText = "Excellent";
+        document.getElementById('percentLabel').style.color = "#10b981";
+
+        Swal.fire('Success', 'Rating submitted!', 'success');
+
+        // Optional: Refresh sidebar to show new score
+        if (typeof loadSidebar === 'function') await loadSidebar();
+
+    } catch (err) {
+        console.error("Critical Error:", err);
+        Swal.fire('Error', 'Could not update seller trust.', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "Submit Feedback";
+    }
+});
+
+
+// Close the rating modal when the (X) is clicked
+document.getElementById('closeRating')?.addEventListener('click', () => {
+    document.getElementById('ratingModal').classList.remove('active');
+});
