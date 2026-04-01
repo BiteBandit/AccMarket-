@@ -564,25 +564,29 @@ window.cancelReplyUI = cancelReplyUI;
     const container = document.querySelector('.message-container');
     if (!container || document.getElementById(`msg-${msg.id}`)) return;
 
-    // 🎯 1. Handle System/Bank/Dispute Messages
-    if (msg.type === 'system') {
-        const systemDiv = document.createElement('div');
-        systemDiv.id = `msg-${msg.id}`;
-        systemDiv.className = 'msg-system';
-        
-        // Check if message is a dispute to apply red styling
-        const isDispute = msg.content.includes('DISPUTE') || msg.content.includes('⚠️');
-        
-        systemDiv.innerHTML = `
-            <div class="system-pill ${isDispute ? 'dispute-alert' : ''}">
-                ${msg.content}
-            </div>
-        `;
-        
-        container.appendChild(systemDiv);
-        container.scrollTop = container.scrollHeight;
-        return; 
-    }
+// 🎯 1. Handle System/Bank/Dispute/Cancel Messages
+if (msg.type === 'system') {
+    const systemDiv = document.createElement('div');
+    systemDiv.id = `msg-${msg.id}`;
+    systemDiv.className = 'msg-system';
+    
+    // Check if message is a dispute OR a cancellation to apply red styling
+    const isAlert = msg.content.includes('DISPUTE') || 
+                    msg.content.includes('CANCELLED') || 
+                    msg.content.includes('⚠️') || 
+                    msg.content.includes('❌');
+    
+    systemDiv.innerHTML = `
+        <div class="system-pill ${isAlert ? 'dispute-alert' : ''}">
+            ${msg.content}
+        </div>
+    `;
+    
+    container.appendChild(systemDiv);
+    container.scrollTop = container.scrollHeight;
+    return; 
+}
+
 
 
     const isMe = msg.sender_id === currentUser.id;
@@ -854,6 +858,8 @@ async function refreshMenuVisibility() {
 
     const btnConfirm = document.getElementById("btnConfirmDelivery");
     const btnRelease = document.getElementById("btnReleaseFunds");
+    const btnCancel = document.getElementById("btnCancel");
+
 
     // Hide both buttons by default
     if (btnConfirm) btnConfirm.style.display = "none";
@@ -872,18 +878,34 @@ async function refreshMenuVisibility() {
     console.log("Current Step:", chat.escrow_step);
 
     // 🕵️ SHOW LOGIC
-    // If I am the Seller, show "Confirm Delivery"
-    if (isSeller) {
+    const step = chat.escrow_step || 1;
+
+    // 1. Seller: Show "Confirm Delivery" ONLY in Step 1
+    if (isSeller && step === 1) {
         console.log("Result: Showing Seller Button");
         if (btnConfirm) btnConfirm.style.display = "flex";
+    } else {
+        if (btnConfirm) btnConfirm.style.display = "none";
     }
 
-    // If I am the Buyer, show "Release Funds"
-    if (isBuyer) {
+    // 2. Buyer: Show "Release Funds" ONLY in Step 2
+    if (isBuyer && step === 2) {
         console.log("Result: Showing Buyer Button");
         if (btnRelease) btnRelease.style.display = "flex";
+    } else {
+        if (btnRelease) btnRelease.style.display = "none";
     }
+
+    // 3. Cancel: Show ONLY in Step 1
+    if (step === 1) {
+        if (btnCancel) btnCancel.style.display = "flex";
+    } else {
+        if (btnCancel) btnCancel.style.display = "none";
+    }
+
+
 }
+
 
 // Global empty functions so you don't get errors when clicking
 window.upgradeToStepTwo = () => console.log("Button clicked: Confirm Delivery");
@@ -894,6 +916,65 @@ window.handleDispute = () => console.log("Button clicked: Dispute");
 document.addEventListener("click", () => {
     document.getElementById("statusMenu")?.classList.remove("show");
 });
+
+/**
+ * 🎯 CANCEL DEAL LOGIC
+ * Only works in Step 1 (Before delivery)
+ */
+window.handleCancelDeal = async function() {
+    if (!activeChatId || !currentUser) return;
+
+    // 1. Ask for confirmation
+    const confirm = await Swal.fire({
+        title: 'Cancel this deal?',
+        text: "This will close the transaction. Only available before delivery.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: 'Yes, cancel it'
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    const systemText = "❌ Transaction Cancelled: The deal has been closed.";
+
+    try {
+        // 2. Update the Conversation Status in Supabase
+        const { error: convoError } = await supabase
+            .from('conversations')
+            .update({ 
+                status: 'cancelled',
+                last_message: systemText,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', activeChatId);
+
+        if (convoError) throw convoError;
+
+        // 3. Insert a System Message into the chat
+        const { error: msgError } = await supabase
+            .from('messages')
+            .insert([{
+                conversation_id: activeChatId,
+                sender_id: currentUser.id,
+                content: systemText,
+                type: 'system'
+            }]);
+
+        if (msgError) throw msgError;
+
+        // 4. UI Cleanup
+        document.getElementById('statusMenu')?.classList.remove('show');
+        Swal.fire('Cancelled', 'The deal is now closed.', 'success');
+        
+        // Refresh sidebar to reflect the new status
+        if (typeof loadSidebar === 'function') await loadSidebar();
+
+    } catch (error) {
+        console.error("Cancel failed:", error);
+        Swal.fire('Error', 'Could not cancel the deal. Try again.', 'error');
+    }
+};
 
 
 window.upgradeToStepTwo = async function() {

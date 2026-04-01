@@ -36,12 +36,14 @@
                         <p class="status" id="headerStatus">Online</p>
                     </div>
                 </div>
-          <div class="header-actions">
+<div class="header-actions">
     <button class="icon-btn" id="menuBtn" onclick="toggleStatusMenu(event)">
         <i class="ph ph-dots-three-vertical"></i>
     </button>
     
     <div id="statusMenu" class="dropdown-menu">
+        
+
         <div id="btnConfirmDelivery" class="menu-item" style="display: none;" onclick="upgradeToStepTwo()">
             <i class="ph ph-package"></i> Confirm Delivery
         </div>
@@ -50,10 +52,13 @@
             <i class="ph ph-hand-coins"></i> Release Funds
         </div>
 
-<div id="btnDispute" class="menu-item item-danger" onclick="handleDispute()">
-    <i class="ph ph-warning-circle"></i> Dispute
-</div>
+        <div id="btnDispute" class="menu-item item-danger" onclick="handleDispute()">
+            <i class="ph ph-warning-circle"></i> Dispute
+        </div>
 
+<div id="btnCancel" class="menu-item item-danger" onclick="handleCancelDeal()">
+            <i class="ph ph-x-circle"></i> Cancel Deal
+        </div>
     </div>
 </div>
 

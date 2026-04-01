@@ -591,3 +591,116 @@ async function showSellerAndAdminLinks() {
 
 // ✅ Run it once page loads
 showSellerAndAdminLinks();
+
+/* ---------- SECURE PROFILE PICTURE UPLOAD ---------- */
+
+const handleProfilePicStats = async () => {
+  const profileInput = document.getElementById("profileInput");
+  const profilePreview = document.getElementById("profilePreview");
+
+  // Get current user
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  // 1. Fetch Profile (including our new tracking column)
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("avatar_url, full_name, last_avatar_update")
+    .eq("id", user.id)
+    .single();
+
+  // Initial load of the picture
+  if (profile?.avatar_url) {
+    profilePreview.src = profile.avatar_url;
+  } else {
+    const name = profile?.full_name || "User";
+    profilePreview.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0b1e5b&color=fff&size=128`;
+  }
+
+  // 2. Handle Upload
+  profileInput.addEventListener("change", async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // --- LIMIT 1: File Size (2MB) ---
+    const maxSize = 2 * 1024 * 1024;
+    if (file.size > maxSize) {
+      Swal.fire({ icon: "error", title: "Too big!", text: "Keep it under 2MB." });
+      profileInput.value = ""; 
+      return;
+    }
+
+    // --- LIMIT 2: Database-Level Cooldown (7 Days) ---
+    const cooldownDays = 7;
+    if (profile?.last_avatar_update) {
+      const lastUpdate = new Date(profile.last_avatar_update).getTime();
+      const now = Date.now();
+      const msInCooldown = cooldownDays * 24 * 60 * 60 * 1000;
+
+      if (now - lastUpdate < msInCooldown) {
+        const diff = msInCooldown - (now - lastUpdate);
+        const daysLeft = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hoursLeft = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+
+        Swal.fire({
+          icon: "info",
+          title: "Cooldown Active",
+          text: `You can change your picture again in ${daysLeft} days and ${hoursLeft} hours.`,
+        });
+        profileInput.value = "";
+        return;
+      }
+    }
+
+    // --- PROCEED WITH UPLOAD ---
+    Swal.fire({ 
+        title: 'Uploading...', 
+        allowOutsideClick: false,
+        didOpen: () => { Swal.showLoading(); } 
+    });
+
+    try {
+      const fileExt = file.name.split(".").pop();
+      // Using a constant filename forces Supabase to OVERWRITE, saving space.
+      const filePath = `${user.id}/avatar.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("avatars")
+        .getPublicUrl(filePath);
+
+      // Update URL and the cooldown timestamp
+      // We add ?t= to the URL to force the browser to refresh the image (cache busting)
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ 
+          avatar_url: `${publicUrl}?t=${Date.now()}`, 
+          last_avatar_update: new Date().toISOString() 
+        })
+        .eq("id", user.id);
+
+      if (updateError) throw updateError;
+
+      Swal.fire({
+        icon: "success",
+        title: "Dope Pic!",
+        text: "Your profile picture has been updated.",
+        timer: 3000,
+        showConfirmButton: false
+      }).then(() => {
+          location.reload(); // Refresh to lock the cooldown and show new pic
+      });
+
+    } catch (err) {
+      console.error(err);
+      Swal.fire({ icon: "error", title: "Failed", text: err.message });
+    }
+  });
+};
+
+handleProfilePicStats();
