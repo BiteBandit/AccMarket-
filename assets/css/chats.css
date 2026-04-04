@@ -231,6 +231,62 @@ body { background: var(--bg-main); height: 100svh; display: flex; align-items: c
     width: 100%;
 }
 
+/* 🎯 The Chat Closed Banner (Lockdown Notice) */
+.chat-closed-notice {
+    background: #f8fafc; /* Very light grey */
+    color: #64748b;      /* Slate grey text */
+    text-align: center;
+    padding: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    /* Smooth entry animation */
+    animation: slideUp 0.3s ease-out;
+}
+
+/* Style for the lock icon */
+.chat-closed-notice i {
+    font-size: 1.1rem;
+    color: #94a3b8;
+}
+
+/* 🎯 Animation for when the chat locks */
+@keyframes slideUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+/* 🎯 Ensure Attachment Button is hidden during lockdown */
+/* If your footer is hidden, this is a backup */
+.chat-footer[style*="display: none"] + .chat-closed-notice {
+    display: flex !important;
+}
+
+/* Ensure the system message container handles the pills correctly */
+.message-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px; /* Increased gap slightly for readability */
+    padding: 15px;
+    overflow-y: auto;
+    flex: 1; /* Allow it to take up all space above the notice */
+}
+
+/* Helper to center the msg-system wrapper */
+.msg-system {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    margin: 8px 0;
+}
+
+
 
 /* --- MESSAGES --- */
 .message-container { 

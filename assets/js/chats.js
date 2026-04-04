@@ -204,12 +204,16 @@ async function initChatWindow() {
     subscribeToMessages();
 
     const { data: chat } = await supabase
-        .from('conversations')
-        .select(`*, 
-            seller:profiles!conversations_seller_id_fkey(id, username, avatar_url, last_seen, show_online), 
-            buyer:profiles!conversations_buyer_id_fkey(id, username, avatar_url, last_seen, show_online)`)
-        .eq('id', activeChatId)
-        .single();
+    .from('conversations')
+    .select(`*, 
+        product_id,
+        product_name, 
+        product_price,
+        seller:profiles!conversations_seller_id_fkey(id, username, avatar_url, last_seen, show_online), 
+        buyer:profiles!conversations_buyer_id_fkey(id, username, avatar_url, last_seen, show_online)`)
+    .eq('id', activeChatId)
+    .single();
+
 
     if (chat) {
         const otherUser = chat.buyer_id === currentUser.id ? chat.seller : chat.buyer;
@@ -223,6 +227,98 @@ async function initChatWindow() {
         } else {
             updateEscrowUI(chat.escrow_step);
         }
+
+// --- 🎯 LOCKDOWN LOGIC (Updated) ---
+const footer = document.querySelector('.chat-footer'); 
+const attachBtn = document.getElementById('attachBtn'); // The plus/clip icon
+const messageInput = document.getElementById('messageInput');
+
+if (chat.status === 'cancelled' || chat.status === 'completed') {
+    if (footer) {
+        // 1. Hide the typing area and attachment button
+        footer.style.display = 'none'; 
+        
+        // 2. Extra Security: Disable the actual input element
+        if (messageInput) messageInput.disabled = true;
+        if (attachBtn) attachBtn.style.pointerEvents = 'none';
+
+        // 3. Add the "Closed" banner if it doesn't exist
+        if (!document.getElementById('closedNotice')) {
+            const notice = document.createElement('div');
+            notice.id = 'closedNotice';
+            notice.className = 'chat-closed-notice';
+            // Using Ph-Fill for a solid lock icon
+            notice.innerHTML = `<i class="ph-fill ph-lock"></i> Transaction Closed — Messaging Disabled`;
+            
+            // Insert the notice where the footer used to be
+            footer.parentNode.appendChild(notice);
+        }
+    }
+} else {
+    // 🔓 RE-ENABLE: If the chat is active (e.g., user switched chats)
+    if (footer) footer.style.display = 'flex';
+    if (messageInput) {
+        messageInput.disabled = false;
+        messageInput.placeholder = "Type a message...";
+    }
+    document.getElementById('closedNotice')?.remove();
+}
+
+
+// --- 🎯 PRODUCT CONTEXT BAR & LOGO LOGIC ---
+const pTitle = document.getElementById('productTitle');
+const pPrice = document.getElementById('productPrice');
+const pImg = document.getElementById('productImg');
+const viewBtn = document.querySelector('.view-listing-btn');
+
+const logos = {
+    instagram: "../images/instagram.png",
+    twitter: "../images/twitter.png",
+    tiktok: "../images/tiktok.png",
+    facebook: "../images/facebook.png",
+    snapchat: "../images/snapchat.png",
+    reddit: "../images/reddit.png",
+    twitch: "../images/twitch.png",
+    discord: "../images/discord.png",
+    linkedin: "../images/linkedin.png",
+    pinterest: "../images/pinterest.png"
+};
+
+if (chat) {
+    if (pTitle) pTitle.innerText = chat.product_name || "Unknown Item";
+    if (pPrice) pPrice.innerText = `₦${chat.product_price || '0.00'}`;
+
+    // Get the correct logo based on the product name
+    if (pImg && chat.product_name) {
+        // Normalize name (e.g., "FACEBOOK " -> "facebook")
+        const platform = chat.product_name.toLowerCase().trim();
+        pImg.src = logos[platform] || "../images/default-platform.png"; 
+    }
+
+    // Redirection Logic
+        // --- 🎯 UPDATED REDIRECTION LOGIC ---
+    if (viewBtn && chat) {
+        viewBtn.onclick = () => {
+            // 1. Clean the platform name (e.g., "FACEBOOK " -> "facebook")
+            const platform = chat.product_name ? chat.product_name.toLowerCase().trim() : "";
+            
+            // 2. Get the product UUID from the conversation table
+            const productId = chat.product_id;
+
+            if (platform && productId) {
+                // Redirects to: ../pages/facebook.html?id=18821243-2792...
+                window.location.href = `../pages/${platform}.html?id=${productId}`;
+            } 
+            else if (platform) {
+                // Fallback if the product_id column is empty
+                window.location.href = `../pages/${platform}.html`;
+            } 
+            else {
+                console.error("Missing platform name to redirect.");
+            }
+        };
+    }
+}
 
 await refreshMenuVisibility();
 
@@ -388,12 +484,14 @@ async function deleteMessage(msgId, senderId) {
     }
 
     try {
-        // 1. Get the content of the message BEFORE we delete it
+        // 1. Get info BEFORE we delete (Added created_at here)
         const { data: msgToDelete } = await supabase
             .from('messages')
-            .select('content, conversation_id')
+            .select('id, conversation_id, created_at')
             .eq('id', msgId)
             .single();
+
+        if (!msgToDelete) return;
 
         // 2. Update the message to 'deleted'
         const { error: msgError } = await supabase
@@ -407,49 +505,48 @@ async function deleteMessage(msgId, senderId) {
 
         if (msgError) throw msgError;
 
-        // 3. 🎯 SMART SIDEBAR CHECK
-        // Fetch the conversation row you showed me
-        const { data: conv } = await supabase
-            .from('conversations')
-            .select('last_message')
-            .eq('id', msgToDelete.conversation_id)
-            .single();
+        // 3. 🎯 THE RELIABLE SIDEBAR UPDATE
+        // Check if there are any messages NEWER than the one we just deleted.
+        // If there are newer messages, we don't need to update the sidebar because 
+        // the deleted message wasn't the "top" one anyway.
+        const { count } = await supabase
+            .from('messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('conversation_id', msgToDelete.conversation_id)
+            .gt('created_at', msgToDelete.created_at);
 
-        // 4. If the sidebar text matches the message we just deleted...
-        if (conv && conv.last_message === msgToDelete.content) {
+        const isLastMessage = count === 0;
+
+        if (isLastMessage) {
+            // If it was the last message, the sidebar should now show the "deleted" status
+            await supabase
+                .from('conversations')
+                .update({ last_message: '🚫 This message was deleted' })
+                .eq('id', msgToDelete.conversation_id);
             
-            // Check if there is any message newer than the one we just deleted
-            const { data: newerMsg } = await supabase
-                .from('messages')
-                .select('id')
-                .eq('conversation_id', msgToDelete.conversation_id)
-                .gt('created_at', msgToDelete.created_at) // Is there anything newer?
-                .limit(1);
-
-            // If no newer message exists, this WAS the last message. Update sidebar.
-            if (!newerMsg || newerMsg.length === 0) {
-                await supabase
-                    .from('conversations')
-                    .update({ last_message: '🚫 This message was deleted' })
-                    .eq('id', msgToDelete.conversation_id);
-                
-                console.log("Sidebar updated to 'Deleted'");
-            }
+            console.log("Sidebar updated to 'Deleted'");
         }
 
         // UI Cleanup
         const msgDiv = document.getElementById(`msg-${msgId}`);
         if (msgDiv) msgDiv.querySelector('.msg-bubble').style.transform = 'translateX(0)';
         
-        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Deleted', showConfirmButton: false, timer: 1500 });
+        Swal.fire({ 
+            toast: true, 
+            position: 'top-end', 
+            icon: 'success', 
+            title: 'Deleted', 
+            showConfirmButton: false, 
+            timer: 1500 
+        });
 
     } catch (err) {
         console.error("[DELETE ERROR]", err.message);
     }
 }
 
-// Ensure this is global!
 window.deleteMessage = deleteMessage;
+
 
 
 
@@ -601,7 +698,7 @@ if (msg.type === 'system') {
         replyHTML = `
             <div class="reply-badge" onclick="scrollToMessage('${msg.reply_to_id}')">
                 <i class="ph ph-arrow-bend-up-left"></i>
-                <span>Replying to <b>${replyName}</b></span>
+                <span>Replying to <b>ORIGINAL</b></span>
             </div>`;
     }
 
@@ -844,10 +941,10 @@ window.toggleStatusMenu = async function(e) {
 async function refreshMenuVisibility() {
     if (!activeChatId || !currentUser) return;
 
-    // Fetch the specific row for this chat
+    // 1. Fetch the data - CRITICAL: Added 'status' to the select
     const { data: chat, error } = await supabase
         .from("conversations")
-        .select("seller_id, buyer_id, escrow_step")
+        .select("seller_id, buyer_id, escrow_step, status")
         .eq("id", activeChatId)
         .single();
 
@@ -856,55 +953,52 @@ async function refreshMenuVisibility() {
         return;
     }
 
+    // 2. Identify the buttons in your HTML
     const btnConfirm = document.getElementById("btnConfirmDelivery");
     const btnRelease = document.getElementById("btnReleaseFunds");
     const btnCancel = document.getElementById("btnCancel");
+    const btnDispute = document.getElementById("btnDispute");
 
-
-    // Hide both buttons by default
-    if (btnConfirm) btnConfirm.style.display = "none";
-    if (btnRelease) btnRelease.style.display = "none";
-
-    // ROLE CHECK
+    // 3. Define the roles and current step
     const isSeller = currentUser.id === chat.seller_id;
     const isBuyer = currentUser.id === chat.buyer_id;
-
-    // LOGS (Check these in F12)
-    console.log("My User ID:  ", currentUser.id);
-    console.log("Seller ID:   ", chat.seller_id);
-    console.log("Buyer ID:    ", chat.buyer_id);
-    console.log("Am I Seller? ", isSeller);
-    console.log("Am I Buyer?  ", isBuyer);
-    console.log("Current Step:", chat.escrow_step);
-
-    // 🕵️ SHOW LOGIC
     const step = chat.escrow_step || 1;
 
-    // 1. Seller: Show "Confirm Delivery" ONLY in Step 1
-    if (isSeller && step === 1) {
-        console.log("Result: Showing Seller Button");
-        if (btnConfirm) btnConfirm.style.display = "flex";
-    } else {
+    // 🛑 LOCKDOWN CHECK: If the deal is cancelled or completed, hide everything and EXIT
+    if (chat.status === 'cancelled' || chat.status === 'completed') {
         if (btnConfirm) btnConfirm.style.display = "none";
-    }
-
-    // 2. Buyer: Show "Release Funds" ONLY in Step 2
-    if (isBuyer && step === 2) {
-        console.log("Result: Showing Buyer Button");
-        if (btnRelease) btnRelease.style.display = "flex";
-    } else {
         if (btnRelease) btnRelease.style.display = "none";
-    }
-
-    // 3. Cancel: Show ONLY in Step 1
-    if (step === 1) {
-        if (btnCancel) btnCancel.style.display = "flex";
-    } else {
         if (btnCancel) btnCancel.style.display = "none";
+        if (btnDispute) btnDispute.style.display = "none";
+        
+        console.log("Result: Chat is closed (Status: " + chat.status + "). Hiding all buttons.");
+        return; // This stops the function here
     }
 
+// 🕵️ SHOW LOGIC (Only runs if status is active)
 
+// 🎯 DISPUTE BUTTON: Show in BOTH Step 1 and Step 2
+if (btnDispute) {
+    // This will show the dispute button as long as the deal isn't finished
+    btnDispute.style.display = "flex"; 
 }
+
+// 🎯 CANCEL BUTTON: Show ONLY in Step 1
+if (btnCancel) {
+    btnCancel.style.display = (step === 1) ? "flex" : "none";
+}
+
+// 🎯 SELLER BUTTON: Confirm Delivery (Only Step 1)
+if (btnConfirm) {
+    btnConfirm.style.display = (isSeller && step === 1) ? "flex" : "none";
+}
+
+// 🎯 BUYER BUTTON: Release Funds (Only Step 2)
+if (btnRelease) {
+    btnRelease.style.display = (isBuyer && step === 2) ? "flex" : "none";
+}
+}
+
 
 
 // Global empty functions so you don't get errors when clicking
@@ -1214,6 +1308,7 @@ document.getElementById('submitRating')?.addEventListener('click', async () => {
         // 🎯 4. CALL THE DATABASE FUNCTION (Bypasses RLS)
         const { error: rpcError } = await supabase.rpc('update_seller_trust', {
             target_seller_id: sellerId,
+            target_buyer_id: currentUser.id,
             boost_amount: boost
         });
 
