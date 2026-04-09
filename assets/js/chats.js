@@ -80,31 +80,36 @@ document.addEventListener('DOMContentLoaded', async () => {
     const searchBar = document.getElementById('chatSearch');
     if(searchBar) searchBar.oninput = (e) => loadSidebar(e.target.value);
 
+// --- 🎯 UPDATED TYPING BROADCASTER ---
 let typingTimeout;
-
 
 if (messageInput) {
     messageInput.addEventListener('input', () => {
-        if (!typingChannel) return;
+        // Only broadcast if we are actually in a chat channel
+        if (!typingChannel || !currentUser) return;
 
-        // 1. Tell the other person we ARE typing
+        // 1. Broadcast your specific ID and typing status
+        // This 'user_id' is used by the listener to filter out your own movements
         typingChannel.track({
-            user_id: currentUser.id,
+            user_id: currentUser.id, 
             isTyping: true
         });
 
-        // 2. Clear previous timer
+        // 2. Clear the previous timer so it doesn't "stop" while you are still typing
         clearTimeout(typingTimeout);
 
-        // 3. If no key is pressed for 2 seconds, tell them we STOPPED
+        // 3. Reset the "stop" signal after 1.5 seconds of no keys pressed
         typingTimeout = setTimeout(() => {
-            typingChannel.track({
-                user_id: currentUser.id,
-                isTyping: false
-            });
-        }, 2000);
+            if (typingChannel) {
+                typingChannel.track({
+                    user_id: currentUser.id,
+                    isTyping: false
+                });
+            }
+        }, 1500); 
     });
 }
+
 
 });
 
@@ -232,32 +237,55 @@ async function initChatWindow() {
     console.log("[CHAT] Refreshing view for:", activeChatId);
     subscribeToMessages();
 
-// --- 🎯 TYPING INDICATOR LISTENER ---
-if (typingChannel) supabase.removeChannel(typingChannel);
+// --- 🎯 UPDATED TYPING INDICATOR LISTENER ---
+if (typingChannel) {
+    supabase.removeChannel(typingChannel);
+}
 
 typingChannel = supabase.channel(`typing-${activeChatId}`, {
-    config: { presence: { key: currentUser.id } }
+    config: { 
+        presence: { 
+            key: currentUser.id 
+        } 
+    }
 });
 
 typingChannel
     .on('presence', { event: 'sync' }, () => {
         const state = typingChannel.presenceState();
-        // Check if anyone OTHER than me is currently typing
+        
+        // Filter: Only show "is typing" if the user_id is NOT mine
         const othersTyping = Object.values(state)
             .flat()
-            .filter(p => p.user_id !== currentUser.id && p.isTyping);
+            .filter(presence => 
+                presence.user_id !== currentUser.id && 
+                presence.isTyping === true             
+            );
 
         const statusLabel = document.getElementById('headerStatus');
+        if (!statusLabel) return;
+
         if (othersTyping.length > 0) {
             statusLabel.innerText = "is typing...";
-            statusLabel.style.color = "#10b981"; // Green color
+            statusLabel.style.color = "#10b981"; 
         } else {
-            // Re-run your existing presence check to show "Online" or "Last seen"
+            // Restore "Online" or "Last seen" using the chat data
             const otherUser = chat.buyer_id === currentUser.id ? chat.seller : chat.buyer;
-            watchPartnerPresence(otherUser);
+            if (typeof watchPartnerPresence === 'function') {
+                watchPartnerPresence(otherUser);
+            }
         }
     })
-    .subscribe();
+    .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+            // Initialize your own presence state as not typing
+            await typingChannel.track({
+                user_id: currentUser.id,
+                isTyping: false
+            });
+        }
+    });
+
 
 
 
