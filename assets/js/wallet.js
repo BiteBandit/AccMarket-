@@ -274,7 +274,7 @@ if (confirmBtn) {
 // =========================
 // KORAPAY PAYMENT LOGIC
 // ========================= 
-async function fundWallet(amount, user) {
+ async function fundWallet(amount, user) {
   try {
     // Get the active session for the token
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -289,13 +289,15 @@ async function fundWallet(amount, user) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          // ADD THIS LINE:
           "Authorization": `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
           amount,
           email: user.email,
-          user_id: user.id
+          user_id: user.id, // Kept for the Edge Function initialization
+          metadata: {
+            user_id: user.id // Added for the Webhook notification
+          }
         })
       }
     );
@@ -319,6 +321,7 @@ async function fundWallet(amount, user) {
     }
   }
 }
+
 
 
 
