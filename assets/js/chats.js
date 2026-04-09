@@ -242,6 +242,8 @@ if (typingChannel) {
     supabase.removeChannel(typingChannel);
 }
 
+// 1. Create channel with 'key' set to currentUser.id
+// This ensures Supabase treats your presence as a distinct entry
 typingChannel = supabase.channel(`typing-${activeChatId}`, {
     config: { 
         presence: { 
@@ -254,7 +256,9 @@ typingChannel
     .on('presence', { event: 'sync' }, () => {
         const state = typingChannel.presenceState();
         
-        // Filter: Only show "is typing" if the user_id is NOT mine
+        // 2. CRITICAL FILTER: 
+        // We look through all presence entries and keep only those 
+        // where the ID is NOT mine and isTyping is true.
         const othersTyping = Object.values(state)
             .flat()
             .filter(presence => 
@@ -266,10 +270,11 @@ typingChannel
         if (!statusLabel) return;
 
         if (othersTyping.length > 0) {
+            // 3. Show for the other person
             statusLabel.innerText = "is typing...";
             statusLabel.style.color = "#10b981"; 
         } else {
-            // Restore "Online" or "Last seen" using the chat data
+            // 4. Reset UI when they stop
             const otherUser = chat.buyer_id === currentUser.id ? chat.seller : chat.buyer;
             if (typeof watchPartnerPresence === 'function') {
                 watchPartnerPresence(otherUser);
@@ -278,13 +283,14 @@ typingChannel
     })
     .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
-            // Initialize your own presence state as not typing
+            // 5. Initialize your state as false immediately on join
             await typingChannel.track({
                 user_id: currentUser.id,
                 isTyping: false
             });
         }
     });
+ 
 
 
 
