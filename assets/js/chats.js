@@ -7,6 +7,8 @@ let messageSubscription = null;
 let statusSubscription = null; 
 let heartbeatInterval = null;
 let replyingTo = null; 
+let typingChannel = null;
+
 
 // --- 1. INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', async () => {
@@ -77,6 +79,33 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const searchBar = document.getElementById('chatSearch');
     if(searchBar) searchBar.oninput = (e) => loadSidebar(e.target.value);
+
+let typingTimeout;
+
+
+if (messageInput) {
+    messageInput.addEventListener('input', () => {
+        if (!typingChannel) return;
+
+        // 1. Tell the other person we ARE typing
+        typingChannel.track({
+            user_id: currentUser.id,
+            isTyping: true
+        });
+
+        // 2. Clear previous timer
+        clearTimeout(typingTimeout);
+
+        // 3. If no key is pressed for 2 seconds, tell them we STOPPED
+        typingTimeout = setTimeout(() => {
+            typingChannel.track({
+                user_id: currentUser.id,
+                isTyping: false
+            });
+        }, 2000);
+    });
+}
+
 });
 
 // --- 2. UPLOAD LOGIC ---
@@ -202,6 +231,35 @@ async function initChatWindow() {
 
     console.log("[CHAT] Refreshing view for:", activeChatId);
     subscribeToMessages();
+
+// --- 🎯 TYPING INDICATOR LISTENER ---
+if (typingChannel) supabase.removeChannel(typingChannel);
+
+typingChannel = supabase.channel(`typing-${activeChatId}`, {
+    config: { presence: { key: currentUser.id } }
+});
+
+typingChannel
+    .on('presence', { event: 'sync' }, () => {
+        const state = typingChannel.presenceState();
+        // Check if anyone OTHER than me is currently typing
+        const othersTyping = Object.values(state)
+            .flat()
+            .filter(p => p.user_id !== currentUser.id && p.isTyping);
+
+        const statusLabel = document.getElementById('headerStatus');
+        if (othersTyping.length > 0) {
+            statusLabel.innerText = "is typing...";
+            statusLabel.style.color = "#10b981"; // Green color
+        } else {
+            // Re-run your existing presence check to show "Online" or "Last seen"
+            const otherUser = chat.buyer_id === currentUser.id ? chat.seller : chat.buyer;
+            watchPartnerPresence(otherUser);
+        }
+    })
+    .subscribe();
+
+
 
     const { data: chat } = await supabase
     .from('conversations')
@@ -819,6 +877,9 @@ async function handleSendMessage() {
         await supabase.from('conversations')
             .update({ last_message: content, updated_at: new Date().toISOString() })
             .eq('id', activeChatId);
+
+if (typingChannel) typingChannel.track({ user_id: currentUser.id, isTyping: false });
+
     }
 }
 
