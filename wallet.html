@@ -243,6 +243,26 @@
   </div>
 
 </div>
+
+<div id="depositModal" class="modal-overlay">
+  <div class="wallet-deposit-card">
+    <div class="modal-header">
+      <h3>Fund Your Wallet</h3>
+      <button id="closeModal" class="close-modal-btn">&times;</button>
+    </div>
+    
+    <p class="modal-subtitle">Enter the amount you wish to deposit below.</p>
+    
+    <div class="input-group">
+      <span class="currency-symbol">₦</span>
+      <input type="number" id="depositAmount" placeholder="0.00" min="100" class="form-control">
+    </div>
+
+    <button id="confirmDepositBtn" class="btn-primary modal-btn">Deposit Now</button>
+    <small class="text-muted">Min deposit: ₦100</small>
+  </div>
+</div>
+
   <!-- Begin of Chaport Live Chat code -->
 <script type="text/javascript">
 (function(w,d,v3){

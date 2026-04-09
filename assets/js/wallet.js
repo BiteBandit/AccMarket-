@@ -42,66 +42,147 @@ document.addEventListener("DOMContentLoaded", () => {
     
     import { supabase } from './supabase-config.js';
 
-// ---------- Wallet JS ----------
+// =========================
+// DOM ELEMENTS
+// =========================
+const walletBalanceEl = document.getElementById("walletBalance");
+const walletTransactionsEl = document.getElementById("walletTransactions");
+
+// =========================
+// GLOBAL STATE
+// =========================
+let allTransactions = [];
+let currentFilter = "all";
+
+// =========================
+// FILTER FUNCTIONS
+// =========================
+function setFilter(type) {
+  currentFilter = type;
+  applyFilter();
+
+  // active button UI
+  document.querySelectorAll(".wallet-filters button").forEach(btn => {
+    btn.classList.remove("active");
+  });
+
+  const activeBtn = document.querySelector(
+    `.wallet-filters button[onclick="setFilter('${type}')"]`
+  );
+
+  if (activeBtn) activeBtn.classList.add("active");
+}
+
+// ⭐ IMPORTANT FIX: expose function to HTML (MODULE FIX)
+window.setFilter = setFilter;
+
+// =========================
+// FILTER LOGIC
+// =========================
+function applyFilter() {
+  let filtered = allTransactions;
+
+  if (currentFilter === "deposit") {
+    filtered = allTransactions.filter(
+      tx => (tx.type || "").toLowerCase() === "deposit"
+    );
+  }
+
+  if (currentFilter === "withdrawal") {
+    filtered = allTransactions.filter(
+      tx => (tx.type || "").toLowerCase() === "withdrawal"
+    );
+  }
+
+  renderTransactions(filtered);
+}
+
+// =========================
+// RENDER FUNCTION
+// =========================
+function renderTransactions(transactions) {
+  if (!transactions || transactions.length === 0) {
+    walletTransactionsEl.innerHTML = `
+      <tr>
+        <td colspan="6" style="text-align:center; padding:1rem; color:var(--secondary)">
+          No transactions yet
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  walletTransactionsEl.innerHTML = transactions.map(tx => {
+
+    const status = (tx.status || "").toLowerCase();
+    const type = (tx.type || "").toLowerCase();
+
+    let statusClass = "status-pending";
+    if (status === "success") statusClass = "status-success";
+    else if (status === "failed") statusClass = "status-failed";
+
+    let amountColor = "var(--black)";
+    if (type === "deposit") amountColor = "var(--green)";
+    else if (type === "withdrawal") amountColor = "var(--red)";
+
+    return `
+      <tr>
+        <td>${new Date(tx.created_at).toLocaleString()}</td>
+        <td style="text-transform:capitalize; font-weight:600;">
+          ${type}
+        </td>
+        <td style="color:${amountColor}; font-weight:600;">
+          ₦${Number(tx.amount).toLocaleString()}
+        </td>
+        <td>${tx.note || "-"}</td>
+        <td class="${statusClass}">${tx.status}</td>
+        <td class="reference">${tx.reference || "-"}</td>
+      </tr>
+    `;
+  }).join("");
+}
+
+
+
+// =========================
+// MAIN WALLET LOGIC
+// =========================
 document.addEventListener("DOMContentLoaded", async () => {
-  const walletBalanceEl = document.getElementById("walletBalance");
-  const walletTransactionsEl = document.getElementById("walletTransactions");
 
   try {
-    // 1️⃣ Get current user
+    // 1️⃣ Get user
     const { data: user, error: userError } = await supabase.auth.getUser();
-    if (userError || !user.user) throw userError || new Error("No user logged in");
+    if (userError || !user.user) throw new Error("No user logged in");
+
+
 
     const userId = user.user.id;
 
-    // 2️⃣ Fetch balance from profiles table
+    // 2️⃣ Get balance
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("balance")
       .eq("id", userId)
       .single();
+
     if (profileError) throw profileError;
 
-    walletBalanceEl.textContent = profile.balance?.toLocaleString() || "0";
+    walletBalanceEl.textContent =
+      profile.balance?.toLocaleString() || "0";
 
-    // 3️⃣ Fetch transactions from wallet table
+    // 3️⃣ Get transactions
     const { data: transactions, error: txError } = await supabase
       .from("wallet")
       .select("created_at, type, amount, note, status, reference")
       .eq("user_id", userId)
       .order("created_at", { ascending: false });
+
     if (txError) throw txError;
 
-    // 4️⃣ Populate table
-    walletTransactionsEl.innerHTML = transactions
-      .map(tx => {
-        let statusClass = "status-pending";
-        if (tx.status === "success") statusClass = "status-success";
-        if (tx.status === "failed") statusClass = "status-failed";
+    // 4️⃣ Save + render
+    allTransactions = transactions || [];
+    applyFilter();
 
-        return `
-          <tr>
-            <td>${new Date(tx.created_at).toLocaleString()}</td>
-            <td>${tx.type}</td>
-            <td>₦${tx.amount.toLocaleString()}</td>
-            <td>${tx.note || ""}</td>
-            <td class="${statusClass}">${tx.status}</td>
-            <td class="reference">${tx.reference || "-"}</td>
-          </tr>
-        `;
-      })
-      .join("");
-
-    // 5️⃣ Optional: handle empty table
-    if (!transactions || transactions.length === 0) {
-      walletTransactionsEl.innerHTML = `
-        <tr>
-          <td colspan="6" style="text-align:center; padding:1rem; color:var(--secondary)">
-            No transactions yet
-          </td>
-        </tr>
-      `;
-    }
   } catch (err) {
     console.error("Wallet error:", err);
     walletTransactionsEl.innerHTML = `
@@ -112,7 +193,134 @@ document.addEventListener("DOMContentLoaded", async () => {
       </tr>
     `;
   }
+
 });
+
+// =========================
+// MODAL & PAYMENT BRIDGE
+// =========================
+
+// 1. Select the elements
+const depositModal = document.getElementById("depositModal");
+const openModalBtn = document.getElementById("depositBtn"); // Button on dashboard
+const closeModalBtn = document.getElementById("closeModal");
+const confirmBtn = document.getElementById("confirmDepositBtn"); // Button inside modal
+const amountInput = document.getElementById("depositAmount");
+
+// 2. Open Modal
+if (openModalBtn && depositModal) {
+  openModalBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    depositModal.classList.add("active");
+  });
+}
+
+// 3. Close Modal Logic
+const handleClose = () => {
+  if (depositModal) {
+    depositModal.classList.remove("active");
+    if (amountInput) amountInput.value = ""; // Clear input for next time
+  }
+};
+
+if (closeModalBtn) closeModalBtn.addEventListener("click", handleClose);
+
+// Close if clicking the dark background
+window.addEventListener("click", (e) => {
+  if (e.target === depositModal) handleClose();
+});
+
+// 4. THE BRIDGE: Connect button click to fundWallet()
+if (confirmBtn) {
+  confirmBtn.addEventListener("click", async () => {
+    // Get the amount from the modal input
+    const amount = amountInput ? parseFloat(amountInput.value) : 0;
+
+    // Validation
+    if (!amount || amount < 100) {
+      alert("Please enter a valid amount (Minimum ₦100).");
+      return;
+    }
+
+    // UI Feedback: Loading state
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = "Redirecting to Payment...";
+
+    try {
+      // Get the current user session from Supabase
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        alert("Your session has expired. Please log in again.");
+        window.location.href = "auth.html";
+        return;
+      }
+
+      // CALL YOUR PAYMENT LOGIC
+      // Passes the 'amount' from input and 'user' from Supabase
+      await fundWallet(amount, user);
+
+    } catch (err) {
+      console.error("Deposit Error:", err);
+      alert("Failed to initiate payment. Please check your connection.");
+      
+      // Reset button if it fails
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = "Deposit Now";
+    }
+  });
+}
+
+// =========================
+// KORAPAY PAYMENT LOGIC
+// ========================= 
+async function fundWallet(amount, user) {
+  try {
+    // Get the active session for the token
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !session) {
+      throw new Error("You must be logged in to deposit.");
+    }
+
+    const res = await fetch(
+      "https://qihzvglznpkytolxkuxz.supabase.co/functions/v1/create-payment",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          // ADD THIS LINE:
+          "Authorization": `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          amount,
+          email: user.email,
+          user_id: user.id
+        })
+      }
+    );
+
+    const data = await res.json();
+
+    if (res.ok && data.checkout_url) {
+      window.location.href = data.checkout_url;
+    } else {
+      throw new Error(data.error || data.message || "Payment initialization failed");
+    }
+  } catch (err) {
+    console.error("Payment Error:", err);
+    alert(err.message);
+    
+    // RESET BUTTON: This prevents the "stuck" state
+    const confirmBtn = document.getElementById("confirmDepositBtn");
+    if (confirmBtn) {
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = "Deposit Now";
+    }
+  }
+}
+
+
 
 // ✅ Get unread notification count for current user (fixed)
 async function loadNotificationCount() {
