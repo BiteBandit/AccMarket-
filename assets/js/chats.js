@@ -80,36 +80,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const searchBar = document.getElementById('chatSearch');
     if(searchBar) searchBar.oninput = (e) => loadSidebar(e.target.value);
 
-// --- 🎯 UPDATED TYPING BROADCASTER ---
-let typingTimeout;
-
-if (messageInput) {
-    messageInput.addEventListener('input', () => {
-        // Only broadcast if we are actually in a chat channel
-        if (!typingChannel || !currentUser) return;
-
-        // 1. Broadcast your specific ID and typing status
-        // This 'user_id' is used by the listener to filter out your own movements
-        typingChannel.track({
-            user_id: currentUser.id, 
-            isTyping: true
-        });
-
-        // 2. Clear the previous timer so it doesn't "stop" while you are still typing
-        clearTimeout(typingTimeout);
-
-        // 3. Reset the "stop" signal after 1.5 seconds of no keys pressed
-        typingTimeout = setTimeout(() => {
-            if (typingChannel) {
-                typingChannel.track({
-                    user_id: currentUser.id,
-                    isTyping: false
-                });
-            }
-        }, 1500); 
-    });
-}
-
 
 });
 
@@ -237,13 +207,12 @@ async function initChatWindow() {
     console.log("[CHAT] Refreshing view for:", activeChatId);
     subscribeToMessages();
 
-// --- 🎯 UPDATED TYPING INDICATOR LISTENER ---
+  // --- 🎯 UPDATED REAL-TIME TYPING LOGIC ---
 if (typingChannel) {
     supabase.removeChannel(typingChannel);
 }
 
-// 1. Create channel with 'key' set to currentUser.id
-// This ensures Supabase treats your presence as a distinct entry
+// 1. Initialize Channel with the current User ID as the unique key
 typingChannel = supabase.channel(`typing-${activeChatId}`, {
     config: { 
         presence: { 
@@ -256,9 +225,7 @@ typingChannel
     .on('presence', { event: 'sync' }, () => {
         const state = typingChannel.presenceState();
         
-        // 2. CRITICAL FILTER: 
-        // We look through all presence entries and keep only those 
-        // where the ID is NOT mine and isTyping is true.
+        // 2. LISTENER: Filter out your own ID so you don't see yourself typing
         const othersTyping = Object.values(state)
             .flat()
             .filter(presence => 
@@ -270,11 +237,10 @@ typingChannel
         if (!statusLabel) return;
 
         if (othersTyping.length > 0) {
-            // 3. Show for the other person
             statusLabel.innerText = "is typing...";
             statusLabel.style.color = "#10b981"; 
         } else {
-            // 4. Reset UI when they stop
+            // Restore "Online" or "Last seen"
             const otherUser = chat.buyer_id === currentUser.id ? chat.seller : chat.buyer;
             if (typeof watchPartnerPresence === 'function') {
                 watchPartnerPresence(otherUser);
@@ -283,13 +249,37 @@ typingChannel
     })
     .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
-            // 5. Initialize your state as false immediately on join
             await typingChannel.track({
                 user_id: currentUser.id,
                 isTyping: false
             });
         }
     });
+
+// 3. BROADCASTER: Attached directly to the input inside this chat context
+const messageInputEl = document.getElementById('messageInput');
+let typingTimeout;
+
+if (messageInputEl) {
+    // We use .oninput to overwrite any old listeners from previous chats
+    messageInputEl.oninput = () => {
+        if (!typingChannel) return;
+
+        typingChannel.track({
+            user_id: currentUser.id,
+            isTyping: true
+        });
+
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => {
+            typingChannel.track({
+                user_id: currentUser.id,
+                isTyping: false
+            });
+        }, 1500); 
+    };
+}
+
  
 
 
