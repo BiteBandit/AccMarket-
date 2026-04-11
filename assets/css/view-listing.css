@@ -525,3 +525,25 @@ body {
     box-shadow: 0 0 0 0 transparent;
   }
 }
+
+
+.notification-badge {
+  display: none;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 4px 7px;
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  line-height: 1;
+  transform: scale(1);
+  transition: transform 0.18s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.notification-badge.pop {
+  transform: scale(1.3);
+}

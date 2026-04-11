@@ -125,9 +125,42 @@ document.addEventListener("DOMContentLoaded", async () => {
     console.error("🌍 Failed to get country info:", err);
   }
 
-  // ✅ Auto-save when editing stops
+  // ✅ Auto-save with 14-Day Cooldown for Name and Username
   [fullNameEl, usernameEl, phoneEl, aboutEl].forEach((el) => {
     el.addEventListener("blur", async () => {
+      const isNameField = el === fullNameEl || el === usernameEl;
+      const newValue = el.textContent.trim();
+      
+      // Get the values currently saved in the database (from the profile object)
+      const originalValue = el === fullNameEl ? profile.full_name : profile.username;
+
+      // Skip if the user didn't actually change the text
+      if (newValue === (originalValue || "")) return;
+
+      // --- 1. COOLDOWN CHECK FOR NAME/USERNAME ---
+      if (isNameField && profile?.last_name_update) {
+        const cooldownDays = 7; 
+        const lastUpdate = new Date(profile.last_name_update).getTime();
+        const now = Date.now();
+        const msInCooldown = cooldownDays * 24 * 60 * 60 * 1000;
+
+        if (now - lastUpdate < msInCooldown) {
+          const diff = msInCooldown - (now - lastUpdate);
+          const daysLeft = Math.ceil(diff / (1000 * 60 * 60 * 24));
+
+          Swal.fire({
+            icon: "warning",
+            title: "Wait a bit!",
+            text: `Names can only be changed once every ${cooldownDays} days. ${daysLeft} days remaining.`,
+          });
+          
+          // Revert the text back to the database value
+          el.textContent = originalValue || "";
+          return;
+        }
+      }
+
+      // --- 2. PREPARE UPDATES ---
       const updates = {
         full_name: fullNameEl.textContent.trim(),
         username: usernameEl.textContent.trim(),
@@ -136,18 +169,27 @@ document.addEventListener("DOMContentLoaded", async () => {
         updated_at: new Date().toISOString(),
       };
 
+      // Only lock the cooldown if a name field was changed
+      if (isNameField) {
+        updates.last_name_update = new Date().toISOString();
+      }
+
+      // --- 3. EXECUTE UPDATE ---
       const { error: updateError } = await supabase
         .from("profiles")
         .update(updates)
         .eq("id", userId);
 
       if (updateError) {
-        Swal.fire({
-          icon: "error",
-          title: "Update Failed",
-          text: updateError.message,
-        });
+        Swal.fire({ icon: "error", title: "Update Failed", text: updateError.message });
       } else {
+        // Update the local profile object so the cooldown works without refreshing
+        if (isNameField) {
+          profile.last_name_update = updates.last_name_update;
+          profile.full_name = updates.full_name;
+          profile.username = updates.username;
+        }
+        
         Swal.fire({
           icon: "success",
           title: "Profile Updated",
@@ -157,6 +199,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     });
   });
+
 
   // ✅ Delete Account (set inactive)
   deleteBtn.addEventListener("click", async () => {
@@ -540,7 +583,7 @@ document.addEventListener("click", async (e) => {
   }
 });
 
-// ✅ Show Sell Account & Analytics links based on role
+// ✅ Show Sell Account link ONLY for Sellers
 async function showSellerAndAdminLinks() {
   try {
     // Get current logged-in user
@@ -566,31 +609,29 @@ async function showSellerAndAdminLinks() {
       return;
     }
 
-    // Select the menu links
+    // Select the Sell Account menu link
     const sellAccountLink = document.querySelector(".seller-only");
-    const analyticsLink = document.querySelector(".analytics-only");
 
-    // Sell Account → admin or seller
-    if (profile.role === "seller" || profile.role === "admin") {
-      if (sellAccountLink) sellAccountLink.style.display = "block";
-    } else {
-      if (sellAccountLink) sellAccountLink.style.display = "none";
+    // Sell Account → ONLY visible for "seller"
+    // This will hide the  link for both "buyer" and "admin"
+    if (sellAccountLink) {
+      if (profile.role === "seller") {
+        sellAccountLink.style.display = "block";
+      } else {
+        sellAccountLink.style.display = "none";
+      }
     }
 
-    // Analytics → admin only
-    if (profile.role === "admin") {
-      if (analyticsLink) analyticsLink.style.display = "block";
-    } else {
-      if (analyticsLink) analyticsLink.style.display = "none";
-    }
+
 
   } catch (err) {
     console.error("⚠️ Error checking role:", err);
   }
 }
 
-// ✅ Run it once page loads
+// Run it once page loads
 showSellerAndAdminLinks();
+
 
 /* ---------- SECURE PROFILE PICTURE UPLOAD ---------- */
 

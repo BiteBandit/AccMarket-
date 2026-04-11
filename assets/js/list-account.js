@@ -41,8 +41,11 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 
-import { supabase } from './supabase-config.js'
-console.log("If this logs, the error is gone!", supabase)
+import { supabase } from './supabase-config.js'; // Added semicolon
+console.log("If this logs, the error is gone!", supabase);
+
+
+
 
 // ✅ Get unread notification count for current user
 async function loadNotificationCount() {
@@ -130,6 +133,37 @@ async function setupNotificationRealtime() {
 // ✅ Activate real-time listener
 setupNotificationRealtime();
 
+(async () => {
+  // 1. Check if user is logged in
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return; // Now valid because it's inside a function
+
+  // 2. Fetch the is_active status
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("is_active")
+    .eq("id", user.id)
+    .single();
+
+  // 3. Professional Account Status Check
+  if (profile && profile.is_active === false) {
+    Swal.fire({
+      title: "Account Deactivated",
+      text: "Your account has been deactivated. Please contact support for assistance.",
+      icon: "error",
+      confirmButtonColor: "#0b1e5b", // Matches your dark blue theme
+      confirmButtonText: "Close",
+      allowOutsideClick: false,
+      allowEscapeKey: false
+    }).then(async () => {
+      await supabase.auth.signOut();
+      window.location.href = "auth.html";
+    });
+    return; // Exit the IIFE
+  }
+})();
+
+
 // ---- LOGOUT FUNCTIONALITY ----
 document.addEventListener("click", async (e) => {
   if (e.target.closest(".logout")) {
@@ -152,8 +186,50 @@ document.addEventListener("click", async (e) => {
   }
 });
 
+(async function restrictToSellers() {
+  try {
+    // 1. Get the current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-// ✅ Show Sell Account & Analytics only for Seller or Admin
+    if (authError || !user) {
+      window.location.href = "auth.html";
+      return;
+    }
+
+    // 2. Fetch the user's role
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError || !profile) return;
+
+    // 3. If NOT a seller, show alert and FORCE LOGOUT
+    if (profile.role !== "seller") {
+      Swal.fire({
+        title: "Access Denied",
+        text: "This page is restricted to Sellers only.",
+        icon: "error",
+        confirmButtonColor: "#0b1e5b", // Matches your chart theme
+        confirmButtonText: "Okay",
+        allowOutsideClick: false,
+        allowEscapeKey: false
+      }).then(async () => {
+        // Clear session and log out
+        await supabase.auth.signOut();
+        localStorage.clear();
+        sessionStorage.clear();
+        window.location.href = "auth.html";
+      });
+    }
+  } catch (err) {
+    console.error("Restriction Error:", err);
+  }
+})();
+
+
+// ✅ Show Sell Account link ONLY for Sellers
 async function showSellerAndAdminLinks() {
   try {
     // Get current logged-in user
@@ -179,22 +255,25 @@ async function showSellerAndAdminLinks() {
       return;
     }
 
-    // Select the menu links
+    // Select the Sell Account menu link
     const sellAccountLink = document.querySelector(".seller-only");
-    const analyticsLink = document.querySelector(".analytics-only");
 
-    // Show links if role is seller or admin
-    if (profile.role === "seller" || profile.role === "admin") {
-      if (sellAccountLink) sellAccountLink.style.display = "block";
-      if (analyticsLink) analyticsLink.style.display = "block";
-    } else {
-      if (sellAccountLink) sellAccountLink.style.display = "none";
-      if (analyticsLink) analyticsLink.style.display = "none";
+    // Sell Account → ONLY visible for "seller"
+    // This will hide the  link for both "buyer" and "admin"
+    if (sellAccountLink) {
+      if (profile.role === "seller") {
+        sellAccountLink.style.display = "block";
+      } else {
+        sellAccountLink.style.display = "none";
+      }
     }
+
+
+
   } catch (err) {
     console.error("⚠️ Error checking role:", err);
   }
 }
 
-// ✅ Run it once page loads
+// Run it once page loads
 showSellerAndAdminLinks();

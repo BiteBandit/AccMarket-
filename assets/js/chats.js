@@ -8,7 +8,22 @@ let statusSubscription = null;
 let heartbeatInterval = null;
 let replyingTo = null; 
 let typingChannel = null;
+let isTyping = false;
 
+// ==========================
+// 💬 STOP TYPING ON SEND
+// ==========================
+function stopTyping() {
+  if (!typingChannel) return;
+
+  typingChannel.track({
+    user_id: currentUser.id,
+    isTyping: false
+  });
+
+  isTyping = false;
+}
+ 
 
 // --- 1. INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', async () => {
@@ -207,80 +222,101 @@ async function initChatWindow() {
     console.log("[CHAT] Refreshing view for:", activeChatId);
     subscribeToMessages();
 
-  // --- 🎯 UPDATED REAL-TIME TYPING LOGIC ---
-if (typingChannel) {
-    supabase.removeChannel(typingChannel);
-}
+// ==========================
+// 🔄 CLEAN START
+// ==========================
+if (typingChannel) supabase.removeChannel(typingChannel);
 
-// 1. Initialize Channel with the current User ID as the unique key
+let lastTypingState = false;
+
+
 typingChannel = supabase.channel(`typing-${activeChatId}`, {
-    config: { 
-        presence: { 
-            key: currentUser.id 
-        } 
-    }
+  config: { presence: { key: currentUser.id } }
 });
 
+// ==========================
+// 👀 HANDLE TYPING DISPLAY
+// ==========================
+const handleTyping = () => {
+  const state = typingChannel.presenceState();
+
+  const othersTyping = Object.values(state)
+    .flat()
+    .filter(p => p?.user_id !== currentUser.id && p?.isTyping === true);
+
+  const isSomeoneTyping = othersTyping.length > 0;
+
+  // 🚀 Prevent unnecessary UI updates
+  if (isSomeoneTyping === lastTypingState) return;
+  lastTypingState = isSomeoneTyping;
+
+  const statusLabel = document.getElementById("headerStatus");
+  if (!statusLabel) return;
+
+  if (isSomeoneTyping) {
+    statusLabel.innerText = "typing...";
+    statusLabel.style.color = "#10b981";
+  } else {
+    if (chat) {
+      const partner =
+        chat.buyer_id === currentUser.id ? chat.seller : chat.buyer;
+
+      watchPartnerPresence(partner);
+    }
+  }
+};
+
+// ==========================
+// 📡 REAL-TIME LISTENER
+// ==========================
 typingChannel
-    .on('presence', { event: 'sync' }, () => {
-        const state = typingChannel.presenceState();
-        
-        // 2. LISTENER: Filter out your own ID so you don't see yourself typing
-        const othersTyping = Object.values(state)
-            .flat()
-            .filter(presence => 
-                presence.user_id !== currentUser.id && 
-                presence.isTyping === true             
-            );
+  .on("presence", { event: "sync" }, handleTyping)
+  .on("presence", { event: "join" }, handleTyping)
+  .on("presence", { event: "leave" }, handleTyping)
+  .subscribe(async (status) => {
+    if (status === "SUBSCRIBED") {
+      // ✅ VERY IMPORTANT (INITIAL PRESENCE)
+      await typingChannel.track({
+        user_id: currentUser.id,
+        isTyping: false
+      });
+    }
+  });
 
-        const statusLabel = document.getElementById('headerStatus');
-        if (!statusLabel) return;
 
-        if (othersTyping.length > 0) {
-            statusLabel.innerText = "is typing...";
-            statusLabel.style.color = "#10b981"; 
-        } else {
-            // Restore "Online" or "Last seen"
-            const otherUser = chat.buyer_id === currentUser.id ? chat.seller : chat.buyer;
-            if (typeof watchPartnerPresence === 'function') {
-                watchPartnerPresence(otherUser);
-            }
-        }
-    })
-    .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-            await typingChannel.track({
-                user_id: currentUser.id,
-                isTyping: false
-            });
-        }
-    });
-
-// 3. BROADCASTER: Attached directly to the input inside this chat context
-const messageInputEl = document.getElementById('messageInput');
-let typingTimeout;
+// ==========================
+// ✍️ TYPING SENDER
+// ==========================
+const messageInputEl = document.getElementById("messageInput");
 
 if (messageInputEl) {
-    // We use .oninput to overwrite any old listeners from previous chats
-    messageInputEl.oninput = () => {
-        if (!typingChannel) return;
+  messageInputEl.addEventListener("input", () => {
+    if (!typingChannel) return;
 
-        typingChannel.track({
-            user_id: currentUser.id,
-            isTyping: true
-        });
+    // ✅ Send "typing" only once
+    if (!isTyping) {
+      typingChannel.track({
+        user_id: currentUser.id,
+        isTyping: true
+      });
+      isTyping = true;
+    }
 
-        clearTimeout(typingTimeout);
-        typingTimeout = setTimeout(() => {
-            typingChannel.track({
-                user_id: currentUser.id,
-                isTyping: false
-            });
-        }, 1500); 
-    };
+    // ⏱ Reset timer
+    clearTimeout(window.typingTimer);
+
+    window.typingTimer = setTimeout(() => {
+      typingChannel.track({
+        user_id: currentUser.id,
+        isTyping: false
+      });
+      isTyping = false;
+    }, 1200); // ⚡ smoother like WhatsApp
+  });
 }
 
- 
+
+
 
 
 
@@ -902,8 +938,7 @@ async function handleSendMessage() {
             .update({ last_message: content, updated_at: new Date().toISOString() })
             .eq('id', activeChatId);
 
-if (typingChannel) typingChannel.track({ user_id: currentUser.id, isTyping: false });
-
+stopTyping();
     }
 }
 

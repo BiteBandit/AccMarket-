@@ -74,6 +74,7 @@
     <script type="module" src="assets/js/dashboard.js" ></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   </head>
   <body>
     <!-- HEADER -->
@@ -199,7 +200,7 @@
     <main class="dashboard-main">
       <!-- Top Greeting -->
       <section class="dashboard-header">
-        <h1>Welcome back, <span id="userName">Kelvin 👋</span></h1>
+        <h1>Welcome back, <span id="userName">User 👋</span></h1>
         <p>Here’s what’s happening with your account today.</p>
       </section>
 
@@ -230,19 +231,22 @@
         </div>
 
         <div class="card">
-          <i class="fas fa-chart-line"></i>
-          <div>
-            <h3>₦0.00</h3>
-            <p>Total Earnings</p>
-          </div>
-        </div>
+  <i class="fas fa-shield-halved"></i> <div>
+    <h3 id="trustScore">0%</h3> <p>Trust Score</p>
+  </div>
+</div>
+
+        
       </section>
 
       <!-- DASHBOARD CHART SECTION -->
-      <section class="dashboard-chart container">
-        <h3 class="chart-title">Account Purchase Overview</h3>
-        <canvas id="userChart"></canvas>
-      </section>
+<section class="dashboard-chart container">
+  <h3 class="chart-title">Account Deals Activity</h3>
+  <div>
+    <canvas id="userChart"></canvas>
+  </div>
+</section>
+
 
       <!-- footer -->
       <footer class="site-footer">
