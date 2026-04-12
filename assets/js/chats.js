@@ -9,21 +9,30 @@ let heartbeatInterval = null;
 let replyingTo = null; 
 let typingChannel = null;
 let isTyping = false;
-
+let typingTimer = null;   // ✅ proper timer reference
+let lastTypingState = null; // ✅ prevents UI flicker  
 // ==========================
-// 💬 STOP TYPING ON SEND
+// 🛑 STOP TYPING (SAFE VERSION)
 // ==========================
 function stopTyping() {
-  if (!typingChannel) return;
+  if (!typingChannel || !isTyping) return;
 
-  typingChannel.track({
-    user_id: currentUser.id,
-    isTyping: false
-  });
+  try {
+    typingChannel.track({
+      user_id: currentUser.id,
+      isTyping: false
+    });
+  } catch (err) {
+    console.warn("Stop typing error:", err);
+  }
 
   isTyping = false;
+
+  if (typingTimer) {
+    clearTimeout(typingTimer);
+    typingTimer = null;
+  }
 }
- 
 
 // --- 1. INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', async () => {
@@ -222,13 +231,15 @@ async function initChatWindow() {
     console.log("[CHAT] Refreshing view for:", activeChatId);
     subscribeToMessages();
 
+  // ==========================
+// 🔄 REAL-TIME TYPING SETUP
 // ==========================
-// 🔄 CLEAN START
-// ==========================
-if (typingChannel) supabase.removeChannel(typingChannel);
-
 let lastTypingState = false;
+let isTyping = false;
 
+if (typingChannel) {
+  supabase.removeChannel(typingChannel);
+}
 
 typingChannel = supabase.channel(`typing-${activeChatId}`, {
   config: { presence: { key: currentUser.id } }
@@ -246,7 +257,7 @@ const handleTyping = () => {
 
   const isSomeoneTyping = othersTyping.length > 0;
 
-  // 🚀 Prevent unnecessary UI updates
+  // 🚀 Prevent unnecessary UI updates (anti flicker)
   if (isSomeoneTyping === lastTypingState) return;
   lastTypingState = isSomeoneTyping;
 
@@ -257,63 +268,72 @@ const handleTyping = () => {
     statusLabel.innerText = "typing...";
     statusLabel.style.color = "#10b981";
   } else {
-    if (chat) {
-      const partner =
-        chat.buyer_id === currentUser.id ? chat.seller : chat.buyer;
+    const partner =
+      chat.buyer_id === currentUser.id ? chat.seller : chat.buyer;
 
+    if (typeof watchPartnerPresence === "function") {
       watchPartnerPresence(partner);
     }
   }
 };
 
 // ==========================
-// 📡 REAL-TIME LISTENER
+// 📡 SUBSCRIBE (REAL-TIME)
 // ==========================
 typingChannel
   .on("presence", { event: "sync" }, handleTyping)
   .on("presence", { event: "join" }, handleTyping)
   .on("presence", { event: "leave" }, handleTyping)
   .subscribe(async (status) => {
+    console.log("Typing channel status:", status);
+
     if (status === "SUBSCRIBED") {
-      // ✅ VERY IMPORTANT (INITIAL PRESENCE)
+      // ✅ Always reset your state
       await typingChannel.track({
         user_id: currentUser.id,
-        isTyping: false
+        isTyping: false,
       });
+    }
+
+    // 🔥 SAFE RECONNECT (NO DUPLICATES)
+    if (status === "CLOSED" || status === "CHANNEL_ERROR") {
+      console.warn("Typing channel lost. Reconnecting...");
+
+      setTimeout(() => {
+        if (typingChannel) supabase.removeChannel(typingChannel);
+        initChatWindow(); // re-init safely
+      }, 2000);
     }
   });
 
 
 // ==========================
-// ✍️ TYPING SENDER
+// ✍️ SENDER LOGIC
 // ==========================
 const messageInputEl = document.getElementById("messageInput");
 
 if (messageInputEl) {
-  messageInputEl.addEventListener("input", () => {
+  messageInputEl.oninput = () => {
     if (!typingChannel) return;
 
-    // ✅ Send "typing" only once
+    // ✅ Send only once (avoid spam)
     if (!isTyping) {
       typingChannel.track({
         user_id: currentUser.id,
-        isTyping: true
+        isTyping: true,
       });
       isTyping = true;
     }
 
-    // ⏱ Reset timer
     clearTimeout(window.typingTimer);
 
+    // ⏱ Auto stop typing
     window.typingTimer = setTimeout(() => {
-      typingChannel.track({
-        user_id: currentUser.id,
-        isTyping: false
-      });
-      isTyping = false;
-    }, 1200); // ⚡ smoother like WhatsApp
-  });
+      stopTyping();
+    }, 1200);
+  };
 }
+
 
 
 
