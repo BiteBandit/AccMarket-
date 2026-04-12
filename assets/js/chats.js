@@ -310,35 +310,29 @@ typingChannel
 // ==========================
 // ✍️ SENDER LOGIC
 // ==========================
+ 
 const messageInputEl = document.getElementById("messageInput");
 
 if (messageInputEl) {
   messageInputEl.oninput = () => {
     if (!typingChannel) return;
 
-    // ✅ Send only once (avoid spam)
-    if (!isTyping) {
-      typingChannel.track({
-        user_id: currentUser.id,
-        isTyping: true,
-      });
-      isTyping = true;
-    }
+    // 🔥 ALWAYS send typing (no blocking)
+    typingChannel.track({
+      user_id: currentUser.id,
+      isTyping: true,
+    });
 
-    clearTimeout(window.typingTimer);
+    isTyping = true;
+
+    clearTimeout(typingTimer);
 
     // ⏱ Auto stop typing
-    window.typingTimer = setTimeout(() => {
+    typingTimer = setTimeout(() => {
       stopTyping();
     }, 1200);
   };
 }
-
-
-
-
-
-
 
 
     const { data: chat } = await supabase
