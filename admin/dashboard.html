@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Command Center | AccMarket</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="assets/css/admin-dashboard.css">
+</head>
+<body>
+
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <aside class="sidebar" id="sidebar">
+        <div class="brand">
+            <div class="logo">A</div>
+            <span>AccMarket Admin</span>
+        </div>
+
+        <nav class="nav-menu">
+            <div class="nav-label">Analytics</div>
+            <a href="#" class="nav-item active" data-section="overview">
+                <i class="fa-solid fa-chart-line"></i> Dashboard
+            </a>
+
+            <div class="nav-label">User Governance</div>
+            <a href="#" class="nav-item" data-section="users">
+                <i class="fa-solid fa-users"></i> Directory
+            </a>
+            <a href="#" class="nav-item" data-section="kyc">
+                <i class="fa-solid fa-id-card"></i> Identity Verification
+            </a>
+            <a href="#" class="nav-item" data-section="banned">
+                <i class="fa-solid fa-user-slash"></i> Restricted Access
+            </a>
+
+            <div class="nav-label">System Audit</div>
+            <a href="#" class="nav-item" data-section="verification">
+                <i class="fa-solid fa-shield-check"></i> Account Audits
+            </a>
+            <a href="#" class="nav-item" data-section="conversations">
+                <i class="fa-solid fa-comments"></i> Communication Logs
+            </a>
+
+            <div class="nav-label">Treasury Management</div>
+            <a href="#" class="nav-item" data-section="withdrawals">
+                <i class="fa-solid fa-money-bill-transfer"></i> Payout Requests
+            </a>
+            <a href="#" class="nav-item" data-section="transactions">
+                <i class="fa-solid fa-list-check"></i> Ledger Reports
+            </a>
+
+            <div class="nav-label">Support Services</div>
+            <a href="#" class="nav-item" data-section="tickets">
+                <i class="fa-solid fa-ticket"></i> Service Tickets
+            </a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <button id="adminLogoutBtn">
+                <i class="fa-solid fa-power-off"></i> Terminate Session
+            </button>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <header class="top-bar">
+            <div class="header-left">
+                <button class="menu-toggle" id="menuToggle" aria-label="Open Menu">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <h1 id="sectionTitle">Platform Overview</h1>
+            </div>
+            
+            <div class="admin-profile">
+                <span id="adminUsername">Loading Security Profile...</span>
+            </div>
+        </header>
+
+        <section id="overviewSection" class="content-section">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>User Intelligence</h3>
+                    <div class="stat-row"><span>Active Buyers</span> <b id="statBuyers">0</b></div>
+                    <div class="stat-row"><span>Verified Sellers</span> <b id="statSellers">0</b></div>
+                    <div class="stat-row"><span>System Administrators</span> <b id="statAdmins">0</b></div>
+                </div>
+
+                <div class="stat-card">
+                    <h3>Financial Oversight</h3>
+                    <div class="stat-value" id="statTotalFunds">₦0.00</div>
+                    <div class="stat-label">Total Platform Liquidity</div>
+                    <hr>
+                    <div class="stat-row">
+                        <span>Outstanding Payouts</span> 
+                        <b id="statPendingPayouts" style="color: #ef4444;">₦0</b>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <h3>Activity Metrics</h3>
+                    <div class="stat-row"><span>Communication Volume</span> <b id="statMessages">0</b></div>
+                    <div class="stat-row"><span>Active Disputes</span> <b id="statDisputes">0</b></div>
+                    <div class="stat-row"><span>Pending Asset Review</span> <b id="statPendingAccs">0</b></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script type="module" src="assets/js/admin-dashboard.js"></script>
+</body>
+</html>

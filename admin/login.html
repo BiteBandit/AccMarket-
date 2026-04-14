@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Login | AccMarket</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script type="module" src="assets/js/login.js"></script>
+
+  <style>
+    :root {
+      --primary-color: #0b1e5b;
+      --accent-color: #3b82f6;
+      --bg-soft: #f8fafc;
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #f4f7fe 0%, #e2e8f0 100%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    .login-card {
+      background: #ffffff;
+      padding: 48px 40px;
+      border-radius: 24px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      width: 100%;
+      max-width: 420px;
+      text-align: center;
+      transition: transform 0.3s ease;
+    }
+
+    .brand-logo {
+      width: 50px;
+      height: 50px;
+      background: var(--primary-color);
+      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      color: white;
+      font-weight: bold;
+      font-size: 24px;
+    }
+
+    .login-card h2 {
+      color: var(--primary-color);
+      font-weight: 700;
+      margin: 0 0 8px 0;
+      letter-spacing: -0.5px;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 14px;
+      margin-bottom: 32px;
+    }
+
+    .input-group {
+      margin-bottom: 24px;
+      text-align: left;
+    }
+
+    .input-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--text-main);
+    }
+
+    .input-group input {
+      width: 100%;
+      padding: 14px 16px;
+      border: 2px solid #e2e8f0;
+      border-radius: 12px;
+      box-sizing: border-box;
+      font-size: 15px;
+      transition: all 0.2s ease;
+      outline: none;
+    }
+
+    .input-group input:focus {
+      border-color: var(--accent-color);
+      box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+    }
+
+    .login-btn {
+      width: 100%;
+      padding: 16px;
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    .login-btn:hover {
+      background-color: #162a75;
+      transform: translateY(-1px);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    }
+
+    .login-btn:active {
+      transform: translateY(0);
+    }
+
+    .footer-links {
+      margin-top: 24px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="login-card">
+    <div class="brand-logo">A</div>
+    <h2>Admin Portal</h2>
+    <p class="subtitle">Secure management for AccMarket</p>
+    
+    <form id="adminLoginForm">
+      <div class="input-group">
+        <label>Email Address</label>
+        <input type="email" id="email" placeholder="name@company.com" required>
+      </div>
+      <div class="input-group">
+        <label>Password</label>
+        <input type="password" id="password" placeholder="••••••••" required>
+      </div>
+      <button type="submit" class="login-btn">Sign In to Dashboard</button>
+    </form>
+
+    <div class="footer-links">
+      Direct access restricted. <br>
+      <a href="#" style="color: #3b82f6; text-decoration: none; margin-top: 10px; display: inline-block;">System Status</a>
+    </div>
+  </div>
+
+</body>
+</html>
