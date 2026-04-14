@@ -1152,57 +1152,76 @@ document.addEventListener("click", () => {
 window.handleCancelDeal = async function() {
     if (!activeChatId || !currentUser) return;
 
-    // 1. Ask for confirmation
-    const confirm = await Swal.fire({
-        title: 'Cancel this deal?',
-        text: "This will close the transaction. Only available before delivery.",
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#ef4444',
-        confirmButtonText: 'Yes, cancel it'
-    });
-
-    if (!confirm.isConfirmed) return;
-
-    const systemText = "❌ Transaction Cancelled: The deal has been closed.";
-
     try {
-        // 2. Update the Conversation Status in Supabase
-        const { error: convoError } = await supabase
+        const { data: chat, error: fetchError } = await supabase
             .from('conversations')
-            .update({ 
-                status: 'cancelled',
-                last_message: systemText,
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', activeChatId);
+            .select('product_price, buyer_id, seller_id, status, product_name')
+            .eq('id', activeChatId)
+            .single();
 
-        if (convoError) throw convoError;
+        if (fetchError || !chat) throw new Error("Deal details not found.");
+        if (chat.status === 'cancelled' || chat.status === 'completed') return;
 
-        // 3. Insert a System Message into the chat
-        const { error: msgError } = await supabase
-            .from('messages')
-            .insert([{
-                conversation_id: activeChatId,
-                sender_id: currentUser.id,
-                content: systemText,
-                type: 'system'
-            }]);
+        const confirm = await Swal.fire({
+            title: 'Cancel & Refund?',
+            text: `₦${chat.product_price} will be refunded and recorded in your wallet history.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            confirmButtonText: 'Yes, Cancel'
+        });
 
-        if (msgError) throw msgError;
+        if (!confirm.isConfirmed) return;
 
-        // 4. UI Cleanup
-        document.getElementById('statusMenu')?.classList.remove('show');
-        Swal.fire('Cancelled', 'The deal is now closed.', 'success');
-        
-        // Refresh sidebar to reflect the new status
+        const systemText = `❌ Deal Cancelled. ₦${chat.product_price} was refunded to the buyer.`;
+
+        // 🚀 The keys here MUST match the names in your SQL function exactly
+        const { error: rpcError } = await supabase.rpc('handle_cancel_refund', {
+            target_buyer_id: chat.buyer_id,
+            refund_amount: parseFloat(chat.product_price),
+            target_conv_id: activeChatId,
+            product_name: chat.product_name // This matches the SQL parameter now
+        });
+
+        if (rpcError) throw rpcError;
+
+        // Update sidebar and chat history
+        await supabase.from('conversations').update({ 
+            last_message: systemText,
+            updated_at: new Date().toISOString()
+        }).eq('id', activeChatId);
+
+        await supabase.from('messages').insert([{
+            conversation_id: activeChatId,
+            sender_id: currentUser.id,
+            content: systemText,
+            type: 'system'
+        }]);
+
+        // Mirror Notification Logic
+        const notifyTargetId = (currentUser.id === chat.buyer_id) ? chat.seller_id : chat.buyer_id;
+        const initiator = (currentUser.id === chat.buyer_id) ? "Buyer" : "Seller";
+
+        await supabase.from('notifications').insert([{
+            user_id: notifyTargetId, 
+            title: "Deal Cancelled",
+            message: `The ${initiator} cancelled the deal for "${chat.product_name}". Funds returned to buyer.`,
+            icon: "fas fa-history",
+            is_read: false,
+            type: "alert"
+        }]);
+
+        Swal.fire('Success', 'Deal cancelled and buyer refunded.', 'success');
         if (typeof loadSidebar === 'function') await loadSidebar();
+        initChatWindow(); 
 
     } catch (error) {
         console.error("Cancel failed:", error);
-        Swal.fire('Error', 'Could not cancel the deal. Try again.', 'error');
+        Swal.fire('Error', 'Transaction failed. Did you run the DROP FUNCTION query?', 'error');
     }
 };
+
+
 
 
 window.upgradeToStepTwo = async function() {
@@ -1311,7 +1330,7 @@ document.getElementById('cancelDispute')?.addEventListener('click', () => {
 });
 
 /**
- * 🎯 SUBMIT DISPUTE
+ * 🎯 SUBMIT DISPUTE (Updated for disputes table integration)
  */
 document.getElementById('submitDispute')?.addEventListener('click', async () => {
     const reason = document.getElementById('disputeReason').value;
@@ -1323,26 +1342,52 @@ document.getElementById('submitDispute')?.addEventListener('click', async () => 
         return;
     }
 
+    if (!activeChatId || !currentUser) return;
+
     // Disable button to prevent double-clicks
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<i class="ph ph-circle-notch animate-spin"></i> Raising dispute...';
 
     try {
+        // 1. Fetch current deal details to get IDs for the disputes table
+        const { data: chat, error: fetchError } = await supabase
+            .from('conversations')
+            .select('buyer_id, seller_id')
+            .eq('id', activeChatId)
+            .single();
+
+        if (fetchError || !chat) throw new Error("Could not retrieve deal details.");
+
         const reasonLabel = document.querySelector(`#disputeReason option[value="${reason}"]`).text;
         const systemMsg = `⚠️ DISPUTE OPENED\nReason: ${reasonLabel}\nDetails: ${details}`;
 
-        // 1. Update Conversation Status
+        // 2. Insert record into the public.disputes table
+        const { error: disputeError } = await supabase
+            .from('disputes')
+            .insert([{
+                conversation_id: activeChatId,
+                buyer_id: chat.buyer_id,
+                seller_id: chat.seller_id,
+                reason: reasonLabel,
+                description: details,
+                status: 'open'
+            }]);
+
+        if (disputeError) throw disputeError;
+
+        // 3. Update Conversation Status to 'disputed'
         const { error: convoError } = await supabase
             .from('conversations')
             .update({ 
                 status: 'disputed',
-                last_message: `Dispute: ${reasonLabel}` 
+                last_message: `⚠️ Dispute: ${reasonLabel}`,
+                updated_at: new Date().toISOString()
             })
             .eq('id', activeChatId);
 
         if (convoError) throw convoError;
 
-        // 2. Insert System Message
+        // 4. Insert System Message into Chat History
         const { error: msgError } = await supabase
             .from('messages')
             .insert([{
@@ -1354,17 +1399,18 @@ document.getElementById('submitDispute')?.addEventListener('click', async () => 
 
         if (msgError) throw msgError;
 
-        // 3. Success UI
+        // 5. Success UI and Cleanup
         document.getElementById('disputeModal').classList.remove('active');
         Swal.fire({
             title: 'Dispute is open',
-            text: 'A moderator has been notified. Do not complete the trade until a decision is made.',
+            text: 'A moderator has been notified. Funds are frozen until a decision is made.',
             icon: 'success',
             confirmButtonColor: '#0b1e5b'
         });
 
-        // Optional: Refresh Sidebar to show "Dispute" status
-        if (typeof loadSidebar === 'function') loadSidebar();
+        // 6. Refresh Sidebar and Chat View
+        if (typeof loadSidebar === 'function') await loadSidebar();
+        initChatWindow(); // Refresh UI to trigger lockdown/notice states
 
     } catch (error) {
         console.error("Dispute failed:", error);
@@ -1374,6 +1420,7 @@ document.getElementById('submitDispute')?.addEventListener('click', async () => 
         submitBtn.innerText = 'Freeze Funds';
     }
 });
+
 
 // --- Handle Slider Movement ---
 const ratingSlider = document.getElementById('ratingSlider');

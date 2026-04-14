@@ -78,15 +78,15 @@ async function loadIntelligenceMetrics() {
             document.getElementById('statTotalFunds').textContent = `₦${totalFunds.toLocaleString()}`;
         }
 
-        // ✅ 2. Fetch Pending Assets (FROM VERIFICATIONS TABLE)
-        const { count: pendingAccs, error: verErr } = await supabase
+        // 2. Fetch Pending Assets (FROM VERIFICATIONS TABLE)
+        const { count: pendingAccs } = await supabase
             .from('verifications')
             .select('*', { count: 'exact', head: true })
             .eq('status', 'pending');
 
         document.getElementById('statPendingAccs').textContent = pendingAccs || 0;
 
-        // ✅ 3. Fetch Outstanding Payouts (FROM WITHDRAWALS TABLE)
+        // 3. Fetch Outstanding Payouts (FROM WITHDRAWALS TABLE)
         const { data: withdrawals, error: payErr } = await supabase
             .from('withdrawals')
             .select('amount')
@@ -99,7 +99,6 @@ async function loadIntelligenceMetrics() {
             document.getElementById('statPendingPayouts').textContent = "₦0";
         }
 
-
         // 4. Communication Volume
         const { count: msgCount } = await supabase
             .from('messages')
@@ -107,8 +106,15 @@ async function loadIntelligenceMetrics() {
 
         document.getElementById('statMessages').textContent = msgCount || 0;
 
-        // 5. Active Disputes (Placeholder until table is created)
-        document.getElementById('statDisputes').textContent = "0";
+        // ✅ 5. Fetch Active Disputes (REPLACED PLACEHOLDER)
+        const { count: disputeCount, error: disputeErr } = await supabase
+            .from('disputes')
+            .select('*', { count: 'exact', head: true })
+            .eq('status', 'open');
+
+        if (!disputeErr) {
+            document.getElementById('statDisputes').textContent = disputeCount || 0;
+        }
 
     } catch (err) {
         console.error("Metric Sync Error:", err);

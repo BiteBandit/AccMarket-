@@ -16,36 +16,17 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
-/* Sidebar Refinement - FIXED FOR CHROME */
+/* Sidebar Refinement */
 .sidebar { 
-    width: 280px; 
+    width: 280px; /* Slightly wider for longer names */
     background: var(--sidebar-bg); 
     height: 100vh; 
     color: white; 
     display: flex; 
     flex-direction: column; 
     position: fixed;
-    top: 0;      /* Ensure it starts at the very top */
-    left: 0;
     z-index: 100;
-    overflow: hidden; /* Prevents the sidebar itself from scrolling */
 }
-
-/* Navigation Styles - Updated to allow internal scrolling */
-.nav-menu { 
-    flex: 1;           /* Tells the menu to take all available middle space */
-    padding: 10px 15px; 
-    overflow-y: auto;  /* Only the menu scrolls if there are too many items */
-}
-
-/* Sidebar Footer - Updated to stay locked at the bottom */
-.sidebar-footer {
-    padding: 20px;
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
-    flex-shrink: 0;    /* CRITICAL: Prevents Chrome from squishing the footer */
-    background: var(--sidebar-bg);
-}
-
 
 .brand { 
     padding: 30px 25px; 
