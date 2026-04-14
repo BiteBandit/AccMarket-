@@ -152,33 +152,149 @@ function renderUserTable(users) {
 }
 
 // --- Exposed Operations (Must be window-scoped for onclick) ---
-window.viewUserFile = (userId) => {
-    Swal.fire({
-        title: 'User Profile',
-        text: `Opening records for ID: ${userId}`,
-        icon: 'info',
-        confirmButtonColor: '#0b1e5b'
-    });
+window.viewUserFile = async (userId) => {
+    Swal.fire({ title: 'Accessing Secure File...', didOpen: () => Swal.showLoading() });
+
+    try {
+        const { data: user, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .single();
+
+        if (error) throw error;
+
+        // Logic to color the trust score (Green for high, Orange for medium, Red for low)
+        const score = parseFloat(user.trust_score || 0);
+        const scoreColor = score >= 7 ? '#22c55e' : (score >= 4 ? '#f59e0b' : '#ef4444');
+
+        Swal.fire({
+            title: `<span style="color: #0b1e5b; font-size: 18px;">Security Dossier: ${user.username}</span>`,
+            width: '500px',
+            html: `
+                <div style="text-align: left; font-family: 'Inter', sans-serif; font-size: 13px; color: #1e293b;">
+                    
+                    <div style="display: flex; align-items: center; gap: 15px; background: #f8fafc; padding: 15px; border-radius: 12px; margin-bottom: 20px;">
+                        <img src="${user.avatar_url || 'https://via.placeholder.com/60'}" style="width: 65px; height: 65px; border-radius: 12px; object-fit: cover; border: 2px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                        <div style="flex: 1;">
+                            <div style="font-weight: 700; font-size: 15px; color: #0b1e5b;">ID: <span style="font-weight: 400; color: #64748b; font-size: 11px;">${user.id}</span></div>
+                            <div style="margin-top: 4px;"><b>Country:</b> ${user.country_flag ? `<img src="${user.country_flag}" width="16">` : ''} ${user.country || 'N/A'}</div>
+                            <div style="margin-top: 4px;"><b>Phone:</b> ${user.country_code || ''}${user.phone || 'Not Linked'}</div>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
+                        <div style="background: #f1f5f9; padding: 12px; border-radius: 10px; text-align: center; border: 1px solid #e2e8f0;">
+                            <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase;">Trust Score</div>
+                            <div style="font-size: 18px; font-weight: 800; color: ${scoreColor};">${score.toFixed(1)} <span style="font-size: 12px; color: #94a3b8;">/ 100</span></div>
+                        </div>
+                        <div style="background: #f1f5f9; padding: 12px; border-radius: 10px; text-align: center; border: 1px solid #e2e8f0;">
+                            <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase;">Verification</div>
+                            <div style="margin-top: 4px;">
+                                <span class="badge ${user.kyc_status === 'verified' ? 'badge-buyer' : 'badge-seller'}" style="padding: 4px 10px;">${user.kyc_status.toUpperCase()}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="background: #ffffff; border: 1px solid #e2e8f0; padding: 15px; border-radius: 12px; margin-bottom: 20px;">
+                        <label style="font-weight: 700; display: block; margin-bottom: 5px; color: #0b1e5b;">Telegram Chat ID (Editable)</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="text" id="editTelegramId" value="${user.telegram_chat_id || ''}" 
+                                style="flex: 1; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none;" 
+                                placeholder="Enter Chat ID">
+                            <button onclick="updateTelegramID('${user.id}')" style="background: #0b1e5b; color: white; border: none; padding: 0 12px; border-radius: 6px; cursor: pointer;">
+                                <i class="fa-solid fa-floppy-disk"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style="font-weight: 700; margin-bottom: 10px; color: #0b1e5b; font-size: 11px; text-transform: uppercase; letter-spacing: 1px;">Security Operations</div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <button onclick="sendAuthLink('${user.email}', 'reset')" style="padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; background: white; cursor: pointer; font-size: 12px; font-weight: 600; color: #1e293b;">
+                            <i class="fa-solid fa-key" style="color: #f59e0b;"></i> Send Reset Link
+                        </button>
+                        <button onclick="sendAuthLink('${user.email}', 'magic')" style="padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; background: white; cursor: pointer; font-size: 12px; font-weight: 600; color: #1e293b;">
+                            <i class="fa-solid fa-wand-magic-sparkles" style="color: #3b82f6;"></i> Send Magic Link
+                        </button>
+                    </div>
+                </div>
+            `,
+            showConfirmButton: false,
+            showCloseButton: true
+        });
+
+    } catch (err) {
+        Swal.fire('System Error', 'Unable to retrieve encrypted file.', 'error');
+    }
 };
 
-window.restrictUserAccess = (userId) => {
-    Swal.fire({
-        title: 'Restrict Access?',
-        text: "This user will be suspended from all marketplace activities.",
-        icon: 'warning',
+// --- Helper: Update Telegram ID ---
+window.updateTelegramID = async (userId) => {
+    const newId = document.getElementById('editTelegramId').value;
+    const { error } = await supabase.from('profiles').update({ telegram_chat_id: newId }).eq('id', userId);
+    
+    if (error) {
+        Swal.showValidationMessage(`Update failed: ${error.message}`);
+    } else {
+        Swal.fire({ icon: 'success', title: 'Telegram ID Synchronized', timer: 1500, showConfirmButton: false });
+    }
+};
+
+// --- Helper: Auth Operations ---
+window.sendAuthLink = async (email, type) => {
+    const isReset = type === 'reset';
+    const { error } = isReset 
+        ? await supabase.auth.resetPasswordForEmail(email) 
+        : await supabase.auth.signInWithOtp({ email });
+
+    if (error) {
+        Swal.fire('Protocol Failed', error.message, 'error');
+    } else {
+        Swal.fire('Success', `${isReset ? 'Reset' : 'Magic'} link transmitted to ${email}`, 'success');
+    }
+};
+
+
+window.restrictUserAccess = async (userId) => {
+    const { value: hours } = await Swal.fire({
+        title: '<span style="color: #ef4444;">Execute Hard Ban</span>',
+        input: 'number',
+        inputLabel: 'How many hours should this user be locked out?',
+        inputPlaceholder: 'e.g., 24, 168, 8760',
         showCancelButton: true,
         confirmButtonColor: '#ef4444',
-        cancelButtonColor: '#94a3b8',
-        confirmButtonText: 'Yes, Restrict'
-    }).then(async (result) => {
-        if (result.isConfirmed) {
-            const { error } = await supabase.from('profiles').update({ role: 'banned' }).eq('id', userId);
-            if (!error) {
-                Swal.fire('Restricted', 'User has been banned.', 'success');
-                loadUserDirectory(); // Refresh table
-            }
+        confirmButtonText: 'Lock Account',
+        inputValidator: (value) => {
+            if (!value) return 'You must enter a duration!';
         }
     });
+
+    if (hours) {
+        Swal.fire({ title: 'Locking Auth Account...', didOpen: () => Swal.showLoading() });
+
+        try {
+            const response = await fetch('https://qihzvglznpkytolxkuxz.supabase.co/functions/v1/admin-ban', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+                },
+                body: JSON.stringify({ 
+                    userId: userId, 
+                    action: 'ban', 
+                    durationHours: parseInt(hours) 
+                })
+            });
+
+            if (!response.ok) throw new Error('Ban request was rejected by the server.');
+
+            Swal.fire('Success', `User has been hard-banned for ${hours} hours.`, 'success');
+            loadUserDirectory(); // Refresh the table
+
+        } catch (err) {
+            Swal.fire('Operation Failed', err.message, 'error');
+        }
+    }
 };
 
 // --- Data Aggregators ---
