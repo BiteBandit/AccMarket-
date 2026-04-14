@@ -273,3 +273,184 @@ hr { border: none; border-top: 1px solid #f1f5f9; margin: 15px 0; }
         display: none; /* Optional: hide profile text to save space on mobile */
     }
 }
+
+
+/* Table Card Styles */
+.table-card {
+    background: white;
+    padding: 24px;
+    border-radius: 20px;
+    box-shadow: var(--card-shadow);
+    margin-top: 20px;
+}
+
+.table-header {
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    margin-bottom: 25px;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.header-info h2 { margin: 0; font-size: 20px; color: var(--sidebar-bg); }
+.header-info p { margin: 5px 0 0 0; color: var(--text-muted); font-size: 14px; }
+
+/* Modern Search Box */
+/* Update this section to keep everything inside the card */
+.header-actions { 
+    display: flex; 
+    align-items: center; /* Vertically centers the button with the input */
+    gap: 10px; 
+    flex-shrink: 0; /* Prevents the buttons from squishing */
+}
+
+/* Specific styling for the refresh button to match your theme */
+.btn-refresh {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    min-width: 42px; /* Set a fixed size */
+    height: 42px;
+    border-radius: 10px;
+    cursor: pointer;
+    color: var(--sidebar-bg);
+    transition: all 0.2s;
+}
+
+.btn-refresh:hover {
+    background: #e2e8f0;
+    color: var(--accent);
+}
+
+/* Center the search bar on mobile screens */
+@media (max-width: 480px) {
+    /* 1. Hide the refresh button entirely */
+    .btn-refresh {
+        display: none !important;
+    }
+
+    /* 2. Center the search bar container */
+    .header-actions {
+        width: 100%;
+        display: flex;
+        justify-content: center; /* This centers the search bar horizontally */
+        margin: 0 auto;
+        padding-bottom: 10px;
+    }
+
+    /* 3. Adjust the search box length for mobile */
+    .search-box {
+        width: 100%;
+        max-width: 320px; /* Adjust this to make it longer or shorter */
+    }
+
+    .search-box input {
+        width: 100%;
+        text-align: center; /* Optional: centers the typing cursor/placeholder */
+        padding: 10px 10px 10px 35px; /* Leave space for the magnifying glass icon */
+        font-size: 14px;
+    }
+
+    /* Ensure the search icon stays visible on the left side */
+    .search-box i {
+        left: 12px;
+    }
+}
+
+  
+.search-box { position: relative; }
+.search-box i { 
+    position: absolute; left: 12px; top: 50%; 
+    transform: translateY(-50%); color: var(--text-muted); 
+}
+.search-box input {
+    padding: 10px 10px 10px 35px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    width: 280px;
+    font-family: inherit;
+    outline: none;
+    transition: 0.2s;
+}
+.search-box input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+
+/* Table Styling */
+.admin-table { width: 100%; border-collapse: collapse; }
+.admin-table thead tr { border-bottom: 2px solid #f1f5f9; }
+.admin-table th { 
+    padding: 15px; text-align: left; 
+    font-size: 12px; text-transform: uppercase; 
+    letter-spacing: 0.5px; color: var(--text-muted); 
+}
+.admin-table td { padding: 16px 15px; border-bottom: 1px solid #f8fafc; vertical-align: middle; }
+
+/* User Identity Cell */
+.user-info { display: flex; align-items: center; gap: 12px; }
+.user-avatar { 
+    width: 35px; height: 35px; background: #e2e8f0; 
+    border-radius: 50%; display: flex; align-items: center; 
+    justify-content: center; font-size: 12px; font-weight: 700; color: var(--sidebar-bg);
+}
+.user-details { display: flex; flex-direction: column; }
+.user-name { font-weight: 600; font-size: 14px; color: var(--sidebar-bg); }
+.user-email { font-size: 12px; color: var(--text-muted); }
+
+/* Classification Badges */
+.badge { 
+    padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; 
+}
+.badge-seller { background: #eff6ff; color: #3b82f6; }
+.badge-buyer { background: #f0fdf4; color: #22c55e; }
+
+/* Operation Buttons */
+/* Operation Buttons Refinement */
+.table-ops { 
+    text-align: right; 
+    white-space: nowrap; /* Keeps buttons on one line */
+}
+
+.op-btn {
+    display: inline-flex; /* Ensures icons center perfectly */
+    align-items: center;
+    justify-content: center;
+    background: white; 
+    border: 1px solid #e2e8f0; 
+    width: 34px; /* Give them explicit circular/square dimensions */
+    height: 34px;
+    border-radius: 8px; 
+    cursor: pointer; 
+    color: var(--text-muted); 
+    transition: 0.2s; 
+    margin-left: 5px;
+}
+
+/* Hover effects for clarity */
+.op-btn:hover.view { 
+    color: var(--accent); 
+    border-color: var(--accent);
+    background: #eff6ff;
+}
+
+.op-btn:hover.restrict { 
+    color: #ef4444; 
+    border-color: #ef4444; 
+    background: #fef2f2;
+}
+
+
+/* Responsive Table */
+.table-responsive { 
+    overflow-x: auto; 
+    width: 100%;
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+}
+
+/* Optional: Make the identity column a bit wider to prevent text wrapping */
+.admin-table th:first-child, 
+.admin-table td:first-child {
+    min-width: 200px;
+}
+

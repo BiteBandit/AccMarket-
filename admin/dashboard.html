@@ -107,6 +107,44 @@
                 </div>
             </div>
         </section>
+
+<section id="overviewSection" class="content-section">
+    </section>
+
+<section id="usersSection" class="content-section" style="display: none;">
+    <div class="table-card">
+        <div class="table-header">
+            <div class="header-info">
+                <h2>User Intelligence Directory</h2>
+                <p>Monitor and manage all registered platform entities.</p>
+            </div>
+            <div class="header-actions">
+                <div class="search-box">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="userSearchInput" placeholder="Search identity or email...">
+                </div>
+                <button class="btn-refresh" title="Refresh Directory"><i class="fa-solid fa-rotate"></i></button>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Identity</th>
+                        <th>Classification</th>
+                        <th>Escrow Balance</th>
+                        <th>Onboarding Date</th>
+                        <th style="text-align: right;">Operations</th>
+                    </tr>
+                </thead>
+                <tbody id="userTableBody">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
     </main>
 
     <script type="module" src="assets/js/admin-dashboard.js"></script>
