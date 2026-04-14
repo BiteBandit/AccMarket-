@@ -86,9 +86,19 @@ async function loadIntelligenceMetrics() {
 
         document.getElementById('statPendingAccs').textContent = pendingAccs || 0;
 
-        // 3. Outstanding Payouts (Placeholder until table is created)
-        // Since table doesn't exist, we default to 0 to avoid errors
-        document.getElementById('statPendingPayouts').textContent = "₦0";
+        // ✅ 3. Fetch Outstanding Payouts (FROM WITHDRAWALS TABLE)
+        const { data: withdrawals, error: payErr } = await supabase
+            .from('withdrawals')
+            .select('amount')
+            .eq('status', 'pending');
+
+        if (!payErr && withdrawals) {
+            const pendingTotal = withdrawals.reduce((sum, w) => sum + (w.amount || 0), 0);
+            document.getElementById('statPendingPayouts').textContent = `₦${pendingTotal.toLocaleString()}`;
+        } else {
+            document.getElementById('statPendingPayouts').textContent = "₦0";
+        }
+
 
         // 4. Communication Volume
         const { count: msgCount } = await supabase
