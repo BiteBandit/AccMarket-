@@ -1,4 +1,4 @@
-import { supabase } from '../../../assets/js/supabase-config.js';
+ import { supabase } from '../../../assets/js/supabase-config.js';
 
 // --- UI Elements ---
 const menuToggle = document.getElementById('menuToggle');
@@ -40,18 +40,15 @@ navItems.forEach(item => {
     item.addEventListener('click', (e) => {
         e.preventDefault();
         
-        // Update UI state
         navItems.forEach(i => i.classList.remove('active'));
         item.classList.add('active');
         
         const section = item.getAttribute('data-section');
         sectionTitle.textContent = item.textContent.trim();
 
-        // Close mobile menu if open
         sidebar.classList.remove('active');
         overlay.classList.remove('active');
 
-        // Toggle Content Sections
         document.querySelectorAll('.content-section').forEach(s => s.style.display = 'none');
         const targetSection = document.getElementById(`${section}Section`);
         if (targetSection) targetSection.style.display = 'block';
@@ -61,60 +58,41 @@ navItems.forEach(item => {
 // --- Data Aggregators ---
 async function loadIntelligenceMetrics() {
     try {
-        // 1. Fetch Profiles for User Stats & Liquidity
-        const { data: users, error: userErr } = await supabase
-            .from('profiles')
-            .select('role, balance');
-
+        // 1. User Stats & Liquidity
+        const { data: users } = await supabase.from('profiles').select('role, balance');
         if (users) {
-            const buyers = users.filter(u => u.role === 'buyer').length;
-            const sellers = users.filter(u => u.role === 'seller').length;
-            const admins = users.filter(u => u.role === 'admin').length;
+            document.getElementById('statBuyers').textContent = users.filter(u => u.role === 'buyer').length;
+            document.getElementById('statSellers').textContent = users.filter(u => u.role === 'seller').length;
+            document.getElementById('statAdmins').textContent = users.filter(u => u.role === 'admin').length;
             const totalFunds = users.reduce((sum, u) => sum + (u.balance || 0), 0);
-
-            document.getElementById('statBuyers').textContent = buyers;
-            document.getElementById('statSellers').textContent = sellers;
-            document.getElementById('statAdmins').textContent = admins;
             document.getElementById('statTotalFunds').textContent = `₦${totalFunds.toLocaleString()}`;
         }
 
-        // 2. Fetch Pending Assets (FROM VERIFICATIONS TABLE)
+        // 2. Pending Assets (Verifications)
         const { count: pendingAccs } = await supabase
             .from('verifications')
             .select('*', { count: 'exact', head: true })
             .eq('status', 'pending');
-
         document.getElementById('statPendingAccs').textContent = pendingAccs || 0;
 
-        // 3. Fetch Outstanding Payouts (FROM WITHDRAWALS TABLE)
-        const { data: withdrawals, error: payErr } = await supabase
+        // 3. Outstanding Payouts (Withdrawals)
+        const { data: withdrawals } = await supabase
             .from('withdrawals')
             .select('amount')
             .eq('status', 'pending');
-
-        if (!payErr && withdrawals) {
-            const pendingTotal = withdrawals.reduce((sum, w) => sum + (w.amount || 0), 0);
-            document.getElementById('statPendingPayouts').textContent = `₦${pendingTotal.toLocaleString()}`;
-        } else {
-            document.getElementById('statPendingPayouts').textContent = "₦0";
-        }
+        const pendingTotal = withdrawals?.reduce((sum, w) => sum + (w.amount || 0), 0) || 0;
+        document.getElementById('statPendingPayouts').textContent = `₦${pendingTotal.toLocaleString()}`;
 
         // 4. Communication Volume
-        const { count: msgCount } = await supabase
-            .from('messages')
-            .select('*', { count: 'exact', head: true });
-
+        const { count: msgCount } = await supabase.from('messages').select('*', { count: 'exact', head: true });
         document.getElementById('statMessages').textContent = msgCount || 0;
 
-        // ✅ 5. Fetch Active Disputes (REPLACED PLACEHOLDER)
-        const { count: disputeCount, error: disputeErr } = await supabase
+        // 5. Active Disputes (Now fully unlocked via RLS)
+        const { count: disputeCount } = await supabase
             .from('disputes')
             .select('*', { count: 'exact', head: true })
             .eq('status', 'open');
-
-        if (!disputeErr) {
-            document.getElementById('statDisputes').textContent = disputeCount || 0;
-        }
+        document.getElementById('statDisputes').textContent = disputeCount || 0;
 
     } catch (err) {
         console.error("Metric Sync Error:", err);
