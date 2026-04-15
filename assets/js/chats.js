@@ -7,32 +7,7 @@ let messageSubscription = null;
 let statusSubscription = null; 
 let heartbeatInterval = null;
 let replyingTo = null; 
-let typingChannel = null;
-let isTyping = false;
-let typingTimer = null;   // ✅ proper timer reference
-let lastTypingState = null; // ✅ prevents UI flicker  
-// ==========================
-// 🛑 STOP TYPING (SAFE VERSION)
-// ==========================
-function stopTyping() {
-  if (!typingChannel || !isTyping) return;
 
-  try {
-    typingChannel.track({
-      user_id: currentUser.id,
-      isTyping: false
-    });
-  } catch (err) {
-    console.warn("Stop typing error:", err);
-  }
-
-  isTyping = false;
-
-  if (typingTimer) {
-    clearTimeout(typingTimer);
-    typingTimer = null;
-  }
-}
 
 // --- 1. INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', async () => {
@@ -230,109 +205,6 @@ async function initChatWindow() {
 
     console.log("[CHAT] Refreshing view for:", activeChatId);
     subscribeToMessages();
-
-  // ==========================
-// 🔄 REAL-TIME TYPING SETUP
-// ==========================
-let lastTypingState = false;
-let isTyping = false;
-
-if (typingChannel) {
-  supabase.removeChannel(typingChannel);
-}
-
-typingChannel = supabase.channel(`typing-${activeChatId}`, {
-  config: { presence: { key: currentUser.id } }
-});
-
-// ==========================
-// 👀 HANDLE TYPING DISPLAY
-// ==========================
-const handleTyping = () => {
-  const state = typingChannel.presenceState();
-
-  const othersTyping = Object.values(state)
-    .flat()
-    .filter(p => p?.user_id !== currentUser.id && p?.isTyping === true);
-
-  const isSomeoneTyping = othersTyping.length > 0;
-
-  // 🚀 Prevent unnecessary UI updates (anti flicker)
-  if (isSomeoneTyping === lastTypingState) return;
-  lastTypingState = isSomeoneTyping;
-
-  const statusLabel = document.getElementById("headerStatus");
-  if (!statusLabel) return;
-
-  if (isSomeoneTyping) {
-    statusLabel.innerText = "typing...";
-    statusLabel.style.color = "#10b981";
-  } else {
-    const partner =
-      chat.buyer_id === currentUser.id ? chat.seller : chat.buyer;
-
-    if (typeof watchPartnerPresence === "function") {
-      watchPartnerPresence(partner);
-    }
-  }
-};
-
-// ==========================
-// 📡 SUBSCRIBE (REAL-TIME)
-// ==========================
-typingChannel
-  .on("presence", { event: "sync" }, handleTyping)
-  .on("presence", { event: "join" }, handleTyping)
-  .on("presence", { event: "leave" }, handleTyping)
-  .subscribe(async (status) => {
-    console.log("Typing channel status:", status);
-
-    if (status === "SUBSCRIBED") {
-      // ✅ Always reset your state
-      await typingChannel.track({
-        user_id: currentUser.id,
-        isTyping: false,
-      });
-    }
-
-    // 🔥 SAFE RECONNECT (NO DUPLICATES)
-    if (status === "CLOSED" || status === "CHANNEL_ERROR") {
-      console.warn("Typing channel lost. Reconnecting...");
-
-      setTimeout(() => {
-        if (typingChannel) supabase.removeChannel(typingChannel);
-        initChatWindow(); // re-init safely
-      }, 2000);
-    }
-  });
-
-
-// ==========================
-// ✍️ SENDER LOGIC
-// ==========================
- 
-const messageInputEl = document.getElementById("messageInput");
-
-if (messageInputEl) {
-  messageInputEl.oninput = () => {
-    if (!typingChannel) return;
-
-    // 🔥 ALWAYS send typing (no blocking)
-    typingChannel.track({
-      user_id: currentUser.id,
-      isTyping: true,
-    });
-
-    isTyping = true;
-
-    clearTimeout(typingTimer);
-
-    // ⏱ Auto stop typing
-    typingTimer = setTimeout(() => {
-      stopTyping();
-    }, 1200);
-  };
-}
 
 
     const { data: chat } = await supabase
@@ -952,7 +824,7 @@ async function handleSendMessage() {
             .update({ last_message: content, updated_at: new Date().toISOString() })
             .eq('id', activeChatId);
 
-stopTyping();
+ 
     }
 }
 
