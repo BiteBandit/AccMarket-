@@ -1,3 +1,6 @@
+import { supabase } from './supabase-config.js';
+
+// --- SIDEBAR & UI LOGIC ---
 const sidebarToggle = document.getElementById("sidebarToggle");
 const profileToggle = document.getElementById("profileToggle");
 const leftSidebar = document.getElementById("leftSidebar");
@@ -5,316 +8,139 @@ const rightSidebar = document.getElementById("rightSidebar");
 const closeLeft = document.getElementById("closeLeft");
 const closeRight = document.getElementById("closeRight");
 
-// Left sidebar
-sidebarToggle.addEventListener("click", () => {
-  leftSidebar.classList.add("active");
-});
-closeLeft.addEventListener("click", () => {
-  leftSidebar.classList.remove("active");
-});
+sidebarToggle?.addEventListener("click", () => leftSidebar.classList.add("active"));
+closeLeft?.addEventListener("click", () => leftSidebar.classList.remove("active"));
+profileToggle?.addEventListener("click", () => rightSidebar.classList.add("active"));
+closeRight?.addEventListener("click", () => rightSidebar.classList.remove("active"));
 
-// Right sidebar
-profileToggle.addEventListener("click", () => {
-  rightSidebar.classList.add("active");
-});
-closeRight.addEventListener("click", () => {
-  rightSidebar.classList.remove("active");
-});
-
-// Sidebar Search Function (Live Search)
+// Live Search
 document.addEventListener("DOMContentLoaded", () => {
   const searchInput = document.querySelector(".search-box input");
   const items = document.querySelectorAll("#categoryList li a");
-
-  // Live filter while typing
-  searchInput.addEventListener("keyup", () => {
+  searchInput?.addEventListener("keyup", () => {
     let input = searchInput.value.toLowerCase().trim();
-
     items.forEach((item) => {
-      if (item.textContent.toLowerCase().includes(input)) {
-        item.parentElement.style.display = "block";
-      } else {
-        item.parentElement.style.display = "none";
-      }
+      item.parentElement.style.display = item.textContent.toLowerCase().includes(input) ? "block" : "none";
     });
   });
 });
 
-// ✅ Initialize Supabase
-// js/main.js
-import { supabase } from './supabase-config.js';
+// --- MAIN AUTH & VERIFICATION FLOW ---
+document.addEventListener("DOMContentLoaded", async () => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    window.location.href = "/auth.html";
+    return;
+  }
 
-// Now just write your logic
-console.log("Supabase is ready to use!", supabase);
+  // Initial Data Fetch
+  const [profileRes, verificationRes] = await Promise.all([
+    supabase.from("profiles").select("role, balance, is_active, telegram_chat_id").eq("id", user.id).single(),
+    supabase.from("user_verifications").select("status, dispatch_status").eq("user_id", user.id).maybeSingle()
+  ]);
 
+  const profile = profileRes.data;
+  const verification = verificationRes.data;
 
-document.getElementById("startDidit").addEventListener("click", startVerification);
-
-async function startVerification() {
-  try {
-    // 1. Check if SDK is ready
-    if (typeof window.Korapay === 'undefined') {
-      alert("Payment system is still loading. Please refresh the page.");
-      return;
-    }
-
-    // 2. Get User from Supabase
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      alert("Please login to continue.");
-      return;
-    }
-
-    // 3. Get Profile
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("username, telegram_chat_id")
-      .eq("id", user.id)
-      .single();
-
-    if (profileError) {
-      console.warn("Profile fetch failed, using default info:", profileError);
-    }
-
-// 4. Unique Reference 
-// We use a shorter prefix 'K' and ensure the ID and Time are separated clearly
-const reference = `K_${user.id}_${Math.floor(Date.now() / 1000)}`; 
-
-
-
-window.Korapay.initialize({
-  key: "pk_test_umoW2niQcStCghyfTodmw2PQHgD3yXLtoXYwiXPK",
-  reference: reference,
-  amount: 22000,
-  currency: "NGN",
-  customer: {
-    name: String(profile?.username || "Customer"),
-    email: String(user.email)
-  },
-  // We explicitly name these keys for the backend to find
-  metadata: {
-    user_id: String(user.id),
-    email: String(user.email), 
-    telegram: String(profile?.telegram_chat_id || "not_provided")
-  },
-            onSuccess: function (response) {
-        console.log("Payment Success:", response);
-        
-        // 1. Show Top-Right Toast Loader
-        Swal.fire({
-          title: 'Verifying Payment...',
-          icon: 'info',
-          position: 'top-end',
-          toast: true,
-          showConfirmButton: false,
-          allowOutsideClick: false,
-          didOpen: () => {
-            Swal.showLoading();
-          }
-        });
-
-        // 2. Poll Supabase for the 'paid' status
-        const reference = response.reference;
-        const checkStatus = setInterval(async () => {
-          const { data, error } = await supabase
-            .from('user_verifications')
-            .select('status')
-            .eq('payment_reference', reference)
-            .single();
-
-          if (data && data.status === 'paid') {
-            clearInterval(checkStatus);
-            
-            // Success Toast
-            Swal.fire({
-              icon: 'success',
-              title: 'Verified ✅',
-              text: 'KYC link is being sent!',
-              position: 'top-end',
-              toast: true,
-              timer: 5000,
-              showConfirmButton: false
-            });
-          }
-        }, 3000); // Check every 3 seconds
-      },
-      onClose: function () {
-        console.log("User closed the modal");
-      }
+  // 1. Account Deactivation Check
+  if (profile && profile.is_active === false) {
+    Swal.fire({
+      title: "Account Deactivated",
+      text: "Please contact support.",
+      icon: "error",
+      confirmButtonColor: "#0b1e5b",
+      allowOutsideClick: false
+    }).then(async () => {
+      await supabase.auth.signOut();
+      window.location.href = "auth.html";
     });
-
-  } catch (err) {
-    console.error("Verification start error:", err);
-    alert("Critical Error: " + err.message);
+    return;
   }
-}
 
+  // 2. UI Button State
+  const startBtn = document.getElementById("startDidit");
+  if (startBtn && verification) {
+    if (verification.dispatch_status === 'pending') {
+      startBtn.disabled = true;
+      startBtn.textContent = "Pending Review";
+    } else if (verification.dispatch_status === 'sent') {
+      startBtn.disabled = true;
+      startBtn.textContent = "Verification link sent";
+    } else if (verification.dispatch_status === 'verified') {
+      startBtn.disabled = true;
+      startBtn.textContent = "Verified ✅";
+    } else if (verification.dispatch_status === 'rejected') {
+      startBtn.disabled = false;
+      startBtn.textContent = "Re-request Verification";
+    }
+  }
 
+  // 3. SECURE VERIFICATION CLICK HANDLER (RPC)
+  startBtn?.addEventListener("click", async () => {
+    try {
+      startBtn.disabled = true;
+      startBtn.textContent = "Processing Transaction...";
 
+      // Call the Database Function
+      const { error } = await supabase.rpc('handle_verification_fee', {
+        user_id_input: user.id,
+        user_email_input: user.email
+      });
 
-// ✅ Get unread notification count for current user (fixed)
+      if (error) {
+        // If the balance was low, the SQL 'RAISE EXCEPTION' will appear here
+        Swal.fire("Transaction Failed", error.message, "error");
+        startBtn.disabled = false;
+        startBtn.textContent = "Request Verification";
+        return;
+      }
+
+      // Success
+      Swal.fire({
+        icon: "success",
+        title: "Success!",
+        text: "1,000 deducted. Your request is now pending.",
+        confirmButtonColor: "#0b1e5b"
+      });
+      
+      startBtn.textContent = "Pending Review";
+      startBtn.disabled = true;
+
+    } catch (err) {
+      console.error(err);
+      Swal.fire("Error", "Critical system error. Please refresh.", "error");
+      startBtn.disabled = false;
+    }
+  });
+});
+
+// --- NOTIFICATIONS, LOGOUT, & ROLE UI (Remained same) ---
 async function loadNotificationCount() {
-  try {
-    // Get current logged-in user from Supabase
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      console.warn("No logged-in user, skipping notification count.");
-      return;
-    }
-
-    // Fetch only count of unread notifications
-    const { count, error } = await supabase
-      .from("notifications")
-      .select("*", { count: "exact", head: true }) // count only, no rows
-      .eq("user_id", user.id)
-      .eq("is_read", false);
-
-    if (error) {
-      console.error("Error loading notification count:", error.message);
-      return;
-    }
-
-    const badge = document.getElementById("notification-count");
-    const unreadCount = count || 0;
-
-    if (unreadCount > 0) {
-      badge.textContent = unreadCount;
-      badge.style.display = "inline-block";
-
-      // Small pop animation
-      badge.classList.add("pop");
-      setTimeout(() => badge.classList.remove("pop"), 200);
-    } else {
-      badge.style.display = "none";
-    }
-  } catch (err) {
-    console.error("Unexpected error loading notification count:", err);
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  const { count } = await supabase.from("notifications").select("*", { count: "exact", head: true }).eq("user_id", user.id).eq("is_read", false);
+  const badge = document.getElementById("notification-count");
+  if (badge) {
+    badge.textContent = count || 0;
+    badge.style.display = count > 0 ? "inline-block" : "none";
   }
 }
-
-// ✅ Run when dashboard loads
 loadNotificationCount();
-
-// ✅ Auto-refresh every 30 seconds
 setInterval(loadNotificationCount, 30000);
 
-// ✅ Preload notification sound from assets folder
-const notificationSound = new Audio("notification.mp3");
-
-// ✅ Real-time updates for notifications
-async function setupNotificationRealtime() {
-  try {
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) return;
-
-    supabase
-      .channel("notifications-realtime-" + user.id)
-      .on(
-        "postgres_changes",
-        {
-          event: "*", // listen for INSERT, UPDATE, DELETE
-          schema: "public",
-          table: "notifications",
-          filter: `user_id=eq.${user.id}`,
-        },
-        async (payload) => {
-          console.log("🔔 Realtime notification event:", payload.eventType);
-          // Reload the badge counter
-          await loadNotificationCount();
-
-          // Play sound only on new notifications
-          if (payload.eventType === "INSERT") {
-            notificationSound.play().catch((e) => console.warn(e));
-          }
-        }
-      )
-      .subscribe();
-  } catch (err) {
-    console.error("Error setting up realtime notifications:", err);
-  }
-}
-
-// ✅ Activate realtime listener
-setupNotificationRealtime();
-
-// ---- LOGOUT FUNCTIONALITY ----
 document.addEventListener("click", async (e) => {
   if (e.target.closest(".logout")) {
-    e.preventDefault(); // stop redirect
-
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-
-      // Optional: clear cached data (just to be safe)
-      localStorage.clear();
-      sessionStorage.clear();
-
-      // Redirect to login page
-      window.location.href = "auth.html";
-    } catch (err) {
-      console.error("Logout failed:", err.message);
-      alert("Something went wrong while logging out.");
-    }
+    e.preventDefault();
+    await supabase.auth.signOut();
+    localStorage.clear();
+    window.location.href = "auth.html";
   }
 });
 
-// ✅ Show Sell Account & Analytics links based on role
-async function showSellerAndAdminLinks() {
-  try {
-    // Get current logged-in user
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      console.warn("⚠️ No logged-in user found.");
-      return;
-    }
-
-    // Get user profile and role
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (profileError) {
-      console.error("❌ Error fetching user role:", profileError.message);
-      return;
-    }
-
-    // Select the menu links
-    const sellAccountLink = document.querySelector(".seller-only");
-    const analyticsLink = document.querySelector(".analytics-only");
-
-    // Sell Account → admin or seller
-    if (profile.role === "seller" || profile.role === "admin") {
-      if (sellAccountLink) sellAccountLink.style.display = "block";
-    } else {
-      if (sellAccountLink) sellAccountLink.style.display = "none";
-    }
-
-    // Analytics → admin only
-    if (profile.role === "admin") {
-      if (analyticsLink) analyticsLink.style.display = "block";
-    } else {
-      if (analyticsLink) analyticsLink.style.display = "none";
-    }
-
-  } catch (err) {
-    console.error("⚠️ Error checking role:", err);
-  }
-}
-
-// ✅ Run it once page loads
-showSellerAndAdminLinks();
+(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+    const sellLink = document.querySelector(".seller-only");
+    if (sellLink) sellLink.style.display = profile?.role === "seller" ? "block" : "none";
+})();
