@@ -60,9 +60,11 @@ navItems.forEach(item => {
         const targetSection = document.getElementById(`${section}Section`);
         if (targetSection) targetSection.style.display = 'block';
 
-        // --- FETCH DATA IF SECTION IS DIRECTORY ---
+   // --- UPDATED LOGIC ---
         if (section === 'users') {
             loadUserDirectory();
+        } else if (section === 'kyc') {
+            loadPaidKYC(); // Trigger the new loading function
         }
     });
 });
@@ -326,6 +328,337 @@ async function loadIntelligenceMetrics() {
         console.error("Metric Sync Error:", err);
     }
 }
+
+/**
+ * ==========================================
+ * IDENTITY VERIFICATION (KYC) SYSTEM
+ * ==========================================
+ */
+
+/**
+ * 1. LOAD VERIFICATION QUEUE
+ * Pulls 'paid' requests and joins 'profiles' using the Foreign Key.
+ */
+window.loadPaidKYC = async () => {
+    const tbody = document.getElementById('kycTableBody');
+    if (!tbody) return;
+
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:40px;"><i class="fa-solid fa-spinner fa-spin"></i> Accessing Linked Records...</td></tr>';
+
+    try {
+        const { data: verifications, error } = await supabase
+            .from('user_verifications') 
+            .select(`
+                id,
+                user_id,
+                email,
+                amount,
+                created_at,
+                dispatch_status,
+                profiles:user_id (
+                    telegram_chat_id, 
+                    telegram_alerts
+                )
+            `)
+            .eq('status', 'paid')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        if (!verifications || verifications.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:40px; color: #64748b;">No pending paid verifications found.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = verifications.map(v => {
+            // Normalize the status string for comparison
+            const dStatus = v.dispatch_status ? v.dispatch_status.trim().toLowerCase() : 'pending';
+
+            // --- UI LOGIC FOR STATUS BADGE ---
+            let statusBadge = '';
+            if (dStatus === 'sent') {
+                statusBadge = `<span class="badge" style="background: #dcfce7; color: #166534; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold;">LINK SENT</span>`;
+            } else if (dStatus === 'rejected') {
+                statusBadge = `<span class="badge" style="background: #fee2e2; color: #991b1b; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold;">REJECTED</span>`;
+            } else {
+                statusBadge = `<span class="badge" style="background: #fefce8; color: #854d0e; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold;">PENDING LINK</span>`;
+            }
+
+            // --- UI LOGIC FOR VERIFY BUTTON ---
+            // Only allow verification if the link has been successfully sent
+            const isDispatched = dStatus === 'sent';
+            const verifyBtnStyle = isDispatched 
+                ? 'background: #22c55e; cursor: pointer;' 
+                : 'background: #cbd5e1; cursor: not-allowed; opacity: 0.6;';
+            
+            const verifyOnClick = isDispatched 
+                ? `onclick="promoteToSeller('${v.user_id}', '${v.id}')"` 
+                : `onclick="Swal.fire('Locked', 'You must dispatch a verification link before promoting this user.', 'info')"`;
+
+            return `
+                <tr class="kyc-row">
+                    <td>
+                        <div class="user-details">
+                            <span style="font-weight:600; display:block; color: #0b1e5b;">${v.email}</span>
+                            <span style="font-size: 10px; color: #64748b; font-family: monospace;">UID: ${v.user_id}</span>
+                        </div>
+                    </td>
+                    <td><b style="color: #0b1e5b;">₦${parseFloat(v.amount).toLocaleString()}</b></td>
+                    <td>${statusBadge}</td>
+                    <td class="date-text">${new Date(v.created_at).toLocaleDateString()}</td>
+                    <td style="text-align: right; display: flex; gap: 8px; justify-content: flex-end;">
+                        <button class="op-btn" onclick="openDispatchModal('${v.user_id}', '${v.email}', '${v.id}')" title="Dispatch Link" style="background: #3b82f6; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor:pointer;">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </button>
+                        
+                        <button class="op-btn" ${verifyOnClick} title="Verify & Promote" style="${verifyBtnStyle} color: white; border: none; padding: 8px 12px; border-radius: 4px;">
+                            <i class="fa-solid fa-user-check"></i>
+                        </button>
+
+                        <button class="op-btn" onclick="rejectVerification('${v.user_id}', '${v.id}')" title="Reject Request" style="background: #ef4444; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor:pointer;">
+                            <i class="fa-solid fa-user-xmark"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+    } catch (err) {
+        console.error("Verification Load Error:", err);
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:40px; color: #ef4444;">Error: ${err.message}</td></tr>`;
+    }
+};
+
+
+/**
+ * 2. REAL-TIME SEARCH FILTER
+ */
+window.filterKYCTable = () => {
+    const input = document.getElementById('kycSearchInput').value.toLowerCase();
+    const rows = document.querySelectorAll('.kyc-row');
+
+    rows.forEach(row => {
+        const text = row.innerText.toLowerCase();
+        row.style.display = text.includes(input) ? '' : 'none';
+    });
+};
+
+/**
+ * 3. DISPATCH MODAL (With Session Auth)
+ */
+window.openDispatchModal = async (userId, email, requestId) => {
+    const { value: link } = await Swal.fire({
+        title: 'Dispatch Accmarket Link',
+        input: 'url',
+        inputLabel: `Sending verification to ${email}`,
+        inputPlaceholder: 'https://verify.accmarket.name.ng/status/...',
+        showCancelButton: true,
+        confirmButtonColor: '#0b1e5b',
+        confirmButtonText: 'Send to Email & Telegram'
+    });
+
+    if (link) {
+        Swal.fire({ title: 'Broadcasting to Accmarket...', didOpen: () => Swal.showLoading() });
+
+        try {
+            // 1. Get Active Session Token
+            const { data: { session } } = await supabase.auth.getSession();
+            
+            // 2. Fetch profile data for Telegram/Username
+            const { data: profile, error: profileError } = await supabase
+                .from('profiles')
+                .select('username, telegram_chat_id, telegram_alerts')
+                .eq('id', userId)
+                .single();
+
+            if (profileError) throw new Error("Could not find user profile.");
+
+            // 3. Trigger the Edge Function (Email & Telegram)
+            const { error: funcError } = await supabase.functions.invoke('kyc-notifications', {
+                body: { 
+                    userId,
+                    email, 
+                    link, 
+                    username: profile?.username,
+                    action: 'dispatch_kyc',
+                    telegramId: profile?.telegram_chat_id,
+                    canSendTelegram: profile?.telegram_alerts || false 
+                },
+                headers: {
+                    Authorization: `Bearer ${session?.access_token}`
+                }
+            });
+
+            if (funcError) throw new Error(`Function Error: ${funcError.message}`);
+
+            // 4. UPDATE DISPATCH PROGRESS
+            // We now update the explicit 'dispatch_status' column to 'sent'
+            const { error: updateError } = await supabase
+                .from('user_verifications')
+                .update({ 
+                    dispatch_status: 'sent',
+                    updated_at: new Date().toISOString() 
+                })
+                .eq('id', requestId);
+
+            if (updateError) throw updateError;
+
+            console.log("Database updated: dispatch_status set to 'sent'");
+
+            // 5. Success Feedback & Table Reload
+            Swal.fire({
+                icon: 'success',
+                title: 'Dispatched!',
+                text: 'Notification sent and status updated to LINK SENT.',
+                confirmButtonColor: '#0b1e5b'
+            });
+            
+            if (typeof loadPaidKYC === 'function') {
+                loadPaidKYC(); // This will now catch the 'sent' status and show the green badge
+            }
+
+        } catch (err) {
+            console.error("Dispatch Error:", err);
+            Swal.fire('Notification Failed', err.message, 'error');
+        }
+    }
+};
+
+
+/**
+ * 4. APPROVE & PROMOTE (With Session Auth)
+ */
+window.promoteToSeller = async (userId, requestId) => {
+    const result = await Swal.fire({
+        title: 'Verify & Promote?',
+        text: "User will be upgraded to 'Seller' status on Accmarket.",
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#22c55e',
+        confirmButtonText: 'Yes, Promote'
+    });
+
+    if (result.isConfirmed) {
+        Swal.fire({ title: 'Upgrading Profile...', didOpen: () => Swal.showLoading() });
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('email, username, telegram_chat_id, telegram_alerts')
+                .eq('id', userId)
+                .single();
+
+            // 1. Upgrade User Role
+            await supabase.from('profiles')
+                .update({ role: 'seller', kyc_status: 'verified' })
+                .eq('id', userId);
+
+            // 2. Update Verification Record 
+            // We set status to 'verified' and dispatch_status to 'verified'
+            const { error: updateError } = await supabase
+                .from('user_verifications')
+                .update({ 
+                    status: 'verified', 
+                    dispatch_status: 'verified', // Synchronize tracking
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', requestId);
+
+            if (updateError) throw updateError;
+
+            // 3. Notify the User (Rebranded to Accmarket in Edge Function)
+            await supabase.functions.invoke('kyc-notifications', {
+                body: { 
+                    email: profile?.email,
+                    username: profile?.username,
+                    action: 'notify_approval',
+                    telegramId: profile?.telegram_chat_id,
+                    canSendTelegram: profile?.telegram_alerts || false 
+                },
+                headers: {
+                    Authorization: `Bearer ${session?.access_token}`
+                }
+            });
+
+            Swal.fire('Approved', 'User is now a verified seller.', 'success');
+            
+            // Refresh table (This row will now disappear from the 'Paid' list)
+            loadPaidKYC(); 
+            
+        } catch (err) {
+            console.error("Promotion Error:", err);
+            Swal.fire('Failed', err.message, 'error');
+        }
+    }
+};
+ 
+
+/**
+ * 5. REJECT & NOTIFY (With Session Auth)
+ */
+window.rejectVerification = async (userId, requestId) => {
+    const { value: reason } = await Swal.fire({
+        title: 'Reject Accmarket Request?',
+        input: 'textarea',
+        inputLabel: 'Reason for rejection',
+        inputPlaceholder: 'e.g. Please provide a clearer ID...',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: 'Mark as Rejected'
+    });
+
+    if (reason) {
+        Swal.fire({ title: 'Updating Dispatch Status...', didOpen: () => Swal.showLoading() });
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('email, username, telegram_chat_id, telegram_alerts')
+                .eq('id', userId)
+                .single();
+
+            // KEEP status as 'paid', but change dispatch_status to 'rejected'
+            const { error: updateError } = await supabase
+                .from('user_verifications')
+                .update({ 
+                    dispatch_status: 'rejected',
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', requestId);
+
+            if (updateError) throw updateError;
+            
+            // Send the notification via Edge Function
+            await supabase.functions.invoke('kyc-notifications', {
+                body: { 
+                    email: profile?.email,
+                    username: profile?.username,
+                    reason: reason,
+                    action: 'notify_rejection',
+                    telegramId: profile?.telegram_chat_id,
+                    canSendTelegram: profile?.telegram_alerts || false 
+                },
+                headers: {
+                    Authorization: `Bearer ${session?.access_token}`
+                }
+            });
+
+            Swal.fire('Rejected', 'User remains in the "Paid" list with a REJECTED status.', 'success');
+            loadPaidKYC(); // Refresh to show the new badge
+
+        } catch (err) {
+            console.error("Rejection Error:", err);
+            Swal.fire('Error', err.message, 'error');
+        }
+    }
+};
+
+
+
+
+
 
 // --- Session Termination ---
 document.getElementById('adminLogoutBtn').addEventListener('click', async () => {

@@ -7,7 +7,7 @@
   --light-gray: #e5e7eb;
 }
 
-body {
+body { 
   font-family: "Inter", sans-serif;
   margin: 0;
   background: var(--milk);

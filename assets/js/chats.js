@@ -1021,6 +1021,7 @@ document.addEventListener("click", () => {
  * 🎯 CANCEL DEAL LOGIC
  * Only works in Step 1 (Before delivery)
  */
+
 window.handleCancelDeal = async function() {
     if (!activeChatId || !currentUser) return;
 
@@ -1045,19 +1046,26 @@ window.handleCancelDeal = async function() {
 
         if (!confirm.isConfirmed) return;
 
+        // 🕒 FIX: Get the local time string (e.g., "06:00 PM")
+        const localTime = new Date().toLocaleTimeString([], { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: true 
+        });
+        
         const systemText = `❌ Deal Cancelled. ₦${chat.product_price} was refunded to the buyer.`;
 
-        // 🚀 The keys here MUST match the names in your SQL function exactly
+        // 1. Execute SQL Refund (RPC)
         const { error: rpcError } = await supabase.rpc('handle_cancel_refund', {
             target_buyer_id: chat.buyer_id,
             refund_amount: parseFloat(chat.product_price),
             target_conv_id: activeChatId,
-            product_name: chat.product_name // This matches the SQL parameter now
+            product_name: chat.product_name 
         });
 
         if (rpcError) throw rpcError;
 
-        // Update sidebar and chat history
+        // 2. Update Sidebar & Chat History
         await supabase.from('conversations').update({ 
             last_message: systemText,
             updated_at: new Date().toISOString()
@@ -1070,30 +1078,53 @@ window.handleCancelDeal = async function() {
             type: 'system'
         }]);
 
-        // Mirror Notification Logic
+        // 3. 🎯 FIX: In-App Notification Time
         const notifyTargetId = (currentUser.id === chat.buyer_id) ? chat.seller_id : chat.buyer_id;
         const initiator = (currentUser.id === chat.buyer_id) ? "Buyer" : "Seller";
 
         await supabase.from('notifications').insert([{
             user_id: notifyTargetId, 
             title: "Deal Cancelled",
-            message: `The ${initiator} cancelled the deal for "${chat.product_name}". Funds returned to buyer.`,
+            // We explicitly add the localTime to the message string here
+            message: `The ${initiator} cancelled the deal for "${chat.product_name}" at ${localTime}. Funds returned to buyer.`,
             icon: "fas fa-history",
             is_read: false,
             type: "alert"
         }]);
 
-        Swal.fire('Success', 'Deal cancelled and buyer refunded.', 'success');
+        // 4. Telegram Notification (Direct API Call)
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('telegram_chat_id')
+            .eq('id', notifyTargetId)
+            .single();
+
+        if (profile?.telegram_chat_id) {
+            const botToken = "8436841265:AAHIh50C2bEamKqB649Dx_CRy7l8X6f2yqg"; 
+            const telegramMsg = `🔔 *AccMarket Alert*\n\n❌ *Deal Cancelled*\nProduct: ${chat.product_name}\nInitiator: ${initiator}\nTime: ${localTime}\nStatus: Refunded to Buyer\nAmount: ₦${chat.product_price}`;
+            
+            try {
+                await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: profile.telegram_chat_id,
+                        text: telegramMsg,
+                        parse_mode: 'Markdown'
+                    })
+                });
+            } catch (tgErr) { console.error(tgErr); }
+        }
+
+        Swal.fire('Success', 'Deal cancelled.', 'success');
         if (typeof loadSidebar === 'function') await loadSidebar();
         initChatWindow(); 
 
     } catch (error) {
         console.error("Cancel failed:", error);
-        Swal.fire('Error', 'Transaction failed. Did you run the DROP FUNCTION query?', 'error');
+        Swal.fire('Error', 'Transaction failed.', 'error');
     }
 };
-
-
 
 
 window.upgradeToStepTwo = async function() {

@@ -144,6 +144,41 @@
         </div>
     </div>
 </section>
+<section id="kycSection" class="content-section" style="display: none;">
+    <div class="table-card">
+        <div class="table-header">
+            <div class="header-info">
+                <h2>Treasury-Cleared Verifications</h2>
+                <p>Monitor paid requests, dispatch Digit links, and promote verified sellers.</p>
+            </div>
+            <div class="header-actions">
+                <div class="search-box">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="kycSearchInput" placeholder="Search Email or UID..." onkeyup="filterKYCTable()">
+                </div>
+                <button class="btn-refresh" onclick="loadPaidKYC()"><i class="fa-solid fa-rotate"></i></button>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>User Identity (Email / UID)</th>
+                        <th>Amount Paid</th>
+                        <th>Dispatch Progress</th>
+                        <th>Request Date</th>
+                        <th style="text-align: right;">Operations</th>
+                    </tr>
+                </thead>
+                <tbody id="kycTableBody">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+
 
     </main>
 
