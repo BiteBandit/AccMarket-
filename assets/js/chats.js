@@ -331,11 +331,12 @@ await refreshMenuVisibility();
     }
 
     // 🎯 Use 'reply_link' constraint hint to solve ambiguity
-    const { data: messages, error } = await supabase
+      // ✅ Corrected Query
+const { data: messages, error } = await supabase
     .from('messages')
     .select(`
         *, 
-        sender:profiles(username, avatar_url, role), -- 🎯 Added 'role' here
+        sender:profiles(username, avatar_url, role), 
         reply_to:messages!reply_to_id(
             id, 
             content, 
@@ -346,6 +347,7 @@ await refreshMenuVisibility();
     `)
     .eq('conversation_id', activeChatId)
     .order('created_at', { ascending: true });
+
 
 
 
@@ -666,37 +668,44 @@ window.cancelReplyUI = cancelReplyUI;
     const container = document.querySelector('.message-container');
     if (!container || document.getElementById(`msg-${msg.id}`)) return;
 
-// 🎯 1. Handle System/Bank/Dispute/Cancel Messages
-if (msg.type === 'system') {
-    const systemDiv = document.createElement('div');
-    systemDiv.id = `msg-${msg.id}`;
-    systemDiv.className = 'msg-system';
-    
-    // Check if message is a dispute OR a cancellation to apply red styling
-    const isAlert = msg.content.includes('DISPUTE') || 
-                    msg.content.includes('CANCELLED') || 
-                    msg.content.includes('⚠️') || 
-                    msg.content.includes('❌');
-    
-    systemDiv.innerHTML = `
-        <div class="system-pill ${isAlert ? 'dispute-alert' : ''}">
-            ${msg.content}
-        </div>
-    `;
-    
-    container.appendChild(systemDiv);
-    container.scrollTop = container.scrollHeight;
-    return; 
-}
+    // 🎯 1. Handle System/Bank/Dispute/Cancel Messages
+    if (msg.type === 'system') {
+        const systemDiv = document.createElement('div');
+        systemDiv.id = `msg-${msg.id}`;
+        systemDiv.className = 'msg-system';
+        
+        const isAlert = msg.content.includes('DISPUTE') || 
+                        msg.content.includes('CANCELLED') || 
+                        msg.content.includes('⚠️') || 
+                        msg.content.includes('❌');
+        
+        systemDiv.innerHTML = `
+            <div class="system-pill ${isAlert ? 'dispute-alert' : ''}">
+                ${msg.content}
+            </div>
+        `;
+        
+        container.appendChild(systemDiv);
+        container.scrollTop = container.scrollHeight;
+        return; 
+    }
 
-
-
+    // 🎯 2. Identify Roles & Declare Variables correctly
     const isMe = msg.sender_id === currentUser.id;
-// 🎯 Identify if the sender is an Admin or Moderator
-const isAdmin = msg.sender?.role === 'admin' || msg.sender?.role === 'moderator';
+    const isAdmin = msg.sender?.role === 'admin' || msg.sender?.role === 'moderator';
     const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    // --- Reply badge ---
+    // 🎯 3. FIX: Properly declare and assign the message class
+    let messageClass = isMe ? 'outgoing' : 'incoming';
+    if (isAdmin) {
+        messageClass = 'admin-msg'; 
+    }
+
+    const div = document.createElement('div');
+    div.id = `msg-${msg.id}`;
+    div.className = `message ${messageClass}`;
+
+    // 🎯 4. Handle Replies
     let replyHTML = '';
     if (msg.reply_to_id) {
         const otherName = document.getElementById('headerName')?.innerText || 'User';
@@ -705,44 +714,32 @@ const isAdmin = msg.sender?.role === 'admin' || msg.sender?.role === 'moderator'
         replyHTML = `
             <div class="reply-badge" onclick="scrollToMessage('${msg.reply_to_id}')">
                 <i class="ph ph-arrow-bend-up-left"></i>
-                <span>Replying to <b>ORIGINAL</b></span>
+                <span>Replying to <b>${replyName}</b></span>
             </div>`;
     }
 
-
-    // Change this line in appendMessageUI:
-const div = document.createElement('div');
-div.id = `msg-${msg.id}`;
-div.className = `message ${isMe ? 'outgoing' : 'incoming'}`; // Use 'message'
-if (isAdmin) messageClass = 'admin-msg'; 
-
-div.className = `message ${messageClass}`;
-
-
-    // 🎯 The Content Logic
+    // 🎯 5. The Content Logic
     const contentHTML = (msg.type === 'deleted')
         ? `<p class="content deleted-text">${msg.content}</p>`
         : (msg.type === 'image') 
-            ? `<img src="${msg.content}" class="chat-img" loading="lazy">`
+            ? `<img src="${msg.content}" class="chat-img" loading="lazy" onclick="window.open('${msg.content}', '_blank')">`
             : `<p class="content">${msg.content}</p>`;
 
-// 🎯 Updated HTML Structure to include Admin Badge
-div.innerHTML = `
-    ${isMe ? `<div class="swipe-delete-btn" onclick="deleteMessage('${msg.id}', '${msg.sender_id}')"><i class="ph ph-trash"></i></div>` : ''}
-    <div class="msg-bubble">
-        ${isAdmin ? `<div class="admin-badge"><i class="ph-fill ph-shield-check"></i> AccMarket Staff</div>` : ''}
-        ${replyHTML}
-        ${contentHTML}
-        <div class="msg-status">
-            <span class="time">${time}</span>
-            ${isMe ? `<i class="ph ${msg.is_read ? 'ph-checks' : 'ph-check'}" id="icon-${msg.id}"></i>` : ''}
-        </div>
-    </div>`;
+    // 🎯 6. Assemble HTML Structure
+    div.innerHTML = `
+        ${isMe ? `<div class="swipe-delete-btn" onclick="deleteMessage('${msg.id}', '${msg.sender_id}')"><i class="ph ph-trash"></i></div>` : ''}
+        <div class="msg-bubble">
+            ${isAdmin ? `<div class="admin-badge"><i class="ph-fill ph-shield-check"></i> AccMarket Staff</div>` : ''}
+            ${replyHTML}
+            ${contentHTML}
+            <div class="msg-status">
+                <span class="time">${time}</span>
+                ${isMe ? `<i class="ph ${msg.is_read ? 'ph-checks' : 'ph-check'}" id="icon-${msg.id}"></i>` : ''}
+            </div>
+        </div>`;
 
-
+    // 🎯 7. Interaction Logic (Swiping & Double Tap)
     const bubble = div.querySelector('.msg-bubble');
-
-    // --- Interaction Logic ---
     let pressTimer;
     let startX = 0;
     let currentX = 0;
@@ -753,9 +750,8 @@ div.innerHTML = `
         currentX = 0;
         isSwiping = false;
         bubble.style.transition = 'none';
-
         pressTimer = setTimeout(() => {
-            if (!isSwiping) { // Don't trigger reply if we are swiping
+            if (!isSwiping) {
                 if (navigator.vibrate) navigator.vibrate(40);
                 setReplyUI(msg);
             }
@@ -764,16 +760,12 @@ div.innerHTML = `
 
     bubble.addEventListener('touchmove', (e) => {
         currentX = e.touches[0].clientX - startX;
-
-        // If moved more than 10px, it's a swipe, not a long-press
         if (Math.abs(currentX) > 10) {
             clearTimeout(pressTimer);
             isSwiping = true;
         }
-
         if (isMe && currentX < 0) {
-            // Drag the bubble to the left
-            const move = Math.max(currentX, -80); // Cap at 80px
+            const move = Math.max(currentX, -80);
             bubble.style.transform = `translateX(${move}px)`;
         }
     }, { passive: true });
@@ -781,9 +773,7 @@ div.innerHTML = `
     bubble.addEventListener('touchend', () => {
         clearTimeout(pressTimer);
         bubble.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-        
         if (isMe) {
-            // If swiped past 40px, stay open, otherwise snap back
             bubble.style.transform = currentX < -40 ? 'translateX(-70px)' : 'translateX(0)';
         }
     });
@@ -793,7 +783,7 @@ div.innerHTML = `
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
 }
- 
+
 
 // 🎯 COOL ADDITION: Function to jump to the message
 function scrollToMessage(id) {

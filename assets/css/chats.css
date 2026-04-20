@@ -873,42 +873,65 @@ body { background: var(--bg-main); height: 100svh; display: flex; align-items: c
 }
 
 
-/* --- Admin/Staff Message Styling --- */
+/* --- 🎯 Admin Messages: Styled like System Alerts --- */
 
-/* 1. Center the entire message container for Admins */
 .message.admin-msg {
     align-self: center;
-    max-width: 85%;
-    margin: 12px 0;
+    width: 100%;
+    margin: 20px 0;
     display: flex;
     flex-direction: column;
     align-items: center;
 }
 
-/* 2. Style the Admin bubble differently from Buyer/Seller */
+/* We remove the bubble background and use a pill shape instead */
 .message.admin-msg .msg-bubble {
-    background-color: #f8fafc; /* Official light blue/grey */
-    border: 1.5px solid #e2e8f0;
-    color: #1e293b;
-    border-radius: 12px;
-    text-align: center;
+    background: #f8fafc; /* Very light official grey */
+    border: 1px solid #e2e8f0;
+    padding: 8px 16px;
+    border-radius: 50px; /* Perfect pill shape like system messages */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+    max-width: 90%;
 }
 
-/* 3. The Badge Label */
+/* Staff Badge inside the pill */
 .admin-badge {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 4px;
-    font-size: 0.7rem;
-    font-weight: 800;
-    color: #2563eb; /* Official Blue */
-    margin-bottom: 5px;
+    gap: 5px;
+    font-size: 0.65rem;
+    font-weight: 900;
+    color: #1e40af; /* Deep official blue */
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    margin-bottom: 2px;
 }
 
 .admin-badge i {
-    color: #ef4444; /* Red shield for authority */
-    font-size: 0.9rem;
+    color: #ef4444; /* Authority Red shield */
+    font-size: 0.8rem;
 }
+
+/* The actual text content */
+.message.admin-msg .content {
+    font-size: 0.85rem;
+    color: #475569;
+    font-weight: 500;
+    text-align: center;
+    line-height: 1.4;
+}
+
+/* Hide the status/time for a cleaner "System" look, or make it tiny */
+.message.admin-msg .msg-status {
+    font-size: 0.6rem;
+    opacity: 0.5;
+    margin-top: 2px;
+    justify-content: center;
+}
+
+/* Remove the blue side-stripe if you want it exactly like the system pill */
+.message.admin-msg .msg-bubble::before {
+    display: none;
+}
+
