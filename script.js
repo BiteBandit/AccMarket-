@@ -164,7 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!sessionStorage.getItem('socialPopupShown')) {
         setTimeout(() => {
             popup.style.display = 'flex';
-        }, 5000); // 5 Seconds
+        }, 3000); // 5 Seconds
     }
 
     const closeHandler = () => {

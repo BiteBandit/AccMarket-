@@ -335,6 +335,7 @@ await refreshMenuVisibility();
     .from('messages')
     .select(`
         *, 
+        sender:profiles(username, avatar_url, role), -- 🎯 Added 'role' here
         reply_to:messages!reply_to_id(
             id, 
             content, 
@@ -691,6 +692,8 @@ if (msg.type === 'system') {
 
 
     const isMe = msg.sender_id === currentUser.id;
+// 🎯 Identify if the sender is an Admin or Moderator
+const isAdmin = msg.sender?.role === 'admin' || msg.sender?.role === 'moderator';
     const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     // --- Reply badge ---
@@ -711,6 +714,9 @@ if (msg.type === 'system') {
 const div = document.createElement('div');
 div.id = `msg-${msg.id}`;
 div.className = `message ${isMe ? 'outgoing' : 'incoming'}`; // Use 'message'
+if (isAdmin) messageClass = 'admin-msg'; 
+
+div.className = `message ${messageClass}`;
 
 
     // 🎯 The Content Logic
@@ -720,17 +726,19 @@ div.className = `message ${isMe ? 'outgoing' : 'incoming'}`; // Use 'message'
             ? `<img src="${msg.content}" class="chat-img" loading="lazy">`
             : `<p class="content">${msg.content}</p>`;
 
-    // 🎯 The HTML Structure (Button sits UNDER the bubble)
-    div.innerHTML = `
-        ${isMe ? `<div class="swipe-delete-btn" onclick="deleteMessage('${msg.id}', '${msg.sender_id}')"><i class="ph ph-trash"></i></div>` : ''}
-        <div class="msg-bubble">
-            ${replyHTML}
-            ${contentHTML}
-            <div class="msg-status">
-                <span class="time">${time}</span>
-                ${isMe ? `<i class="ph ${msg.is_read ? 'ph-checks' : 'ph-check'}" id="icon-${msg.id}"></i>` : ''}
-            </div>
-        </div>`;
+// 🎯 Updated HTML Structure to include Admin Badge
+div.innerHTML = `
+    ${isMe ? `<div class="swipe-delete-btn" onclick="deleteMessage('${msg.id}', '${msg.sender_id}')"><i class="ph ph-trash"></i></div>` : ''}
+    <div class="msg-bubble">
+        ${isAdmin ? `<div class="admin-badge"><i class="ph-fill ph-shield-check"></i> AccMarket Staff</div>` : ''}
+        ${replyHTML}
+        ${contentHTML}
+        <div class="msg-status">
+            <span class="time">${time}</span>
+            ${isMe ? `<i class="ph ${msg.is_read ? 'ph-checks' : 'ph-check'}" id="icon-${msg.id}"></i>` : ''}
+        </div>
+    </div>`;
+
 
     const bubble = div.querySelector('.msg-bubble');
 
@@ -1037,7 +1045,7 @@ window.handleCancelDeal = async function() {
 
         const confirm = await Swal.fire({
             title: 'Cancel & Refund?',
-            text: `₦${chat.product_price} will be refunded and recorded in your wallet history.`,
+            text: `₦${chat.product_price} will be refunded.`,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#ef4444',
@@ -1139,31 +1147,92 @@ window.upgradeToStepTwo = async function() {
 
     if (!confirm.isConfirmed) return;
 
-    const systemText= "📦 Seller has marked the logs as delivered. Buyer, please verify and release funds.";
+    try {
+        // 1. Fetch deal details to get Product Name and Buyer ID
+        const { data: chat, error: fetchError } = await supabase
+            .from('conversations')
+            .select('product_name, buyer_id')
+            .eq('id', activeChatId)
+            .single();
 
-    // 1. Update Conversation Step
-    const { error: updateError } = await supabase.from('conversations')
-        .update({ 
-            escrow_step: 2, 
-            last_message: systemText, 
-            updated_at: new Date().toISOString() 
-        })
-        .eq('id', activeChatId);
+        if (fetchError || !chat) throw new Error("Deal details not found.");
 
-    if (updateError) return Swal.fire('Error', 'Update failed', 'error');
+        const now = new Date();
+        // Format time for local display (e.g., 6:00 PM)
+        const localTime = now.toLocaleTimeString([], { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: true 
+        });
 
-    // 2. Insert System Message
-    await supabase.from('messages').insert([{
-        conversation_id: activeChatId,
-        sender_id: currentUser.id, 
-        content: systemText,
-        type: 'system' 
-    }]);
+        const systemText = "📦 Seller has marked the logs as delivered. Buyer, please verify and release funds.";
 
-    // 3. Refresh UI
-    updateEscrowUI(2); 
-    document.getElementById('statusMenu')?.classList.remove('show');
-    await loadSidebar(); // Refresh the preview text in sidebar
+        // 2. Update Conversation Step
+        const { error: updateError } = await supabase.from('conversations')
+            .update({ 
+                escrow_step: 2, 
+                last_message: systemText, 
+                updated_at: now.toISOString() 
+            })
+            .eq('id', activeChatId);
+
+        if (updateError) throw updateError;
+
+        // 3. Insert System Message
+        await supabase.from('messages').insert([{
+            conversation_id: activeChatId,
+            sender_id: currentUser.id, 
+            content: systemText,
+            type: 'system' 
+        }]);
+
+        // 4. 🎯 IN-APP NOTIFICATION FOR BUYER
+        await supabase.from('notifications').insert([{
+            user_id: chat.buyer_id, 
+            title: "Logs Delivered",
+            message: `The seller has delivered the logs for "${chat.product_name}" at ${localTime}. Please verify and release funds.`,
+            icon: "fas fa-box-open",
+            is_read: false,
+            type: "alert",
+            created_at: now.toISOString() 
+        }]);
+
+        // 5. 🚀 TELEGRAM NOTIFICATION (Check preference first)
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('telegram_chat_id, telegram_alerts') 
+            .eq('id', chat.buyer_id)
+            .single();
+
+        // Only send if linked AND telegram_alerts is true
+        if (profile?.telegram_chat_id && profile?.telegram_alerts === true) {
+            const botToken = "8436841265:AAHIh50C2bEamKqB649Dx_CRy7l8X6f2yqg"; 
+            const telegramMsg = `🔔 *AccMarket Alert*\n\n📦 *Logs Delivered*\nProduct: ${chat.product_name}\nTime: ${localTime}\n\n*Action Required:* Please login to the app, verify the account details, and release the funds.`;
+            
+            try {
+                await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: profile.telegram_chat_id,
+                        text: telegramMsg,
+                        parse_mode: 'Markdown'
+                    })
+                });
+            } catch (tgErr) { console.error("Telegram error:", tgErr); }
+        }
+
+        // 6. Refresh UI
+        updateEscrowUI(2); 
+        document.getElementById('statusMenu')?.classList.remove('show');
+        if (typeof loadSidebar === 'function') await loadSidebar();
+        
+        Swal.fire('Success', 'Delivery confirmed. Buyer has been notified.', 'success');
+
+    } catch (error) {
+        console.error("Delivery confirmation failed:", error);
+        Swal.fire('Error', 'Could not confirm delivery.', 'error');
+    }
 };
 
 
@@ -1172,7 +1241,7 @@ window.upgradeToStepThree = async function() {
 
     const confirm = await Swal.fire({
         title: 'Release Funds?',
-        text: "Only do this if you have received the logs. This action cannot be undone!",
+        text: "Only do this if you have received and verified the logs. This action is final!",
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#22c55e',
@@ -1181,33 +1250,91 @@ window.upgradeToStepThree = async function() {
 
     if (!confirm.isConfirmed) return;
 
-    const systemText = "✅ Funds released! Transaction completed successfully.";
+    try {
+        // 1. Fetch deal details
+        const { data: chat, error: fetchError } = await supabase
+            .from('conversations')
+            .select('product_name, seller_id, product_price, buyer_id')
+            .eq('id', activeChatId)
+            .single();
 
-    // 1. Update Conversation Step
-    await supabase.from('conversations')
-        .update({ 
+        if (fetchError || !chat) throw new Error("Deal details not found.");
+
+        const now = new Date();
+        const localTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+        const systemText = "✅ Funds released! Transaction completed successfully.";
+
+        // 2. 💰 EXECUTE WALLET TRANSACTION (RPC)
+        // This function must: 
+        // a) Update seller's balance 
+        // b) Insert into 'wallets' or 'transactions' history table
+        const { error: rpcError } = await supabase.rpc('handle_release_funds', {
+            target_seller_id: chat.seller_id,
+            amount_to_release: parseFloat(chat.product_price),
+            target_conv_id: activeChatId,
+            product_name: chat.product_name
+        });
+
+        if (rpcError) throw rpcError;
+
+        // 3. Update Conversation Status
+        await supabase.from('conversations').update({ 
             escrow_step: 3, 
+            status: 'completed',
             last_message: systemText, 
-            updated_at: new Date().toISOString() 
-        })
-        .eq('id', activeChatId);
+            updated_at: now.toISOString() 
+        }).eq('id', activeChatId);
 
-    // 2. Insert System Message
-    await supabase.from('messages').insert([{
-        conversation_id: activeChatId,
-        sender_id: currentUser.id, 
-        content: systemText,
-        type: 'system' 
-    }]);
+        // 4. Insert System Message
+        await supabase.from('messages').insert([{
+            conversation_id: activeChatId,
+            sender_id: currentUser.id, 
+            content: systemText,
+            type: 'system' 
+        }]);
 
-    // 3. Refresh UI
-    updateEscrowUI(3);
-    document.getElementById('statusMenu')?.classList.remove('show');
-    await loadSidebar();
+        // 5. In-App Notification (Seller)
+        await supabase.from('notifications').insert([{
+            user_id: chat.seller_id, 
+            title: "Payment Received",
+            message: `Funds for "${chat.product_name}" (₦${chat.product_price}) were added to your wallet at ${localTime}.`,
+            icon: "fas fa-wallet",
+            is_read: false,
+            type: "success",
+            created_at: now.toISOString() 
+        }]);
 
-    // 🎯 ADD THIS: Show the rating modal after everything is done
-    document.getElementById('ratingModal').classList.add('active'); 
+        // 6. Telegram Alert (Check Preference)
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('telegram_chat_id, telegram_alerts') 
+            .eq('id', chat.seller_id)
+            .single();
+
+        if (profile?.telegram_chat_id && profile?.telegram_alerts === true) {
+            const botToken = "8436841265:AAHIh50C2bEamKqB649Dx_CRy7l8X6f2yqg"; 
+            const telegramMsg = `🔔 *AccMarket Alert*\n\n💰 *Payment Received!*\nProduct: ${chat.product_name}\nAmount: ₦${chat.product_price}\nTime: ${localTime}\n\nCheck your wallet history for details.`;
+            
+            try {
+                await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chat_id: profile.telegram_chat_id, text: telegramMsg, parse_mode: 'Markdown' })
+                });
+            } catch (tgErr) { console.error(tgErr); }
+        }
+
+        // 7. Finalize UI
+        updateEscrowUI(3);
+        if (typeof loadSidebar === 'function') await loadSidebar();
+        document.getElementById('ratingModal').classList.add('active'); 
+
+    } catch (error) {
+        console.error("Release failed:", error);
+        Swal.fire('Error', 'Wallet update failed. Please contact support.', 'error');
+    }
 };
+
 
 
 /**
@@ -1378,7 +1505,7 @@ document.getElementById('submitRating')?.addEventListener('click', async () => {
     btn.innerText = "Updating...";
 
     try {
-        // 3. Save the Review (The buyer is allowed to insert into 'reviews')
+        // 3. Save the Review
         const { error: revError } = await supabase.from('reviews').insert([{
             conversation_id: activeChatId,
             reviewer_id: currentUser.id,
@@ -1407,7 +1534,11 @@ document.getElementById('submitRating')?.addEventListener('click', async () => {
         document.getElementById('percentLabel').innerText = "Excellent";
         document.getElementById('percentLabel').style.color = "#10b981";
 
-        Swal.fire('Success', 'Rating submitted!', 'success');
+        // 🎯 6. REFRESH CHAT TO ACTIVATE LOCKDOWN
+        // This ensures the footer disappears and the "Transaction Closed" notice appears immediately.
+        await initChatWindow(); 
+
+        Swal.fire('Success', 'Rating submitted! The transaction is now officially closed.', 'success');
 
         // Optional: Refresh sidebar to show new score
         if (typeof loadSidebar === 'function') await loadSidebar();
