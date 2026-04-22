@@ -220,6 +220,8 @@ async function initChatWindow() {
 
 
     if (chat) {
+window.activeChatData = chat; 
+
         const otherUser = chat.buyer_id === currentUser.id ? chat.seller : chat.buyer;
         headerName.innerText = otherUser.username;
         headerAvatar.src = otherUser.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUser.username}`;
@@ -692,29 +694,49 @@ window.cancelReplyUI = cancelReplyUI;
         return; 
     }
 
-    // 🎯 2. Identify Roles & Declare Variables correctly
+    // 🎯 2. Setup Identities & Positioning
     const isMe = msg.sender_id === currentUser.id;
-    const isAdmin = msg.sender?.role === 'admin' || msg.sender?.role === 'moderator';
+    // Check if the person LOOKING at the chat is an Admin
+    const iAmAdmin = currentUser?.role === 'admin' || currentUser?.role === 'moderator';
+    // Check if the person who SENT the message is an Admin
+    const senderIsAdmin = msg.sender?.role === 'admin' || msg.sender?.role === 'moderator';
+    
+const senderName = msg.sender?.username || 'User';
     const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const sellerId = window.activeChatData?.seller_id;
+    const buyerId = window.activeChatData?.buyer_id;
 
-    // 🎯 3. FIX: Properly declare and assign the message class
-    let messageClass = isMe ? 'outgoing' : 'incoming';
-      
-    if (isAdmin) {
-        messageClass = 'admin-msg'; 
+    let messageClass = '';
+    let roleLabel = '';
+
+    if (senderIsAdmin) {
+        messageClass = 'admin-msg';
+        roleLabel = `<span class="role-badge admin">STAFF</span>`;
         
-        // 🎯 FORCE SCROLL:
-        // This makes the screen jump to the bottom so the admin message isn't missed.
         setTimeout(() => {
-            const container = document.querySelector('.message-container');
-            if (container) {
-                container.scrollTo({ 
-                    top: container.scrollHeight, 
-                    behavior: 'smooth' 
-                });
-            }
-        }, 150); // Small delay to allow the new HTML to render first
+            if (container) container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+        }, 150);
+    } 
+    else if (sellerId && buyerId) {
+        // ADMIN VIEW: Force Seller LEFT and Buyer RIGHT
+        if (msg.sender_id === sellerId) {
+            messageClass = 'incoming';
+            // Only show the badge to Admins
+            if (iAmAdmin) roleLabel = `<span class="role-badge seller">SELLER</span>`;
+        } else if (msg.sender_id === buyerId) {
+            messageClass = 'outgoing';
+            // Only show the badge to Admins
+            if (iAmAdmin) roleLabel = `<span class="role-badge buyer">BUYER</span>`;
+        } else {
+            messageClass = isMe ? 'outgoing' : 'incoming';
+        }
+    } 
+    else {
+        // Standard User Fallback
+        messageClass = isMe ? 'outgoing' : 'incoming';
     }
+
+    // 🎯 3. Create the Base Element
     const div = document.createElement('div');
     div.id = `msg-${msg.id}`;
     div.className = `message ${messageClass}`;
@@ -732,64 +754,63 @@ window.cancelReplyUI = cancelReplyUI;
             </div>`;
     }
 
-    // 🎯 5. The Content Logic
+    // 🎯 5. Content Logic
     const contentHTML = (msg.type === 'deleted')
         ? `<p class="content deleted-text">${msg.content}</p>`
         : (msg.type === 'image') 
             ? `<img src="${msg.content}" class="chat-img" loading="lazy" onclick="window.open('${msg.content}', '_blank')">`
             : `<p class="content">${msg.content}</p>`;
 
-    // 🎯 6. Assemble HTML Structure
+        
+
+    // 🎯 6. Assemble Final Structure
     div.innerHTML = `
         ${isMe ? `<div class="swipe-delete-btn" onclick="deleteMessage('${msg.id}', '${msg.sender_id}')"><i class="ph ph-trash"></i></div>` : ''}
+        
         <div class="msg-bubble">
-            ${isAdmin ? `<div class="admin-badge"><i class="ph-fill ph-shield-check"></i> AccMarket Staff</div>` : ''}
+            ${senderIsAdmin ? `
+                <div class="admin-badge">
+                    <i class="ph-fill ph-shield-check"></i> 
+                    ${senderName} (Staff)
+                </div>` : ''}
+            
+            ${(iAmAdmin && !senderIsAdmin) ? `
+                <div class="msg-header">
+                    ${roleLabel}
+                </div>
+            ` : ''}
+
             ${replyHTML}
             ${contentHTML}
+            
             <div class="msg-status">
                 <span class="time">${time}</span>
                 ${isMe ? `<i class="ph ${msg.is_read ? 'ph-checks' : 'ph-check'}" id="icon-${msg.id}"></i>` : ''}
             </div>
         </div>`;
 
-    // 🎯 7. Interaction Logic (Swiping & Double Tap)
+
+    // 🎯 7. Mobile Interactions & Rendering
     const bubble = div.querySelector('.msg-bubble');
-    let pressTimer;
-    let startX = 0;
-    let currentX = 0;
-    let isSwiping = false;
+    let pressTimer, startX = 0, currentX = 0, isSwiping = false;
 
     bubble.addEventListener('touchstart', (e) => {
         startX = e.touches[0].clientX;
-        currentX = 0;
-        isSwiping = false;
+        currentX = 0; isSwiping = false;
         bubble.style.transition = 'none';
-        pressTimer = setTimeout(() => {
-            if (!isSwiping) {
-                if (navigator.vibrate) navigator.vibrate(40);
-                setReplyUI(msg);
-            }
-        }, 600);
+        pressTimer = setTimeout(() => { if (!isSwiping) { if (navigator.vibrate) navigator.vibrate(40); setReplyUI(msg); } }, 600);
     }, { passive: true });
 
     bubble.addEventListener('touchmove', (e) => {
         currentX = e.touches[0].clientX - startX;
-        if (Math.abs(currentX) > 10) {
-            clearTimeout(pressTimer);
-            isSwiping = true;
-        }
-        if (isMe && currentX < 0) {
-            const move = Math.max(currentX, -80);
-            bubble.style.transform = `translateX(${move}px)`;
-        }
+        if (Math.abs(currentX) > 10) { clearTimeout(pressTimer); isSwiping = true; }
+        if (isMe && currentX < 0) { const move = Math.max(currentX, -80); bubble.style.transform = `translateX(${move}px)`; }
     }, { passive: true });
 
     bubble.addEventListener('touchend', () => {
         clearTimeout(pressTimer);
         bubble.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-        if (isMe) {
-            bubble.style.transform = currentX < -40 ? 'translateX(-70px)' : 'translateX(0)';
-        }
+        if (isMe) bubble.style.transform = currentX < -40 ? 'translateX(-70px)' : 'translateX(0)';
     });
 
     bubble.addEventListener('dblclick', () => setReplyUI(msg));
@@ -797,6 +818,7 @@ window.cancelReplyUI = cancelReplyUI;
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
 }
+
 
 
 // 🎯 COOL ADDITION: Function to jump to the message

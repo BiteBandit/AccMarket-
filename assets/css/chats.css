@@ -882,66 +882,114 @@ body { background: var(--bg-main); height: 100svh; display: flex; align-items: c
     color: #dc2626;      /* Slightly darker red on hover */
 }
 
-
-/* --- 🎯 Admin Messages: Styled like System Alerts --- */
-
-.message.admin-msg {
-    align-self: center;
-    width: 100%;
-    margin: 20px 0;
+/* --- 🏛️ Chat Container & Alignment --- */
+.message-container {
     display: flex;
     flex-direction: column;
+    width: 100%;
+    padding: 15px;
+    gap: 12px;
+}
+
+.message {
+    max-width: 80%;
+    display: flex;
+    flex-direction: column;
+    transition: all 0.2s ease;
+}
+
+/* 📍 Positioning */
+.message.incoming { align-self: flex-start; }  /* Seller (Left) */
+.message.outgoing { align-self: flex-end; }    /* Buyer (Right) */
+
+.message.admin-msg { 
+    align-self: center;
+    width: 100%;
+    margin: 15px 0;
     align-items: center;
 }
 
-/* We remove the bubble background and use a pill shape instead */
-.message.admin-msg .msg-bubble {
-    background: #f8fafc; /* Very light official grey */
-    border: 1px solid #e2e8f0;
-    padding: 8px 16px;
-    border-radius: 50px; /* Perfect pill shape like system messages */
-    box-shadow: 0 2px 5px rgba(0,0,0,0.03);
-    max-width: 90%;
+/* --- 🏷️ Headers & Role Badges --- */
+.msg-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 2px;
 }
 
-/* Staff Badge inside the pill */
+/* Flip header order for outgoing messages (Bubble on right) */
+.message.outgoing .msg-header {
+    flex-direction: row-reverse;
+}
+
+.sender-name {
+    font-size: 0.7rem;
+    font-weight: 700;
+    opacity: 0.9;
+}
+
+.role-badge {
+    font-size: 0.6rem;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    opacity: 0.8;
+}
+
+.role-badge.seller { color: #2563eb; } /* Blue */
+.role-badge.buyer { color: #7c3aed; }  /* Purple */
+
+/* --- 🏛️ Admin/Staff Identity --- */
+.message.admin-msg .msg-bubble {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 12px 20px;
+    border-radius: 20px; /* Official Pill Shape */
+    box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+    max-width: 90%;
+    text-align: center;
+}
+
 .admin-badge {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 5px;
-    font-size: 0.65rem;
-    font-weight: 900;
-    color: #1e40af; /* Deep official blue */
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 2px;
+    gap: 6px;
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: #b91c1c; /* Authority Red */
+    margin-bottom: 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px dashed rgba(185, 28, 28, 0.2);
 }
 
 .admin-badge i {
-    color: #ef4444; /* Authority Red shield */
-    font-size: 0.8rem;
+    font-size: 0.9rem;
+    color: #ef4444;
 }
 
-/* The actual text content */
+/* --- 📝 Content & Status --- */
 .message.admin-msg .content {
-    font-size: 0.85rem;
-    color: #475569;
+    font-size: 0.88rem;
     font-weight: 500;
-    text-align: center;
+    color: #1e293b;
     line-height: 1.4;
 }
 
-/* Hide the status/time for a cleaner "System" look, or make it tiny */
-.message.admin-msg .msg-status {
-    font-size: 0.6rem;
-    opacity: 0.5;
-    margin-top: 2px;
-    justify-content: center;
+.msg-status {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.65rem;
+    opacity: 0.6;
+    margin-top: 4px;
 }
 
-/* Remove the blue side-stripe if you want it exactly like the system pill */
-.message.admin-msg .msg-bubble::before {
+.message.outgoing .msg-status { justify-content: flex-end; }
+.message.admin-msg .msg-status { justify-content: center; }
+
+/* Hide tails/decorations for Admin messages */
+.message.admin-msg .msg-bubble::before,
+.message.admin-msg .msg-bubble::after {
     display: none;
 }
-
