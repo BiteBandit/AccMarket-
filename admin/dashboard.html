@@ -36,10 +36,11 @@
                 <i class="fa-solid fa-user-slash"></i> Restricted Access
             </a>
 
-            <div class="nav-label">System Audit</div>
-            <a href="#" class="nav-item" data-section="verification">
-                <i class="fa-solid fa-shield-check"></i> Account Audits
-            </a>
+<div class="nav-label">System Audit</div>
+<a href="#" class="nav-item" data-section="verification">
+    <i class="fa-solid fa-shield-halved"></i> Account Audits
+</a>
+
             <a href="#" class="nav-item" data-section="conversations">
                 <i class="fa-solid fa-comments"></i> Communication Logs
             </a>
@@ -51,6 +52,15 @@
             <a href="#" class="nav-item" data-section="transactions">
                 <i class="fa-solid fa-list-check"></i> Ledger Reports
             </a>
+
+<div class="nav-label">Marketing & Outreach</div>
+<a href="#" class="nav-item" data-section="broadcast">
+    <i class="fa-solid fa-bullhorn"></i> Global Broadcast
+</a>
+<a href="#" class="nav-item" data-section="blog">
+    <i class="fa-solid fa-blog"></i> Platform News
+</a>
+
 
             <div class="nav-label">Support Services</div>
             <a href="#" class="nav-item" data-section="tickets">
@@ -178,7 +188,77 @@
     </div>
 </section>
 
+<section id="bannedSection" class="content-section" style="display: none;">
+    <div class="table-card">
+        <div class="table-header">
+            <div class="header-info">
+                <h2>Restricted Access Management</h2>
+                <p>View and manage users currently set to inactive status.</p>
+            </div>
+            <div class="header-actions">
+                <div class="search-box">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="bannedSearchInput" placeholder="Search Inactive Users..." onkeyup="filterBannedTable()">
+                </div>
+                <button class="btn-refresh" onclick="loadRestrictedUsers()" title="Refresh List">
+                    <i class="fa-solid fa-rotate"></i>
+                </button>
+            </div>
+        </div>
 
+        <div class="table-responsive">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Identity (Username/UID)</th>
+                        <th>Restriction Type</th>
+                        <th>Access Status</th>
+                        <th>Date Flagged</th>
+                        <th style="text-align: right;">Operations</th>
+                    </tr>
+                </thead>
+                <tbody id="bannedTableBody">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<section id="verificationSection" class="content-section" style="display: none;">
+    <div class="table-card">
+        <div class="table-header">
+            <div class="header-info">
+                <h2><i class="fa-solid fa-shield-halved"></i> Account Integrity Audit</h2>
+                <p>Monitoring high-privilege roles, verification status, and security flags.</p>
+            </div>
+            <div class="header-actions">
+                <div class="search-box">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="auditSearchInput" placeholder="Filter by Identity..." onkeyup="filterAuditTable()">
+                </div>
+                <button class="btn-refresh" onclick="loadAccountAudits()" title="Refresh Audit Feed">
+                    <i class="fa-solid fa-rotate"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Subject (Username/UID)</th>
+                        <th>Privilege Level</th>
+                        <th>Security Status</th>
+                        <th>Last Activity / Created</th>
+                        <th style="text-align: right;">Investigation</th>
+                    </tr>
+                </thead>
+                <tbody id="verificationTableBody">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+</section>
 
     </main>
 

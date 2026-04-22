@@ -407,15 +407,16 @@ function subscribeToMessages() {
         }, async (payload) => {
             console.log("[REALTIME] New message incoming...");
             
-            // 🎯 FIX: If it's a system message, skip the complex query and append immediately
+            // 🎯 Handle System messages immediately
             if (payload.new.type === 'system') {
                 appendMessageUI(payload.new);
             } else {
-                // Normal message logic
+                // 🎯 UPDATED: Fetch the sender's 'role' and 'avatar_url' live
                 const { data: fullMsg } = await supabase
                     .from('messages')
                     .select(`
                         *,
+                        sender:profiles(username, avatar_url, role), 
                         reply_to:messages!reply_to_id (
                             id, content, type, sender_id,
                             sender:profiles (username)
@@ -466,6 +467,7 @@ function subscribeToMessages() {
         })
         .subscribe();
 }
+
 
 
 
@@ -697,10 +699,22 @@ window.cancelReplyUI = cancelReplyUI;
 
     // 🎯 3. FIX: Properly declare and assign the message class
     let messageClass = isMe ? 'outgoing' : 'incoming';
+      
     if (isAdmin) {
         messageClass = 'admin-msg'; 
+        
+        // 🎯 FORCE SCROLL:
+        // This makes the screen jump to the bottom so the admin message isn't missed.
+        setTimeout(() => {
+            const container = document.querySelector('.message-container');
+            if (container) {
+                container.scrollTo({ 
+                    top: container.scrollHeight, 
+                    behavior: 'smooth' 
+                });
+            }
+        }, 150); // Small delay to allow the new HTML to render first
     }
-
     const div = document.createElement('div');
     div.id = `msg-${msg.id}`;
     div.className = `message ${messageClass}`;

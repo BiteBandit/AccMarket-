@@ -862,3 +862,23 @@ body {
     font-size: 1.1rem;
   }
 }
+
+.chat-count-badge {
+  display: none;
+  background: #ef4444; /* Matches notification red */
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 3px 6px;
+  position: absolute;
+  top: -4px;
+  right: -5px;
+  line-height: 1;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease;
+}
+
+.chat-count-badge.pop {
+  transform: scale(1.3);
+}

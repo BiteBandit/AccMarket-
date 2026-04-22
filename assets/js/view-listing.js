@@ -298,6 +298,71 @@ async function setupNotificationRealtime() {
 // ✅ Activate real-time listener
 setupNotificationRealtime();
 
+// ✅ 1. Preload the notification sound
+const chatNotificationSound = new Audio("notification.mp3");
+
+// ✅ 2. Get total unread messages
+async function loadTotalChatCount() {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { count, error } = await supabase
+      .from("messages")
+      .select("*", { count: "exact", head: true })
+      .eq("is_read", false)
+      .neq("sender_id", user.id); 
+
+    if (error) throw error;
+
+    const badge = document.getElementById("chat-notification-count");
+    if (!badge) return;
+
+    if (count > 0) {
+      badge.textContent = count > 99 ? '99+' : count;
+      badge.style.display = "inline-block";
+      badge.classList.add("pop");
+      setTimeout(() => badge.classList.remove("pop"), 200);
+    } else {
+      badge.style.display = "none";
+    }
+  } catch (err) {
+    console.error("Error loading chat count:", err);
+  }
+}
+
+// ✅ 3. Real-time listener WITH SOUND
+async function setupGlobalChatRealtime() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  supabase
+    .channel("global-chat-updates")
+    .on(
+      "postgres_changes",
+      {
+        event: "*", 
+        schema: "public",
+        table: "messages",
+      },
+      async (payload) => {
+        // Refresh the count regardless of event type
+        await loadTotalChatCount();
+        
+        // 🎯 PLAY SOUND: Only on NEW messages sent by someone else
+        if (payload.eventType === "INSERT" && payload.new.sender_id !== user.id) {
+            chatNotificationSound.play().catch((e) => console.warn("Sound blocked by browser:", e));
+        }
+      }
+    )
+    .subscribe();
+}
+
+// ✅ 4. Initialize
+loadTotalChatCount();
+setupGlobalChatRealtime();
+
+
 (async () => {
   // 1. Check if user is logged in
   const { data: { user } } = await supabase.auth.getUser();

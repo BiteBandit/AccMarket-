@@ -16,7 +16,9 @@
   --danger: #ef4444;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased; }
+
 
 body { background: var(--bg-main); height: 100svh; display: flex; align-items: center; justify-content: center; color: var(--text-dark); overflow: hidden; }
 
@@ -505,6 +507,14 @@ body { background: var(--bg-main); height: 100svh; display: flex; align-items: c
     }
 }
 
+.message.admin-msg {
+    animation: adminPop 0.3s ease-out forwards;
+}
+
+@keyframes adminPop {
+    0% { opacity: 0; transform: scale(0.9); }
+    100% { opacity: 1; transform: scale(1); }
+}
 
 
 /* --- TICK & TIME STYLING --- */

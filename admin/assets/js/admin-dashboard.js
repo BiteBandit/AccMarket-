@@ -61,11 +61,17 @@ navItems.forEach(item => {
         if (targetSection) targetSection.style.display = 'block';
 
    // --- UPDATED LOGIC ---
-        if (section === 'users') {
-            loadUserDirectory();
-        } else if (section === 'kyc') {
-            loadPaidKYC(); // Trigger the new loading function
-        }
+if (section === 'users') {
+    loadUserDirectory();
+} else if (section === 'kyc') {
+    loadPaidKYC();
+} else if (section === 'banned') {
+    loadRestrictedUsers();
+} else if (section === 'verification') {
+    loadAccountAudits(); // New function for the Audit section
+}
+
+
     });
 });
 
@@ -656,6 +662,269 @@ window.rejectVerification = async (userId, requestId) => {
 };
 
 
+/**
+ * OFFICIAL BANNED USERS SECTION
+ * Logic for managing users with an official Supabase Auth ban
+ */
+window.loadRestrictedUsers = async () => {
+    const tbody = document.getElementById('bannedTableBody');
+    const searchInput = document.getElementById('bannedSearchInput');
+    if (!tbody) return;
+
+    // Reset search bar on full reload
+    if (searchInput) searchInput.value = '';
+
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:40px;"><i class="fa-solid fa-spinner fa-spin"></i> Synchronizing with Auth Records...</td></tr>';
+
+    try {
+        // Fetch users flagged by the SQL Trigger via is_official_ban column
+        const { data: bannedUsers, error } = await supabase
+            .from('profiles')
+            .select('id, username, email, is_official_ban, created_at')
+            .eq('is_official_ban', true) 
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        if (!bannedUsers || bannedUsers.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:40px; color: #64748b;">No officially restricted accounts found.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = bannedUsers.map(u => {
+            return `
+                <tr>
+                    <td>
+                        <div class="user-details">
+                            <span style="font-weight:600; display:block; color: #0b1e5b;">${u.username || u.email}</span>
+                            <span style="font-size: 10px; color: #64748b; font-family: monospace;">UID: ${u.id}</span>
+                        </div>
+                    </td>
+                    <td>
+                        <span style="color: #991b1b; font-size: 11px; font-weight: 600; background: #fee2e2; padding: 2px 6px; border-radius: 4px;">
+                            SUPABASE AUTH BAN
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge" style="background: #1e293b; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold;">
+                            OFFICIAL
+                        </span>
+                    </td>
+                    <td class="date-text">${new Date(u.created_at).toLocaleDateString()}</td>
+                    <td style="text-align: right;">
+                        <button class="op-btn" onclick="liftOfficialBan('${u.id}')" title="Unban User" 
+                            style="background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; padding: 8px 12px; border-radius: 6px; cursor:pointer;">
+                            <i class="fa-solid fa-user-check"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+    } catch (err) {
+        console.error("Ban Load Error:", err);
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:40px; color: #ef4444;">Error: ${err.message}</td></tr>`;
+    }
+};
+
+/**
+ * UNBAN OPERATION (LIFT OFFICIAL BAN)
+ * Calls the Edge Function to reset ban_duration to 'none'
+ */
+window.liftOfficialBan = async (userId) => {
+    const confirm = await Swal.fire({
+        title: 'Lift Official Ban?',
+        text: "This will restore the user's access at the Auth Level.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#22c55e',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Yes, Restore Access'
+    });
+
+    if (confirm.isConfirmed) {
+        Swal.fire({ 
+            title: 'Updating Auth Server...', 
+            html: 'Please wait while we communicate with Supabase Auth API',
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading() 
+        });
+
+        try {
+            // Calling your Edge Function 'manage-bans'
+            const { data, error } = await supabase.functions.invoke('admin-ban', {
+                body: { 
+                    userId: userId, 
+                    action: 'unban' 
+                }
+            });
+
+            if (error) throw error;
+
+            await Swal.fire({
+                icon: 'success',
+                title: 'Access Restored',
+                text: 'The user has been officially unbanned.',
+                timer: 2000,
+                showConfirmButton: false
+            });
+
+            // Refresh the table
+            loadRestrictedUsers();
+
+        } catch (err) {
+            console.error("Unban error:", err);
+            Swal.fire({
+                icon: 'error',
+                title: 'Request Failed',
+                text: err.message || 'Check if your Edge Function is deployed and active.'
+            });
+        }
+    }
+};
+
+window.filterBannedTable = () => {
+    const filter = document.getElementById('bannedSearchInput').value.toLowerCase();
+    const rows = document.querySelectorAll('#bannedTableBody tr');
+    
+    rows.forEach(row => {
+        // Skip the "No accounts found" or "Loading" rows (they don't have 5 cells)
+        if (row.cells.length < 5) return;
+        
+        // Target the first column: Identity (Username/UID)
+        const identity = row.cells[0].textContent.toLowerCase();
+        
+        if (identity.includes(filter)) {
+            row.style.display = ""; // Show
+        } else {
+            row.style.display = "none"; // Hide
+        }
+    });
+};
+
+
+
+/**
+ * ADVANCED ACCOUNT AUDITS + DISPUTE MONITORING
+ */
+window.loadAccountAudits = async () => {
+    const tbody = document.getElementById('verificationTableBody');
+    if (!tbody) return;
+
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:60px;"><i class="fa-solid fa-shield-halved fa-beat-low fa-2xl" style="color: #0b1e5b;"></i><div>Analyzing System Integrity & Active Disputes...</div></td></tr>`;
+
+    try {
+        // Fetch profiles
+        const { data: profiles, error: pError } = await supabase
+            .from('profiles')
+            .select('id, username, email, role, is_official_ban, kyc_status, created_at, balance, trust_score, telegram_chat_id')
+            .or('role.neq.buyer,is_official_ban.eq.true') 
+            .order('created_at', { ascending: false });
+
+        if (pError) throw pError;
+
+        // Fetch count of open disputes for these users
+        // We assume your disputes table has 'buyer_id' or 'seller_id' and a 'status'
+        const { data: disputes, error: dError } = await supabase
+            .from('disputes')
+            .select('buyer_id, seller_id, status')
+            .eq('status', 'open');
+
+        if (dError) throw dError;
+
+        tbody.innerHTML = profiles.map(u => {
+            // Check if this specific user ID appears in any open disputes
+            const activeDisputes = disputes.filter(d => d.buyer_id === u.id || d.seller_id === u.id).length;
+            
+            let disputeWarning = '';
+            if (activeDisputes > 0) {
+                disputeWarning = `<div style="margin-top:5px; color: #f59e0b; font-size: 10px; font-weight: 800; background: #fffbeb; padding: 2px 6px; border-radius: 4px; border: 1px solid #fef3c7;">
+                    <i class="fa-solid fa-gavel"></i> ${activeDisputes} OPEN DISPUTE(S)
+                </div>`;
+            }
+
+            const trust = u.trust_score || 0;
+            const trustColor = trust >= 80 ? '#22c55e' : (trust >= 50 ? '#f59e0b' : '#ef4444');
+            const roleStyles = u.role === 'admin' ? 'background: #7c3aed; color: white;' : 'background: #2563eb15; color: #2563eb;';
+
+            return `
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                    <td>
+                        <div class="user-details">
+                            <span style="font-weight:700; display:block; color: #0b1e5b;">${u.username || u.email}</span>
+                            <span style="font-size: 10px; color: #94a3b8; font-family: monospace;">${u.id}</span>
+                            ${disputeWarning}
+                        </div>
+                    </td>
+                    <td>
+                        <span style="padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 900; ${roleStyles}">
+                            ${u.role.toUpperCase()}
+                        </span>
+                        <div style="font-size: 12px; font-weight: 700; margin-top: 5px;">₦${(u.balance || 0).toLocaleString()}</div>
+                    </td>
+                    <td>
+                        <div style="font-size: 10px; font-weight: 600; color: #64748b; margin-bottom: 4px;">TRUST LEVEL</div>
+                        <div style="height: 6px; width: 80px; background: #e2e8f0; border-radius: 3px; margin-bottom: 4px;">
+                            <div style="width: ${trust}%; background: ${trustColor}; height: 100%; border-radius: 3px;"></div>
+                        </div>
+                        <span style="font-size: 10px; font-weight: 800; color: ${trustColor}">${trust}%</span>
+                    </td>
+                    <td>
+                        <div style="font-size: 11px; color: #1e293b;">${new Date(u.created_at).toLocaleDateString()}</div>
+                        <div style="font-size: 10px; color: ${u.is_official_ban ? '#ef4444' : '#22c55e'}; font-weight: 700;">
+                            ${u.is_official_ban ? 'BANNED' : 'CLEAR'}
+                        </div>
+                    </td>
+                    <td style="text-align: right;">
+                        <button class="op-btn" onclick="viewUserFile('${u.id}')" style="background: #0b1e5b; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 12px;">
+                            <i class="fa-solid fa-fingerprint"></i> Inspect
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color: #ef4444;">${err.message}</td></tr>`;
+    }
+};
+
+window.runAITransactionScan = async (userId) => {
+    const output = document.getElementById('ai-output');
+    output.innerHTML = '<span class="fa-beat">AI ANALYZING TRANSACTIONS & DISPUTES...</span>';
+
+    try {
+        // 1. Fetch Transactions
+        const { data: transactions } = await supabase.from('transactions').select('*').eq('user_id', userId).limit(20);
+        
+        // 2. Fetch Disputes
+        const { data: disputes } = await supabase.from('disputes').select('*').or(`buyer_id.eq.${userId},seller_id.eq.${userId}`);
+
+        // 3. Send to AI
+        const { data: aiResult, error } = await supabase.functions.invoke('ai-fraud-detector', {
+            body: { 
+                transactions, 
+                disputes, 
+                userId 
+            }
+        });
+
+        if (error) throw error;
+
+        // The AI will return a verdict based on both
+        // Example: "User has high wash-trading patterns and 2 open disputes for non-delivery."
+        output.innerHTML = `
+            <div style="border-left: 3px solid ${aiResult.riskScore > 60 ? '#ef4444' : '#22c55e'}; padding-left: 10px;">
+                <div style="font-weight: 800; font-size: 11px;">AI VERDICT:</div>
+                <div style="font-size: 12px; color: #fff;">${aiResult.summary}</div>
+                <div style="margin-top: 5px; font-size: 10px; opacity: 0.7;">RISK RATING: ${aiResult.riskScore}%</div>
+            </div>
+        `;
+
+    } catch (err) {
+        output.innerHTML = "SCAN FAILED: " + err.message;
+    }
+};
 
 
 
