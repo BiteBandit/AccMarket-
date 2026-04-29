@@ -86,12 +86,29 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function handleFileUpload(file) {
     if (!activeChatId || !currentUser) return;
 
+    // 1. Generate a temporary ID to show an "Uploading" state in the UI
+    const tempId = 'uploading-' + Date.now();
+    const container = document.querySelector('.message-container');
+    
+    const tempDiv = document.createElement('div');
+    tempDiv.id = tempId;
+    tempDiv.className = 'message outgoing'; // Align to your side
+    tempDiv.innerHTML = `
+        <div class="msg-bubble" style="opacity: 0.7;">
+            <p class="content">
+                <i class="ph ph-circle-notch animate-spin"></i> 
+                Uploading ${file.name}...
+            </p>
+        </div>`;
+    container.appendChild(tempDiv);
+    container.scrollTop = container.scrollHeight;
+
     try {
-        const fileExt = file.name.split('.').pop();
+        const fileExt = file.name.split('.').pop().toLowerCase();
         const fileName = `${Date.now()}.${fileExt}`;
         const filePath = `${activeChatId}/${fileName}`;
 
-        console.log("[UPLOAD] Uploading to storage...");
+        // 2. Upload to your 'chat-attachments' bucket
         const { error: uploadError } = await supabase.storage
             .from('chat-attachments')
             .upload(filePath, file);
@@ -102,35 +119,48 @@ async function handleFileUpload(file) {
             .from('chat-attachments')
             .getPublicUrl(filePath);
 
+        // 3. Determine if it's an image or a general file
+        const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExt);
+        const msgType = isImage ? 'image' : 'file';
         const replyId = replyingTo ? replyingTo.id : null;
 
+        // 4. Insert into database with the file_name for non-image types
         const { error: msgError } = await supabase
             .from('messages')
             .insert([{
                 conversation_id: activeChatId,
                 sender_id: currentUser.id,
                 content: publicUrl,
-                type: 'image', 
+                type: msgType, 
                 is_read: false,
-                reply_to_id: replyId
+                reply_to_id: replyId,
+                file_name: file.name // We save this so we can show "document.pdf" in the chat
             }]);
 
         if (msgError) throw msgError;
 
+        // 5. Cleanup
+        document.getElementById(tempId)?.remove();
         cancelReplyUI();
+        
         await supabase.from('conversations')
-            .update({ last_message: '📷 Image', updated_at: new Date().toISOString() })
+            .update({ 
+                last_message: isImage ? '📷 Image' : `📁 ${file.name}`, 
+                updated_at: new Date().toISOString() 
+            })
             .eq('id', activeChatId);
 
     } catch (err) {
+        document.getElementById(tempId)?.remove();
         console.error("[UPLOAD ERROR]", err);
-        alert(`Upload failed: ${err.message}`);
+        Swal.fire('Upload Failed', err.message, 'error');
     }
 }
 
+
 // --- 3. HEARTBEAT / PRESENCE ---
 async function initUserPresence() {
-    if (heartbeatInterval) clearInterval(heartbeatInterval);
+    if (heartbeatInterval) clearInterval();
 
     const updateStatus = async () => {
         const { data: profile } = await supabase.from('profiles').select('show_online').eq('id', currentUser.id).single();
@@ -358,6 +388,29 @@ const { data: messages, error } = await supabase
     }
 
     container.innerHTML = ''; 
+
+    // 🛡️ 2. ADD SAFETY WARNING (New Step)
+    // We check if it's Level 1 (Step 1) or any active deal
+    if (chat && chat.status === 'active') {
+        const warningDiv = document.createElement('div');
+        warningDiv.className = 'system-pill-container'; // Keeps it centered
+        warningDiv.innerHTML = `
+            <div class="safety-warning-box">
+                <div class="warning-header">
+                    <i class="ph-fill ph-shield-warning"></i>
+                    <span>Safety Disclaimer</span>
+                </div>
+                <p>To avoid scams, keep all payments and conversations inside the website. Never share your WhatsApp, Telegram, or phone number.</p>
+                <ul>
+                    <li>Take screenshots of the chat for evidence in case of a dispute.</li>
+                    <li>Payments made outside the platform are not protected by escrow.</li>
+                    <li>Report any user asking to "deal direct" to our Admins.</li>
+                </ul>
+            </div>
+        `;
+        container.appendChild(warningDiv);
+    }
+
     if (messages) messages.forEach(msg => appendMessageUI(msg));
 }
 
@@ -477,6 +530,22 @@ function subscribeToMessages() {
 async function deleteMessage(msgId, senderId) {
     if (senderId !== currentUser.id) return;
 
+    // 🛑 1. DISPUTE LOCK: Block deletion if status is disputed, cancelled, or completed
+    const currentStatus = window.activeChatData?.status;
+    if (currentStatus === 'disputed' || currentStatus === 'cancelled' || currentStatus === 'completed') {
+        Swal.fire({
+            title: 'Action Blocked',
+            text: 'Messages cannot be deleted after a dispute is raised or a deal is closed to preserve evidence.',
+            icon: 'error',
+            confirmButtonColor: '#0b1e5b'
+        });
+        
+        // Reset the swipe UI so the bubble doesn't stay stuck to the side
+        const msgDiv = document.getElementById(`msg-${msgId}`);
+        if (msgDiv) msgDiv.querySelector('.msg-bubble').style.transform = 'translateX(0)';
+        return;
+    }
+
     const result = await Swal.fire({
         title: 'Delete Message?',
         text: "This action cannot be undone!",
@@ -517,9 +586,6 @@ async function deleteMessage(msgId, senderId) {
         if (msgError) throw msgError;
 
         // 3. 🎯 THE RELIABLE SIDEBAR UPDATE
-        // Check if there are any messages NEWER than the one we just deleted.
-        // If there are newer messages, we don't need to update the sidebar because 
-        // the deleted message wasn't the "top" one anyway.
         const { count } = await supabase
             .from('messages')
             .select('*', { count: 'exact', head: true })
@@ -529,7 +595,6 @@ async function deleteMessage(msgId, senderId) {
         const isLastMessage = count === 0;
 
         if (isLastMessage) {
-            // If it was the last message, the sidebar should now show the "deleted" status
             await supabase
                 .from('conversations')
                 .update({ last_message: '🚫 This message was deleted' })
@@ -556,7 +621,6 @@ async function deleteMessage(msgId, senderId) {
     }
 }
 
-window.deleteMessage = deleteMessage;
 
 
 
@@ -755,17 +819,35 @@ const senderName = msg.sender?.username || 'User';
     }
 
     // 🎯 5. Content Logic
-    const contentHTML = (msg.type === 'deleted')
-        ? `<p class="content deleted-text">${msg.content}</p>`
-        : (msg.type === 'image') 
-            ? `<img src="${msg.content}" class="chat-img" loading="lazy" onclick="window.open('${msg.content}', '_blank')">`
-            : `<p class="content">${msg.content}</p>`;
+    let contentHTML = '';
+    if (msg.type === 'deleted') {
+        contentHTML = `<p class="content deleted-text">${msg.content}</p>`;
+    } else if (msg.type === 'image') {
+        contentHTML = `<img src="${msg.content}" class="chat-img" loading="lazy" onclick="window.open('${msg.content}', '_blank')">`;
+    } else if (msg.type === 'file') {
+        // Show a download box for non-image files
+        const displayFileName = msg.file_name || 'Attachment';
+        contentHTML = `
+            <div class="file-attachment-box" onclick="window.open('${msg.content}', '_blank')">
+                <i class="ph-fill ph-file-text"></i>
+                <div class="file-info">
+                    <span>${displayFileName}</span>
+                    <small>Click to view/download</small>
+                </div>
+            </div>`;
+    } else {
+        contentHTML = `<p class="content">${msg.content}</p>`;
+    }
 
-        
 
     // 🎯 6. Assemble Final Structure
+    // Check if the chat is in a state where deleting is forbidden
+    const isLocked = window.activeChatData?.status === 'disputed' || 
+                     window.activeChatData?.status === 'cancelled' || 
+                     window.activeChatData?.status === 'completed';
+
     div.innerHTML = `
-        ${isMe ? `<div class="swipe-delete-btn" onclick="deleteMessage('${msg.id}', '${msg.sender_id}')"><i class="ph ph-trash"></i></div>` : ''}
+        ${(isMe && !isLocked) ? `<div class="swipe-delete-btn" onclick="deleteMessage('${msg.id}', '${msg.sender_id}')"><i class="ph ph-trash"></i></div>` : ''}
         
         <div class="msg-bubble">
             ${senderIsAdmin ? `
