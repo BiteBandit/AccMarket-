@@ -155,9 +155,10 @@
         <li>
           <a href="wallet.html"><i class="fas fa-wallet"></i> Wallet</a>
         </li>
-        <li class="seller-only" style="display: none">
-          <a href="sell.html"><i class="fas fa-coins"></i> Sell Account</a>
-        </li>
+<li class="seller-only hidden-element">
+  <a href="sell.html"><i class="fas fa-coins"></i> Sell Account</a>
+</li>
+
 <li>
   <a href="chats.html" style="position: relative;">
     <i class="fas fa-message"></i> My Chats
@@ -201,39 +202,28 @@
       </section>
 
       <!-- Overview Cards -->
-      <section class="overview-cards">
-        <div class="card">
-          <i class="fas fa-wallet"></i>
-          <div>
-            <h3>₦0.00</h3>
-            <p>Wallet Balance</p>
-          </div>
-        </div>
-
-        <div class="card">
-          <i class="fas fa-tags"></i>
-          <div>
-            <h3>0</h3>
-            <p>Total Deals</p>
-          </div>
-        </div>
-
-        <div class="card">
-          <i class="fas fa-tags"></i>
-          <div>
-            <h3>0</h3>
-            <p>Accounts Sold</p>
-          </div>
-        </div>
-
-        <div class="card">
-  <i class="fas fa-shield-halved"></i> <div>
-    <h3 id="trustScore">0%</h3> <p>Trust Score</p>
+     <section class="overview-cards">
+  <div class="card">
+    <i class="fas fa-wallet"></i>
+    <div><h3>₦0.00</h3><p>Wallet Balance</p></div>
   </div>
-</div>
 
-        
-      </section>
+  <div class="card">
+    <i class="fas fa-tags"></i>
+    <div><h3>0</h3><p>Total Deals</p></div>
+  </div>
+
+  <div class="card seller-only hidden-element">
+    <i class="fas fa-tags"></i>
+    <div><h3>0</h3><p>Accounts Sold</p></div>
+  </div>
+
+  <div class="card seller-only hidden-element">
+    <i class="fas fa-shield-halved"></i> 
+    <div><h3 id="trustScore">0%</h3><p>Trust Score</p></div>
+  </div>
+</section>
+
 
       <!-- DASHBOARD CHART SECTION -->
 <section class="dashboard-chart container">

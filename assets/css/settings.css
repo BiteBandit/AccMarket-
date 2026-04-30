@@ -668,6 +668,44 @@ input:checked + .slider:before {
     transform: translateY(0) scale(0.98);
 }
 
+/* --- 🔐 PAYMENT SECURITY SECTION --- */
+
+/* Specific styling for the PIN Update button to make it stand out slightly */
+#changePinBtn {
+    background-color: var(--dark-blue);
+    font-weight: 600;
+    min-width: 100px;
+}
+
+#changePinBtn:hover {
+    background-color: #0d2570;
+    box-shadow: 0 4px 12px rgba(11, 30, 91, 0.2);
+}
+
+/* Styling the small-text for the default PIN warning */
+.small-text {
+    font-size: 0.8rem;
+    color: #e63946; /* A subtle red to grab attention */
+    margin-top: 5px;
+    font-weight: 500;
+}
+
+/* --- 📟 SWEETALERT PIN INPUT STYLING --- */
+/* This targets the SweetAlert input when you are asking for the PIN */
+.swal2-input[type="password"] {
+    letter-spacing: 8px; /* Makes the PIN dots look like a banking app */
+    text-align: center;
+    font-size: 1.5rem;
+}
+
+/* Ensure the number pad icon (numeric mode) fits the theme */
+.swal2-label {
+    font-family: 'Inter', sans-serif;
+    color: var(--dark-blue);
+    font-weight: 600;
+}
+
+
 .chat-count-badge {
   display: none;
   background: #ef4444; /* Matches notification red */

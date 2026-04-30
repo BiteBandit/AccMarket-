@@ -243,6 +243,95 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 });
 
+// ✅ Add this to your existing script
+document.addEventListener("DOMContentLoaded", async () => {
+  const changePinBtn = document.getElementById("changePinBtn");
+
+  // Get current user from Supabase
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) return;
+
+  // --- 🔐 UPDATE SECURITY PIN LOGIC ---
+  if (changePinBtn) {
+    changePinBtn.addEventListener("click", async () => {
+      // 1️⃣ Verify Identity with Login Password
+      const { value: password } = await Swal.fire({
+        title: 'Verify Identity',
+        text: 'Enter your account password to authorize PIN change',
+        input: 'password',
+        inputPlaceholder: 'Enter password',
+        showCancelButton: true,
+        confirmButtonColor: '#0b1e5b',
+        cancelButtonColor: '#6b7280',
+      });
+
+      if (!password) return; // User cancelled
+
+      // Show loading state while checking password
+      Swal.fire({
+        title: 'Verifying...',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+      });
+
+      try {
+        // Re-authenticate user
+        const { error: authError } = await supabase.auth.signInWithPassword({
+          email: user.email,
+          password: password,
+        });
+
+        if (authError) throw new Error("Incorrect password. Access denied.");
+
+        // 2️⃣ Ask for the New 4-Digit PIN
+        const { value: newPin } = await Swal.fire({
+          title: 'Set New PIN',
+          text: 'Enter a 4-digit PIN for withdrawals',
+          input: 'password',
+          inputPlaceholder: 'e.g., 1234',
+          inputAttributes: {
+            maxlength: 4,
+            autocapitalize: 'off',
+            autocorrect: 'off',
+            inputmode: 'numeric'
+          },
+          showCancelButton: true,
+          confirmButtonColor: '#0b1e5b',
+          preConfirm: (value) => {
+            if (!/^\d{4}$/.test(value)) {
+              Swal.showValidationMessage('PIN must be exactly 4 digits');
+            }
+            return value;
+          }
+        });
+
+        if (!newPin) return;
+
+        // 3️⃣ Update PIN in Database
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ security_pin: newPin })
+          .eq('id', user.id);
+
+        if (updateError) throw updateError;
+
+        Swal.fire({
+          icon: 'success',
+          title: 'PIN Secured!',
+          text: 'Your security PIN has been updated.',
+          timer: 2500,
+          showConfirmButton: false
+        });
+
+      } catch (err) {
+        Swal.fire('Error', err.message, 'error');
+      }
+    });
+  }
+});
+
+
+
 document.addEventListener("DOMContentLoaded", async () => {
   const telegramToggle = document.getElementById("telegramAlertsToggle");
   if (!telegramToggle) return console.error("Toggle element not found!");

@@ -425,6 +425,32 @@ body {
   color: #fff;
 }
 
+/* --- 🔐 ROLE-BASED VISIBILITY --- */
+
+/* This class hides elements by default */
+.hidden-element {
+    display: none !important;
+}
+
+/* --- 📊 OVERVIEW CARDS STYLING --- */
+.overview-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
+.card {
+    background-color: #ffffff;
+    padding: 1.5rem;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    display: flex; /* Normal cards stay flex */
+    align-items: center;
+    gap: 1rem;
+}
+
+
 .dashboard-chart {
   background: var(--milk);
   border: 1px solid var(--light-gray);

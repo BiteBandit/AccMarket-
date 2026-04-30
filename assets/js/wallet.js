@@ -51,15 +51,38 @@ const walletTransactionsEl = document.getElementById("walletTransactions");
 // =========================
 // GLOBAL STATE
 // =========================
+let currentUser = null; // 🎯 Added this to fix the error
 let allTransactions = [];
 let currentFilter = "all";
 
 // =========================
+// INITIALIZATION flow
+// =========================
+document.addEventListener("DOMContentLoaded", async () => {
+    // This fetches the user as soon as the page opens
+    const { data: { user }, error } = await supabase.auth.getUser();
+
+    if (error || !user) {
+        console.error("Auth error:", error);
+        window.location.href = "auth.html"; // Redirect if not logged in
+        return;
+    }
+
+    currentUser = user; 
+    console.log("Wallet session started for:", currentUser.id);
+
+    // Call your data fetching functions here
+    if (typeof fetchWalletData === 'function') fetchWalletData();
+    if (typeof showSellerAndAdminLinks === 'function') showSellerAndAdminLinks();
+});
+
+// =========================
 // FILTER FUNCTIONS
 // =========================
-function setFilter(type) {
+// Added window. to make it accessible to HTML onclick since this is a module
+window.setFilter = function(type) {
   currentFilter = type;
-  applyFilter();
+  if (typeof applyFilter === 'function') applyFilter();
 
   // active button UI
   document.querySelectorAll(".wallet-filters button").forEach(btn => {
@@ -67,11 +90,12 @@ function setFilter(type) {
   });
 
   const activeBtn = document.querySelector(
-    `.wallet-filters button[onclick="setFilter('${type}')"]`
+    `.wallet-filters button[onclick*="'${type}'"]`
   );
 
   if (activeBtn) activeBtn.classList.add("active");
 }
+
 
 // ⭐ IMPORTANT FIX: expose function to HTML (MODULE FIX)
 window.setFilter = setFilter;
@@ -124,6 +148,9 @@ function renderTransactions(transactions) {
     let amountColor = "var(--black)";
     if (type === "deposit") amountColor = "var(--green)";
     else if (type === "withdrawal") amountColor = "var(--red)";
+else if (type === "refund") amountColor = "var(--green)";
+else if (type === "verification_fee") amountColor = "var(--red)";
+else if (type === "credit") amountColor = "var(--green)";
 
     return `
       <tr>
@@ -270,6 +297,198 @@ if (confirmBtn) {
     }
   });
 }
+
+// --- 🎯 WITHDRAWAL SYSTEM LOGIC ---
+const withdrawModal = document.getElementById('withdrawModal');
+const withdrawBtn = document.getElementById('withdrawBtn'); 
+const closeWithdrawModal = document.getElementById('closeWithdrawModal');
+const confirmWithdrawBtn = document.getElementById('confirmWithdrawBtn');
+
+// 1. Open Modal Logic
+if (withdrawBtn) {
+    withdrawBtn.onclick = (e) => {
+        e.preventDefault();
+        if (!currentUser) {
+            Swal.fire('Please wait', 'Your account details are still loading...', 'info');
+            return;
+        }
+        withdrawModal.classList.add('active');
+    };
+}
+
+// 2. Close Modal Logic
+if (closeWithdrawModal) {
+    closeWithdrawModal.onclick = () => {
+        withdrawModal.classList.remove('active');
+    };
+}
+
+// 3. Process the Withdrawal
+confirmWithdrawBtn?.addEventListener('click', async () => {
+    // 🛡️ Basic Security Check
+    if (!currentUser) return Swal.fire('Error', 'Session not found. Please refresh.', 'error');
+
+    // Get input elements
+    const amountInput = document.getElementById('withdrawAmount');
+    const bankInput = document.getElementById('bankName');
+    const accNumInput = document.getElementById('accountNumber');
+    const accNameInput = document.getElementById('accountName');
+
+    const amount = parseFloat(amountInput.value);
+    const bank = bankInput.value.trim();
+    const accNum = accNumInput.value.trim();
+    const accName = accNameInput.value.trim();
+
+    // --- 🟢 VALIDATIONS ---
+    if (!amount || amount < 1000) {
+        return Swal.fire({
+            target: withdrawModal, // 👈 Force alert on top of modal
+            title: 'Invalid Amount',
+            text: 'Minimum withdrawal is ₦1,000',
+            icon: 'warning'
+        });
+    }
+    if (!bank || !accNum || !accName) {
+        return Swal.fire({
+            target: withdrawModal, // 👈 Force alert on top of modal
+            title: 'Missing Info',
+            text: 'Please provide all bank details.',
+            icon: 'warning'
+        });
+    }
+
+    try {
+        // --- 🔵 STEP 1: FETCH PROFILE (Check Balance & PIN) ---
+        const { data: profile, error: profileErr } = await supabase
+            .from('profiles')
+            .select('balance, security_pin')
+            .eq('id', currentUser.id)
+            .single();
+
+        if (profileErr) throw profileErr;
+        
+        // --- 🔒 SECURITY CHECK 1: FORBID DEFAULT PIN ---
+        if (profile.security_pin === '0000') {
+            return Swal.fire({
+                target: withdrawModal,
+                title: 'Secure Your Account',
+                text: 'You are using the default PIN (0000). Please change it in Settings before withdrawing.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Go to Settings',
+                confirmButtonColor: '#0b1e5b'
+            }).then((result) => {
+                if (result.isConfirmed) window.location.href = 'settings.html';
+            });
+        }
+
+        // --- 🔒 SECURITY CHECK 2: PIN VERIFICATION POPUP ---
+        const { value: enteredPin } = await Swal.fire({
+            target: withdrawModal, // 👈 Essential for the PIN popup
+            title: 'Enter Security PIN',
+            input: 'password',
+            inputLabel: 'Authorize this withdrawal',
+            inputPlaceholder: 'Enter 4-digit PIN',
+            inputAttributes: {
+                maxlength: 4,
+                autocapitalize: 'off',
+                autocorrect: 'off',
+                inputmode: 'numeric'
+            },
+            showCancelButton: true,
+            confirmButtonColor: '#0b1e5b'
+        });
+
+        if (!enteredPin) return; // User cancelled
+
+        if (enteredPin !== profile.security_pin) {
+            return Swal.fire({
+                target: withdrawModal,
+                title: 'Access Denied',
+                text: 'Invalid Security PIN.',
+                icon: 'error'
+            });
+        }
+
+        // Final balance check
+        if (profile.balance < amount) {
+            return Swal.fire({
+                target: withdrawModal,
+                title: 'Insufficient Funds',
+                text: `Your balance is ₦${profile.balance.toLocaleString()}`,
+                icon: 'error'
+            });
+        }
+
+        // UI Feedback: Start Processing
+        confirmWithdrawBtn.disabled = true;
+        confirmWithdrawBtn.innerText = "Processing...";
+
+        // --- 🟡 STEP 2: LOG TO WITHDRAWALS TABLE ---
+        const { error: withdrawError } = await supabase
+            .from('withdrawals')
+            .insert([{
+                user_id: currentUser.id,
+                amount: amount,
+                method: 'Transfer',
+                details: `${bank} | Acc: ${accNum} | Name: ${accName}`,
+                status: 'pending'
+            }]);
+
+        if (withdrawError) throw withdrawError;
+
+        // --- 🟠 STEP 3: LOG TO WALLET TABLE ---
+        const { error: walletTableError } = await supabase
+            .from('wallet')
+            .insert([{
+                user_id: currentUser.id,
+                type: 'withdrawal',
+                amount: amount,
+                note: `Withdrawal to ${bank} (${accNum})`,
+                status: 'success',
+                reference: `WDR-${Date.now()}-${currentUser.id.slice(0, 5)}`
+            }]);
+
+        if (walletTableError) throw walletTableError;
+
+        // --- 🔴 STEP 4: DEDUCT FROM BALANCE ---
+        const { error: updateError } = await supabase
+            .rpc('deduct_balance', { 
+                user_id: currentUser.id, 
+                amount_to_deduct: amount 
+            });
+
+        if (updateError) throw updateError;
+
+        // --- 🟢 STEP 5: SUCCESS UI ---
+        Swal.fire({
+            target: withdrawModal,
+            title: 'Authorized!',
+            text: `₦${amount.toLocaleString()} deducted. Your funds will be sent within 24 hours.`,
+            icon: 'success',
+            confirmButtonText: 'Done'
+        }).then(() => {
+            window.location.reload(); 
+        });
+        
+    } catch (err) {
+        console.error("Withdrawal Error:", err);
+        Swal.fire({
+            target: withdrawModal,
+            title: 'System Error',
+            text: err.message,
+            icon: 'error'
+        });
+    } finally {
+        if (confirmWithdrawBtn) {
+            confirmWithdrawBtn.disabled = false;
+            confirmWithdrawBtn.innerText = "Confirm Withdrawal";
+        }
+    }
+});
+
+
+
 
 // =========================
 // KORAPAY PAYMENT LOGIC
@@ -534,10 +753,10 @@ document.addEventListener("click", async (e) => {
   }
 });
 
-// ✅ Show Sell Account link ONLY for Sellers
+// ✅ Show Sell Account link and Withdraw Button ONLY for Sellers
 async function showSellerAndAdminLinks() {
   try {
-    // Get current logged-in user
+    // 1. Get current logged-in user
     const {
       data: { user },
       error: userError,
@@ -548,7 +767,7 @@ async function showSellerAndAdminLinks() {
       return;
     }
 
-    // Get user profile and role
+    // 2. Get user profile and role
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("role")
@@ -560,12 +779,21 @@ async function showSellerAndAdminLinks() {
       return;
     }
 
-    // Select the Sell Account menu link
-    const sellAccountLink = document.querySelector(".seller-only");
+    // --- 🎯 TARGET THE WITHDRAW BUTTON ---
+    const withdrawBtn = document.getElementById("withdrawBtn");
+    if (withdrawBtn) {
+      // Show only if role is 'seller', hide for 'buyer' and 'admin'
+      if (profile.role === "seller") {
+        withdrawBtn.style.display = "block";
+      } else {
+        withdrawBtn.style.display = "none";
+      }
+    }
 
-    // Sell Account → ONLY visible for "seller"
-    // This will now hide the link for both "buyer" and "admin"
+    // --- 🎯 TARGET THE SELL ACCOUNT LINK ---
+    const sellAccountLink = document.querySelector(".seller-only");
     if (sellAccountLink) {
+      // Sell Account → ONLY visible for "seller"
       if (profile.role === "seller") {
         sellAccountLink.style.display = "block";
       } else {
@@ -573,12 +801,12 @@ async function showSellerAndAdminLinks() {
       }
     }
 
-
-
   } catch (err) {
     console.error("⚠️ Error checking role:", err);
   }
 }
 
-// Run it once page loads
-showSellerAndAdminLinks();
+// Ensure it runs after the page has finished loading
+document.addEventListener("DOMContentLoaded", () => {
+    showSellerAndAdminLinks();
+});

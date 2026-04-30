@@ -43,45 +43,30 @@ document.addEventListener("DOMContentLoaded", () => {
 import { supabase } from './supabase-config.js'
 console.log("If this logs, the error is gone!", supabase)
 
- // ---- FETCH USER DATA ----
 async function loadDashboard() {
   try {
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
-      console.warn("No user logged in, redirecting...");
       window.location.href = "auth.html";
       return;
     }
 
-
-
-
-
-    // ✅ Fetch trust_score instead of total_earnings
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select(
-        "username, role, balance, accounts_sold, total_deals, trust_score,is_active"
-      )
+      .select("username, role, balance, accounts_sold, total_deals, trust_score, is_active")
       .eq("id", user.id)
       .single();
 
     if (profileError) throw profileError;
 
-// ✅ PROFESSIONAL SWEET ALERT CHECK
+    // ✅ DEACTIVATION CHECK
     if (profile.is_active === false) {
       Swal.fire({
         title: "Account Deactivated",
-        text: "Your account has been deactivated. Please contact support for assistance.",
+        text: "Your account has been deactivated. Please contact support.",
         icon: "error",
-        confirmButtonColor: "#0b1e5b", // Matches your chart theme
-        confirmButtonText: "Close",
-        allowOutsideClick: false,
-        allowEscapeKey: false
+        confirmButtonColor: "#0b1e5b",
+        confirmButtonText: "Close"
       }).then(async () => {
         await supabase.auth.signOut();
         window.location.href = "auth.html";
@@ -89,67 +74,66 @@ async function loadDashboard() {
       return;
     }
 
-
-
-    // Update username
+    // --- 👤 STEP 1: UPDATE PUBLIC CARDS (Shows instantly) ---
     document.getElementById("userName").textContent = `${profile.username} 👋`;
 
-    // Update wallet balance (Card 1)
-    document.querySelector(".card:nth-child(1) h3").textContent = `₦${Number(
-      profile.balance
-    ).toLocaleString()}`;
+    const balanceEl = document.querySelector(".card i.fa-wallet")?.parentElement.querySelector("h3");
+    if (balanceEl) balanceEl.textContent = `₦${Number(profile.balance || 0).toLocaleString()}`;
 
-    // Update total deals (Card 2)
-    document.querySelector(".card:nth-child(2) h3").textContent =
-      profile.total_deals || 0;
+    const dealsEl = document.querySelector(".card i.fa-tags")?.parentElement.querySelector("h3");
+    if (dealsEl) dealsEl.textContent = profile.total_deals || 0;
 
-    // Show/hide seller-only stats
-    const accountsSoldCard = document.querySelector(".card:nth-child(3)");
-    const trustScoreCard = document.querySelector(".card:nth-child(4)"); // 👈 Target for Trust Score
-    const sellerMenuItem = document.querySelector(".seller-only"); // 👈 Sell Account button
+    // --- 🎯 STEP 2: SELLER-ONLY LOGIC ---
+    const sellerOnlyElements = document.querySelectorAll(".seller-only");
+    const trustScoreEl = document.getElementById("trustScore");
 
-    // ✅ Sell Account & Stats → show ONLY for sellers
-    // Admins and Buyers will not see these cards or the sell link
     if (profile.role === "seller") {
-      accountsSoldCard.style.display = "flex";
-      trustScoreCard.style.display = "flex";
+      // 🔓 Reveal everything with the .seller-only class
+      sellerOnlyElements.forEach(el => {
+        el.classList.remove("hidden-element"); // Remove the CSS hide class
+        
+        // Handle the display style based on element type
+        // This overrides 'style="display: none"' in your HTML
+        if (el.tagName === "LI") {
+          el.style.display = "block"; 
+        } else {
+          el.style.display = "flex"; // Cards need flex for layout
+        }
+      });
 
-      if (sellerMenuItem) sellerMenuItem.style.display = "block";
-
-      // Card 3: Accounts Sold
-      document.querySelector(".card:nth-child(3) h3").textContent =
-        profile.accounts_sold || 0;
-
-      // Card 4: Trust Score (Formatted as percentage)
-      const score = profile.trust_score || 0;
-      const scoreEl = document.querySelector(".card:nth-child(4) h3");
-      scoreEl.textContent = `${Math.round(score)}%`;
-
-// ✅ Updated 3-Color Logic
-      if (score >= 80) {
-        scoreEl.style.color = "#2aec58"; // Green (80% and above)
-      } else if (score >= 50) {
-        scoreEl.style.color = "#f59e0b"; // Orange (Between 50% and 79%)
-      } else {
-        scoreEl.style.color = "#ff4d4d"; // Red (Below 50%)
+      // Update Accounts Sold Card
+      const accountsSoldCard = Array.from(sellerOnlyElements).find(card => 
+        card.innerText.includes("Accounts Sold")
+      );
+      if (accountsSoldCard) {
+        accountsSoldCard.querySelector("h3").textContent = profile.accounts_sold || 0;
       }
 
+      // Update Trust Score & Colors
+      if (trustScoreEl) {
+        const score = profile.trust_score || 0;
+        trustScoreEl.textContent = `${Math.round(score)}%`;
+
+        if (score >= 80) trustScoreEl.style.color = "#2aec58";
+        else if (score >= 50) trustScoreEl.style.color = "#f59e0b";
+        else trustScoreEl.style.color = "#ff4d4d";
+      }
 
     } else {
-      // Hide for Buyers and Admins
-      accountsSoldCard.style.display = "none";
-      trustScoreCard.style.display = "none";
-      if (sellerMenuItem) sellerMenuItem.style.display = "none";
+      // 🔒 Force hide for Buyers and Admins
+      sellerOnlyElements.forEach(el => {
+        el.classList.add("hidden-element");
+        el.style.display = "none";
+      });
     }
 
-    // ✅ Analytics logic removed entirely as requested
-
   } catch (err) {
-    console.error("Error loading dashboard:", err.message);
+    console.error("Dashboard Error:", err.message);
   }
 }
 
 loadDashboard();
+
 
 
 // ---- LOGOUT FUNCTIONALITY ----

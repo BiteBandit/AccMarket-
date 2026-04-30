@@ -260,6 +260,36 @@
   </div>
 </div>
 
+<div id="withdrawModal" class="modal-overlay">
+  <div class="wallet-deposit-card">
+    <div class="modal-header">
+      <h3>Withdraw Funds</h3>
+      <button id="closeWithdrawModal" class="close-modal-btn">&times;</button>
+    </div>
+    
+    <p class="modal-subtitle">Transfer earnings to your bank account (Min ₦1,000).</p>
+    
+    <div class="input-group">
+      <span class="currency-symbol">₦</span>
+      <input type="number" id="withdrawAmount" placeholder="Amount" class="form-control">
+    </div>
+
+    <div class="input-group">
+      <input type="text" id="bankName" placeholder="Bank Name (e.g. Opay, Kuda, GTB)" class="form-control">
+    </div>
+
+    <div class="input-group">
+      <input type="text" id="accountNumber" placeholder="Account Number" class="form-control" maxlength="10">
+    </div>
+
+    <div class="input-group">
+      <input type="text" id="accountName" placeholder="Account Holder Name" class="form-control">
+    </div>
+
+    <button id="confirmWithdrawBtn" class="btn-primary modal-btn">Confirm Withdrawal</button>
+  </div>
+</div>
+
   <!-- Begin of Chaport Live Chat code -->
 <script type="text/javascript">
 (function(w,d,v3){
