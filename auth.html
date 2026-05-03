@@ -116,16 +116,16 @@
       <div class="categories">
         <h4>Categories</h4>
         <ul id="categoryList" class="category-list">
-          <li><a href="#">FACEBOOK</a></li>
-          <li><a href="#">TIKTOK</a></li>
-          <li><a href="#">INSTAGRAM</a></li>
-          <li><a href="#">TWITTER </a></li>
-          <li><a href="#">SNAPCHAT</a></li>
-          <li><a href="#">LINKEDIN</a></li>
-          <li><a href="#">REDDIT</a></li>
+          <li><a href="facebook.html">FACEBOOK</a></li>
+          <li><a href="platforms/tiktok">TIKTOK</a></li>
+          <li><a href="platforms/imstagram">INSTAGRAM</a></li>
+          <li><a href="platforms/twitter">TWITTER </a></li>
+          <li><a href="platforms/snapchat">SNAPCHAT</a></li>
+          <li><a href="platforms/linkedin">LINKEDIN</a></li>
+          <li><a href="platforms/reddit">REDDIT</a></li>
           <li><a href="#">MAILS</a></li>
-          <li><a href="#">PINTEREST</a></li>
-          <li><a href="#">DISCORD</a></li>
+          <li><a href="platforms/pinterest">PINTEREST</a></li>
+          <li><a href="platforms/discord">DISCORD</a></li>
         </ul>
       </div>
     </aside>
@@ -207,104 +207,56 @@
         </div>
       </section>
 
-      <!-- REGISTER SECTION -->
-      <section id="register-section" class="auth-section">
-        <div class="auth-illustration">
-          <img
-            src="https://stories.freepiklabs.com/storage/13489/Mobile-login-01.svg"
-            alt="Register Illustration"
-          />
+<section id="register-section" class="auth-section">
+  <div class="auth-illustration">
+    <img src="https://stories.freepiklabs.com/storage/13489/Mobile-login-01.svg" alt="Register Illustration" />
+  </div>
+
+  <div class="auth-form">
+    <h2>Create Account</h2>
+    <form id="register-form" novalidate>
+      
+      <div class="form-group">
+        <label for="email">Email Address</label>
+        <input type="email" id="email" placeholder="Enter your email" required />
+      </div>
+
+      <div class="form-group password-group">
+        <label for="password">Password</label>
+        <div class="password-wrapper">
+          <input type="password" id="password" placeholder="Min. 8 characters" required />
+          <svg class="eye-icon password-toggle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:24px; cursor:pointer;">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+          </svg>
         </div>
-
-        <div class="auth-form">
-          <h2>Create Account</h2>
-          <form id="register-form" novalidate>
-            <div class="form-group">
-              <label for="username">Username</label>
-              <input
-                type="text"
-                id="username"
-                placeholder="Enter username"
-                required
-              />
-            </div>
-            <div class="form-group">
-              <label for="email">Email Address</label>
-              <input
-                type="email"
-                id="email"
-                placeholder="Enter email"
-                required
-              />
-
-  <div class="form-group">
-  <label for="country">Country</label>
-  <div class="country-display">
-    <span id="country-flag">🌍</span>
-    <span id="country-name">Detecting...</span>
-  </div>
-  <input type="hidden" id="country" name="country" />
-</div>
-
-<div class="form-group">
-  <label for="phone">Phone Number</label>
-  <div class="phone-field">
-    <span id="country-code">+00</span>
-    <input type="tel" id="phone" placeholder="Enter phone number" required />
-  </div>
-</div>
-            
-           <div class="form-group password-group">
-  <label for="password">Password</label>
-  <div class="password-wrapper">
-    <input
-      type="password"
-      id="password"
-      placeholder="Enter password"
-      required
-    />
-    <svg class="eye-icon password-toggle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:24px; cursor:pointer;">
-  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-</svg>
-
-  </div>
-</div>
-<div class="password-strength hidden">
-  <div class="strength-bar"></div>
-  <small class="strength-text"></small>
-</div>
-
-<div class="form-group password-group">
-  <label for="password">Confirm Password</label>
-  <div class="password-wrapper">
-    <input
-      type="password"
-      id="confirm-password"
-      placeholder="Confirm password"
-      required
-    />
-    <svg class="eye-icon password-toggle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:24px; cursor:pointer;">
-  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-</svg>
-
-  </div>
-</div>
-            <div class="terms">
-              <input type="checkbox" id="terms" required />
-              <label for="terms"
-                >I agree to the <a href="terms.html">Terms & Policies</a></label
-              >
-            </div>
-            <button type="submit" class="auth-btn">Register</button>
-            <p class="switch-form">
-              Already have an account?
-              <a href="#" id="go-to-login">Login here</a>
-            </p>
-          </form>
+        <div class="password-strength hidden">
+          <div class="strength-bar"></div>
         </div>
-      </section>
+        <small class="strength-text"></small>
+      </div>
+
+      <div class="form-group password-group">
+        <label for="confirm-password">Confirm Password</label>
+        <div class="password-wrapper">
+          <input type="password" id="confirm-password" placeholder="Repeat password" required />
+        </div>
+      </div>
+
+      <div class="terms">
+        <input type="checkbox" id="terms" required />
+        <label for="terms">I agree to the <a href="terms.html">Terms & Policies</a></label>
+      </div>
+
+      <button type="submit" class="auth-btn">Register</button>
+      
+      <p class="switch-form">
+        Already have an account? <a href="#" id="go-to-login">Login here</a>
+      </p>
+    </form>
+  </div>
+</section>
+
     
 
     <footer class="site-footer">

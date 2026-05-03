@@ -130,15 +130,7 @@ window
 
 document.getElementById("footerYear").textContent = new Date().getFullYear();
 
-const categoryItems = document.querySelectorAll(".category-list > li > a");
 
-categoryItems.forEach((item) => {
-  item.addEventListener("click", (e) => {
-    e.preventDefault();
-    const parent = item.parentElement;
-    parent.classList.toggle("active");
-  });
-});
 
 const backToTop = document.getElementById("backToTop");
 

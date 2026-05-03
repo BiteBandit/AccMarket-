@@ -324,14 +324,20 @@ body {
   margin-bottom: 6px;
 }
 
-.form-group input {
+/* 🎯 Standardize all input-like containers for perfect alignment */
+.form-group input, 
+.password-wrapper input {
   width: 100%;
-  padding: 12px 14px;
+  height: 48px; /* Force consistent height across all fields */
+  padding: 0 14px;
   border: 1px solid var(--light-gray);
   border-radius: 10px;
   font-size: 0.95rem;
   transition: border-color 0.3s ease;
-  box-sizing: border-box;
+  box-sizing: border-box; /* Ensures padding doesn't break width */
+  background: #fff;
+  display: flex;
+  align-items: center;
 }
 
 .form-group input:focus {
@@ -339,55 +345,17 @@ body {
   outline: none;
 }
 
-.country-display {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 1rem;
-  padding: 10px 12px;
-  border: 1px solid var(--light-gray);
-  border-radius: 10px;
-  background: #fff;
-}
 
-.phone-field {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid var(--light-gray);
-  border-radius: 10px;
-  padding: 2px 12px;
-  background: #fff;
-}
-
-#country-code {
-  color: var(--dark-blue);
-  font-weight: 600;
-}
-
-#phone {
-  border: none;
-  outline: none;
-  width: 100%;
-  font-size: 0.95rem;
-  background: transparent;
-}
-
+/* 🎯 Password Wrapper Adjustments */
 .password-wrapper {
-  position: relative; /* ✅ make the wrapper the positioning container */
+  position: relative;
   width: 100%;
-  display: flex;
-  align-items: center;
 }
 
 .password-wrapper input {
-  width: 100%;
-  flex: 1;
-  padding-right: 40px; /* space for the eye icon */
-  box-sizing: border-box;
-  height: 44px;
-  min-width: 0;
+  padding-right: 45px; /* Increase space for the eye icon */
 }
+
 
 .eye-icon {
   position: absolute;
@@ -396,40 +364,43 @@ body {
   transform: translateY(-50%);
   width: 22px;
   height: 22px;
-  stroke: #555;
   cursor: pointer;
-  transition: stroke 0.3s ease;
-  pointer-events: auto;
   z-index: 2;
+  transition: opacity 0.3s ease;
 }
 
-.eye-icon:hover {
-  stroke: #000;
+/* When the password is shown, change the icon or add a slash */
+.eye-icon.visible {
+  color: var(--dark-blue);
 }
 
-.eye-icon.visible path:first-child {
-  display: none;
+/* Optional: If you want a visual 'slash' over the eye when hidden */
+.eye-icon::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: var(--gray);
+  transform: rotate(45deg);
+  display: block; /* Show slash by default (password hidden) */
+  transition: all 0.3s ease;
 }
 
 .eye-icon.visible::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  width: 2px;
-  height: 100%;
-  background: #555;
-  transform: rotate(45deg);
-  margin: auto;
-  pointer-events: none;
+  display: none; /* Hide slash when password is visible */
 }
 
+
+/* 🔐 Password Strength Container */
 .password-strength {
-  height: 5px;
-  background: #e0e0e0;
-  border-radius: 5px;
+  height: 6px;
+  background: #e5e7eb; /* Matches var(--light-gray) */
+  border-radius: 10px;
   overflow: hidden;
-  margin-top: 5px;
-  transition: opacity 0.3s ease;
+  margin-top: 8px;
+  transition: opacity 0.3s ease, height 0.3s ease;
 }
 
 .password-strength.hidden {
@@ -438,31 +409,56 @@ body {
   margin-top: 0;
 }
 
+/* 📊 Dynamic Strength Bar */
 .strength-bar {
   height: 100%;
   width: 0%;
-  background: red;
-  transition: width 0.3s ease, background 0.3s ease;
+  background: #ef4444; /* Default Red */
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease;
 }
+
+/* Helper classes for JS to toggle colors */
+.strength-bar.weak { background: #ef4444; width: 33%; }
+.strength-bar.medium { background: #f59e0b; width: 66%; }
+.strength-bar.strong { background: #10b981; width: 100%; }
 
 .strength-text {
   display: block;
-  font-size: 12px;
-  margin-top: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 4px;
   text-align: right;
-  color: #555;
+  color: var(--gray);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
+/* ✅ Password Match Message */
 .password-match-msg {
   font-size: 0.85rem;
-  margin-top: 5px;
-  opacity: 1;
-  transition: opacity 0.3s ease;
+  font-weight: 500;
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.3s ease;
 }
 
 .password-match-msg.hidden {
   opacity: 0;
+  transform: translateY(-5px);
+  pointer-events: none;
 }
+
+/* Success/Error states for the match message */
+.password-match-msg.error {
+  color: #ef4444;
+}
+
+.password-match-msg.success {
+  color: #10b981;
+}
+
 
 /* ⚡ Stronger Vibrate Animation */
 @keyframes vibrate {
@@ -1022,4 +1018,30 @@ body.dark-mode .back-to-top {
 
 body.dark-mode .back-to-top:hover {
   background-color: var(--milk);
+}
+
+/* Custom Styling for SweetAlert to match AccMarket */
+.swal2-popup {
+  border-radius: 16px !important; /* Matches your form radius */
+  font-family: 'Inter', sans-serif !important;
+  padding: 2rem !important;
+}
+
+.swal2-title {
+  color: #0b1e5b !important; /* Your dark blue variable */
+  font-weight: 700 !important;
+}
+
+.swal2-confirm {
+  padding: 12px 30px !important;
+  font-weight: 600 !important;
+  border-radius: 10px !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 0.9rem !important;
+}
+
+.swal2-html-container {
+  color: #4b5563 !important; /* Modern slate gray */
+  line-height: 1.6 !important;
 }

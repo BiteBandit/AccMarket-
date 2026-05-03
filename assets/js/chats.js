@@ -528,11 +528,12 @@ function subscribeToMessages() {
 
 // --- 9. DELETE LOGIC WITH SWEETALERT ---
 async function deleteMessage(msgId, senderId) {
-    if (senderId !== currentUser.id) return;
+    // 🛑 Safety check: ensures currentUser is loaded and owns the message
+    if (!currentUser || senderId !== currentUser.id) return;
 
     // 🛑 1. DISPUTE LOCK: Block deletion if status is disputed, cancelled, or completed
     const currentStatus = window.activeChatData?.status;
-    if (currentStatus === 'disputed' || currentStatus === 'cancelled' || currentStatus === 'completed') {
+    if (['disputed', 'cancelled', 'completed'].includes(currentStatus)) {
         Swal.fire({
             title: 'Action Blocked',
             text: 'Messages cannot be deleted after a dispute is raised or a deal is closed to preserve evidence.',
@@ -540,9 +541,12 @@ async function deleteMessage(msgId, senderId) {
             confirmButtonColor: '#0b1e5b'
         });
         
-        // Reset the swipe UI so the bubble doesn't stay stuck to the side
+        // Reset the swipe UI visuals
         const msgDiv = document.getElementById(`msg-${msgId}`);
-        if (msgDiv) msgDiv.querySelector('.msg-bubble').style.transform = 'translateX(0)';
+        if (msgDiv) {
+            const bubble = msgDiv.querySelector('.msg-bubble');
+            if (bubble) bubble.style.transform = 'translateX(0)';
+        }
         return;
     }
 
@@ -559,12 +563,15 @@ async function deleteMessage(msgId, senderId) {
 
     if (!result.isConfirmed) {
         const msgDiv = document.getElementById(`msg-${msgId}`);
-        if (msgDiv) msgDiv.querySelector('.msg-bubble').style.transform = 'translateX(0)';
+        if (msgDiv) {
+            const bubble = msgDiv.querySelector('.msg-bubble');
+            if (bubble) bubble.style.transform = 'translateX(0)';
+        }
         return;
     }
 
     try {
-        // 1. Get info BEFORE we delete (Added created_at here)
+        // 2. Fetch info to check if this is the last message
         const { data: msgToDelete } = await supabase
             .from('messages')
             .select('id, conversation_id, created_at')
@@ -573,7 +580,7 @@ async function deleteMessage(msgId, senderId) {
 
         if (!msgToDelete) return;
 
-        // 2. Update the message to 'deleted'
+        // 3. Update the message record (Soft Delete)
         const { error: msgError } = await supabase
             .from('messages')
             .update({ 
@@ -585,28 +592,21 @@ async function deleteMessage(msgId, senderId) {
 
         if (msgError) throw msgError;
 
-        // 3. 🎯 THE RELIABLE SIDEBAR UPDATE
+        // 4. Update Sidebar if this was the most recent message
         const { count } = await supabase
             .from('messages')
             .select('*', { count: 'exact', head: true })
             .eq('conversation_id', msgToDelete.conversation_id)
             .gt('created_at', msgToDelete.created_at);
 
-        const isLastMessage = count === 0;
-
-        if (isLastMessage) {
+        if (count === 0) {
             await supabase
                 .from('conversations')
                 .update({ last_message: '🚫 This message was deleted' })
                 .eq('id', msgToDelete.conversation_id);
-            
-            console.log("Sidebar updated to 'Deleted'");
         }
 
-        // UI Cleanup
-        const msgDiv = document.getElementById(`msg-${msgId}`);
-        if (msgDiv) msgDiv.querySelector('.msg-bubble').style.transform = 'translateX(0)';
-        
+        // 5. Success UI
         Swal.fire({ 
             toast: true, 
             position: 'top-end', 
@@ -618,8 +618,13 @@ async function deleteMessage(msgId, senderId) {
 
     } catch (err) {
         console.error("[DELETE ERROR]", err.message);
+        Swal.fire('Error', 'Could not delete message.', 'error');
     }
 }
+
+// 🎯 CRITICAL: Export to global scope so HTML onclick can find it
+window.deleteMessage = deleteMessage;
+
 
 
 
@@ -736,7 +741,7 @@ window.cancelReplyUI = cancelReplyUI;
     const container = document.querySelector('.message-container');
     if (!container || document.getElementById(`msg-${msg.id}`)) return;
 
-    // 🎯 1. Handle System/Bank/Dispute/Cancel Messages
+    // 🎯 1. Handle System Messages
     if (msg.type === 'system') {
         const systemDiv = document.createElement('div');
         systemDiv.id = `msg-${msg.id}`;
@@ -760,45 +765,10 @@ window.cancelReplyUI = cancelReplyUI;
 
     // 🎯 2. Setup Identities & Positioning
     const isMe = msg.sender_id === currentUser.id;
-    // Check if the person LOOKING at the chat is an Admin
-    const iAmAdmin = currentUser?.role === 'admin' || currentUser?.role === 'moderator';
-    // Check if the person who SENT the message is an Admin
-    const senderIsAdmin = msg.sender?.role === 'admin' || msg.sender?.role === 'moderator';
-    
-const senderName = msg.sender?.username || 'User';
     const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const sellerId = window.activeChatData?.seller_id;
-    const buyerId = window.activeChatData?.buyer_id;
-
-    let messageClass = '';
-    let roleLabel = '';
-
-    if (senderIsAdmin) {
-        messageClass = 'admin-msg';
-        roleLabel = `<span class="role-badge admin">STAFF</span>`;
-        
-        setTimeout(() => {
-            if (container) container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
-        }, 150);
-    } 
-    else if (sellerId && buyerId) {
-        // ADMIN VIEW: Force Seller LEFT and Buyer RIGHT
-        if (msg.sender_id === sellerId) {
-            messageClass = 'incoming';
-            // Only show the badge to Admins
-            if (iAmAdmin) roleLabel = `<span class="role-badge seller">SELLER</span>`;
-        } else if (msg.sender_id === buyerId) {
-            messageClass = 'outgoing';
-            // Only show the badge to Admins
-            if (iAmAdmin) roleLabel = `<span class="role-badge buyer">BUYER</span>`;
-        } else {
-            messageClass = isMe ? 'outgoing' : 'incoming';
-        }
-    } 
-    else {
-        // Standard User Fallback
-        messageClass = isMe ? 'outgoing' : 'incoming';
-    }
+    
+    // Standard User Positioning: My messages on the right, others on the left
+    const messageClass = isMe ? 'outgoing' : 'incoming';
 
     // 🎯 3. Create the Base Element
     const div = document.createElement('div');
@@ -825,7 +795,6 @@ const senderName = msg.sender?.username || 'User';
     } else if (msg.type === 'image') {
         contentHTML = `<img src="${msg.content}" class="chat-img" loading="lazy" onclick="window.open('${msg.content}', '_blank')">`;
     } else if (msg.type === 'file') {
-        // Show a download box for non-image files
         const displayFileName = msg.file_name || 'Attachment';
         contentHTML = `
             <div class="file-attachment-box" onclick="window.open('${msg.content}', '_blank')">
@@ -839,9 +808,7 @@ const senderName = msg.sender?.username || 'User';
         contentHTML = `<p class="content">${msg.content}</p>`;
     }
 
-
     // 🎯 6. Assemble Final Structure
-    // Check if the chat is in a state where deleting is forbidden
     const isLocked = window.activeChatData?.status === 'disputed' || 
                      window.activeChatData?.status === 'cancelled' || 
                      window.activeChatData?.status === 'completed';
@@ -850,18 +817,6 @@ const senderName = msg.sender?.username || 'User';
         ${(isMe && !isLocked) ? `<div class="swipe-delete-btn" onclick="deleteMessage('${msg.id}', '${msg.sender_id}')"><i class="ph ph-trash"></i></div>` : ''}
         
         <div class="msg-bubble">
-            ${senderIsAdmin ? `
-                <div class="admin-badge">
-                    <i class="ph-fill ph-shield-check"></i> 
-                    ${senderName} (Staff)
-                </div>` : ''}
-            
-            ${(iAmAdmin && !senderIsAdmin) ? `
-                <div class="msg-header">
-                    ${roleLabel}
-                </div>
-            ` : ''}
-
             ${replyHTML}
             ${contentHTML}
             

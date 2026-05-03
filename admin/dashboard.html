@@ -228,29 +228,23 @@
     <div class="table-card">
         <div class="table-header">
             <div class="header-info">
-                <h2><i class="fa-solid fa-shield-halved"></i> Account Integrity Audit</h2>
-                <p>Monitoring high-privilege roles, verification status, and security flags.</p>
+                <h2><i class="fa-solid fa-tower-broadcast"></i> System Live Feed</h2>
+                <p>Real-time monitoring of transactions, communications, and system events.</p>
             </div>
-            <div class="header-actions">
-                <div class="search-box">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" id="auditSearchInput" placeholder="Filter by Identity..." onkeyup="filterAuditTable()">
-                </div>
-                <button class="btn-refresh" onclick="loadAccountAudits()" title="Refresh Audit Feed">
-                    <i class="fa-solid fa-rotate"></i>
-                </button>
-            </div>
+            <button class="btn-refresh" onclick="loadAccountAudits()">
+                <i class="fa-solid fa-sync"></i> 
+            </button>
         </div>
 
         <div class="table-responsive">
             <table class="admin-table">
                 <thead>
                     <tr>
-                        <th>Subject (Username/UID)</th>
-                        <th>Privilege Level</th>
-                        <th>Security Status</th>
-                        <th>Last Activity / Created</th>
-                        <th style="text-align: right;">Investigation</th>
+                        <th>Event Type</th>
+                        <th>Activity Description</th>
+                        <th>Entities Involved</th>
+                        <th>Timestamp</th>
+                        <th style="text-align: right;">Ai Security Verdicts</th>
                     </tr>
                 </thead>
                 <tbody id="verificationTableBody">
@@ -259,6 +253,7 @@
         </div>
     </div>
 </section>
+
 
     </main>
 
