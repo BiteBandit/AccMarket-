@@ -971,3 +971,30 @@ body {
         padding: 0 20px 30px; /* Extra bottom padding for mobile home indicators */
     }
 }
+/* --- Centered Action Button --- */
+.card-action-container {
+    width: 92%;
+    display: flex;
+    justify-content: center; /* Horizontal Center */
+    align-items: center;     /* Vertical Center */
+    padding-top: 15px;
+    margin-top: auto;        /* Pushes button to bottom of card if content is short */
+}
+
+.purchase-btn {
+    width: 92%;              /* Slight breathing room on sides */
+    max-width: 280px;        /* Prevents it from looking too stretched on desktop */
+    padding: 14px;
+    transition: transform 0.2s, background 0.2s;
+}
+
+/* Owner State - Disabled Look */
+.owner-btn {
+    background: #94a3b8 !important; /* Slate gray */
+    cursor: not-allowed !important;
+    opacity: 0.8;
+}
+
+.purchase-btn:active:not(:disabled) {
+    transform: scale(0.96);  /* Tactile click effect */
+}

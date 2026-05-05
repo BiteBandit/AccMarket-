@@ -343,11 +343,11 @@ if (chat) {
 
             if (platform && productId) {
                 // Redirects to: ../pages/facebook.html?id=18821243-2792...
-                window.location.href = `../pages/${platform}.html?id=${productId}`;
+                window.location.href = `../platforms/${platform}.html?id=${productId}`;
             } 
             else if (platform) {
                 // Fallback if the product_id column is empty
-                window.location.href = `../pages/${platform}.html`;
+                window.location.href = `../platforms/${platform}.html`;
             } 
             else {
                 console.error("Missing platform name to redirect.");
@@ -1126,19 +1126,29 @@ window.handleCancelDeal = async function() {
         
         const systemText = `❌ Deal Cancelled. ₦${chat.product_price} was refunded to the buyer.`;
 
-        const { error: rpcError } = await supabase.rpc('handle_cancel_refund', {
-            target_buyer_id: chat.buyer_id,
-            refund_amount: parseFloat(chat.product_price),
-            target_conv_id: activeChatId,
-            product_name: chat.product_name 
-        });
+                // Inside handleCancelDeal in chats.js
+const basePrice = parseFloat(chat.product_price);
 
-        if (rpcError) throw rpcError;
+// Recalculate fee to ensure buyer gets a 100% refund
+const feeRate = (basePrice === 1500) ? 0.05 : 0.03;
+const totalRefund = basePrice + (basePrice * feeRate);
 
-        await supabase.from('conversations').update({ 
-            last_message: systemText,
-            updated_at: now.toISOString()
-        }).eq('id', activeChatId);
+const { error: rpcError } = await supabase.rpc('handle_cancel_refund', {
+    target_buyer_id: chat.buyer_id,
+    refund_amount: totalRefund, // Sends the full price + fee back to the buyer
+    target_conv_id: activeChatId,
+    product_name: chat.product_name 
+});
+
+if (rpcError) throw rpcError;
+
+// Proceed with updating the conversation UI
+await supabase.from('conversations').update({ 
+    last_message: systemText,
+    updated_at: now.toISOString()
+}).eq('id', activeChatId);
+
+
 
         await supabase.from('messages').insert([{
             conversation_id: activeChatId,

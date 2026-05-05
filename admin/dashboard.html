@@ -238,21 +238,58 @@
 
         <div class="table-responsive">
             <table class="admin-table">
-                <thead>
-                    <tr>
-                        <th>Event Type</th>
-                        <th>Activity Description</th>
-                        <th>Entities Involved</th>
-                        <th>Timestamp</th>
-                        <th style="text-align: right;">Ai Security Verdicts</th>
-                    </tr>
-                </thead>
+<thead>
+    <tr>
+        <th>Event Type</th>
+        <th>Activity Description</th>
+        <th>Status / Result</th>
+        <th>Timestamp</th>
+        <th style="text-align: right;">AI Security Check</th> </tr>
+</thead>
+
                 <tbody id="verificationTableBody">
                     </tbody>
             </table>
         </div>
     </div>
 </section>
+
+<section id="conversationsSection" class="content-section" style="display: none;">
+    <div class="table-card">
+        <div class="table-header">
+            <div class="header-info">
+                <h2><i class="fa-solid fa-comments"></i> Communication Intelligence</h2>
+                <p>Monitoring active trade spaces, escrow chats, and direct messages.</p>
+            </div>
+            <div class="header-actions">
+                <div class="search-box">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="chatSearchInput" placeholder="Search by Username..." onkeyup="filterChatTable()">
+                </div>
+                <button class="btn-refresh" onclick="loadCommunicationLogs()">
+                    <i class="fa-solid fa-rotate"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Channel ID</th>
+                        <th>Participants</th>
+                        <th>Latest Activity</th>
+                        <th>Last Message Highlight</th>
+                        <th style="text-align: right;">AI Integrity</th>
+                    </tr>
+                </thead>
+                <tbody id="conversationsTableBody">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+ 
 
 
     </main>

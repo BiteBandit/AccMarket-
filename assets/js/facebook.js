@@ -114,47 +114,64 @@ const getTrustInfo = (row) => {
 
 
 // 2. Main Fetch Function
+// 2. Main Fetch Function (Refined for Deep-Linking vs Grid Visibility)
 async function fetchFacebookInventory() {
     try {
-        // Fetch accounts
-        const { data: inventory, error: invError } = await supabase
-            .from('verifications')
-            .select('*')
-            .eq('status', 'approved');
+        const urlParams = new URLSearchParams(window.location.search);
+        const targetId = urlParams.get('id');
 
+        let query = supabase.from('verifications').select('*');
+
+        // Fetch approved items OR the specific ID from the URL
+        if (targetId) {
+            query = query.or(`status.eq.approved,id.eq.${targetId}`);
+        } else {
+            query = query.eq('status', 'approved');
+        }
+
+        const { data: inventory, error: invError } = await query;
         if (invError) throw invError;
 
-        // Fetch profiles separately (to avoid join errors)
         const userIds = [...new Set(inventory.map(row => row.user_id))];
-        const { data: profileList, error: profError } = await supabase
+        const { data: profileList } = await supabase
             .from('profiles')
             .select('id, trust_score')
             .in('id', userIds);
 
-        // Merge and Parse
         activeAccounts = inventory.map(row => {
-            // CRITICAL: Parse the 'data' string into an object
             const meta = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
             const userProfile = profileList?.find(p => p.id === row.user_id);
-            
             return {
                 ...row,
                 data: meta,
                 profiles: userProfile || { trust_score: "0" }
             };
-        }).filter(row => row.data && row.data.platform?.toLowerCase() === 'facebook');
+        }).filter(row => {
+            // Check if it's a Facebook account
+            return row.data && row.data.platform?.toLowerCase() === 'facebook';
+        });
 
-        renderGrid(activeAccounts);
+        // ✅ THE FIX: Separate the data used for the Modal from the data used for the Grid
+        // We only want to show 'approved' accounts in the marketplace cards
+        const gridAccounts = activeAccounts.filter(row => row.status === 'approved');
+        
+        renderGrid(gridAccounts);
 
     } catch (err) {
         console.error("Master Fetch Error:", err.message);
     }
 }
 
-// 3. Render Function
-function renderGrid(accounts) {
+
+
+// 3. Render Function (Updated to handle self-purchase protection)
+async function renderGrid(accounts) {
     const grid = document.getElementById('inventoryGrid');
     if (!grid) return;
+
+    // Fetch the current user to check for ownership
+    const { data: { user } } = await supabase.auth.getUser();
+    const currentUserId = user ? user.id : null;
 
     if (accounts.length === 0) {
         grid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 40px;">No accounts found.</p>`;
@@ -163,11 +180,14 @@ function renderGrid(accounts) {
 
     grid.innerHTML = accounts.map(row => {
         const meta = row.data; 
-        const trust = getTrustInfo(row); // Now defined and works
+        const trust = getTrustInfo(row);
 
         const rawAge = String(meta.account_age || "");
         const yearMatch = rawAge.match(/\d{4}/); 
         const displayYear = yearMatch ? yearMatch[0] : rawAge;
+
+        // Check if the current user is the seller of this specific account
+        const isOwner = row.user_id === currentUserId;
 
         return `
             <div class="card">
@@ -197,15 +217,18 @@ function renderGrid(accounts) {
                     <span class="price">₦${parseFloat(meta.price || 0).toLocaleString()}</span>
                 </div>
                 
-                <div style="width: 100%; display: flex; justify-content: center; align-items: center; margin: 15px 0 5px 0;">
-                    <button class="btn" style="width: 90%;" onclick="initiatePurchase('${row.id}')">
-                        PURCHASE
-                    </button>
-                </div>
+ <div class="card-action-container">
+        <button class="btn purchase-btn ${isOwner ? 'owner-btn' : ''}" 
+                onclick="${isOwner ? '' : `initiatePurchase('${row.id}')`}"
+                ${isOwner ? 'disabled' : ''}>
+            ${isOwner ? 'YOUR LISTING' : 'PURCHASE'}
+        </button>
+    </div>
             </div>
         `;
     }).join('');
 }
+
 
 
 
@@ -214,11 +237,18 @@ document.getElementById('assetSearch')?.addEventListener('input', (e) => {
     applyFilters();
 });
 
-// View Details (Modal)
-window.openDetails = (id) => {
+// View Details (Modal with Purchase Integration)
+window.openDetails = async (id) => {
     const acc = activeAccounts.find(a => a.id === id);
+    if (!acc) return;
+    
     const meta = acc.data;
     const body = document.getElementById('modalBody');
+
+    // Fetch the current user to check for ownership
+    const { data: { user } } = await supabase.auth.getUser();
+    const currentUserId = user ? user.id : null;
+    const isOwner = acc.user_id === currentUserId;
 
     const rawAge = String(meta.account_age || "");
     const yearMatch = rawAge.match(/\d{4}/); 
@@ -229,16 +259,28 @@ window.openDetails = (id) => {
         <div class="detail-item"><span class="detail-label">Username</span><span class="detail-value">@${meta.username}</span></div>
         <div class="detail-item"><span class="detail-label">Verification Code</span><span class="detail-value" style="color:var(--primary); font-weight:bold;">${meta.verification_code || 'N/A'}</span></div>
         <div class="detail-item"><span class="detail-label">Region</span><span class="detail-value">${meta.region}</span></div>
-        <div class="detail-item"><span class="detail-label">Followers</span><span class="detail-value">${meta.followers.toLocaleString()}</span></div>
+        <div class="detail-item"><span class="detail-label">Followers</span><span class="detail-value">${(meta.followers || 0).toLocaleString()}</span></div>
         <div class="detail-item"><span class="detail-label">Account Year</span><span class="detail-value">${displayYear}</span></div>
-        <div class="detail-item"><span class="detail-label">Formats</span><span class="detail-value">${meta.login_formats.join(', ')}</span></div>
+        <div class="detail-item"><span class="detail-label">Formats</span><span class="detail-value">${meta.login_formats ? meta.login_formats.join(', ') : 'N/A'}</span></div>
+        
         <div style="margin-top:15px; padding-top:10px; border-top:1px solid #eee;">
             <span class="detail-label" style="display:block; margin-bottom:5px;">Description</span>
             <p style="font-size:0.8rem; color:var(--text-muted); line-height:1.4; margin:0;">${meta.description || 'No description provided.'}</p>
         </div>
+
+        <div class="card-action-container" style="padding-top:20px; display: flex; justify-content: center;">
+             <button class="btn purchase-btn ${isOwner ? 'owner-btn' : ''}" 
+                onclick="${isOwner ? '' : `closeModal(); initiatePurchase('${acc.id}')`}"
+                ${isOwner ? 'disabled' : ''}
+                style="width: 100%; ${isOwner ? 'background: #94a3b8; cursor: not-allowed;' : ''}">
+                ${isOwner ? 'YOUR LISTING' : 'PROCEED TO PURCHASE'}
+            </button>
+        </div>
     `;
+    
     document.getElementById('modalOverlay').style.display = 'flex';
 };
+
 
 // Purchase Flow
 window.initiatePurchase = async (id) => {
@@ -294,32 +336,70 @@ window.initiatePurchase = async (id) => {
 
 async function processTransaction(account, totalWithFee, originalPrice, buyerId) {
     try {
-        // 1. Change status to hide from others
-        await supabase.from('verifications').update({ status: 'in_progress' }).eq('id', account.id);
+        // 1. Atomic Status Change: Lock the account so no one else can buy it
+        const { data: lockCheck, error: lockError } = await supabase
+            .from('verifications')
+            .update({ status: 'in_progress' })
+            .eq('id', account.id)
+            .eq('status', 'approved') // Only update if still available
+            .select();
 
-        // 2. Deduct Balance
-        const { data: buyer } = await supabase.from('profiles').select('balance').eq('id', buyerId).single();
-        await supabase.from('profiles').update({ balance: buyer.balance - totalWithFee }).eq('id', buyerId);
+        if (lockError || !lockCheck || lockCheck.length === 0) {
+            return Swal.fire("Unavailable", "This account was just taken or is no longer available.", "error");
+        }
 
-        // 3. Create Conversation
-        const { data: conv, error } = await supabase.from('conversations').insert([{
+        // 2. Deduct Balance from Buyer Profile
+        const { data: buyer, error: balanceError } = await supabase
+            .from('profiles')
+            .select('balance')
+            .eq('id', buyerId)
+            .single();
+
+        if (balanceError || buyer.balance < totalWithFee) {
+            // Rollback: set status back to approved if balance is insufficient
+            await supabase.from('verifications').update({ status: 'approved' }).eq('id', account.id);
+            return Swal.fire("Insufficient Balance", "You do not have enough funds for this purchase.", "warning");
+        }
+
+        await supabase.from('profiles')
+            .update({ balance: buyer.balance - totalWithFee })
+            .eq('id', buyerId);
+
+        // 3. Insert into Transactions Table (Matching your schema)
+        const { error: transError } = await supabase.from('wallet').insert([{
+            user_id: buyerId,
+            type: 'Payment',
+            amount: `-${totalWithFee.toFixed(2)}`, // Negative decimal string
+            note: `Payment for Facebook account: @${account.data.username}`,
+            status: 'success',
+            reference: `PUR_${account.id.slice(0, 8)}_${Date.now()}`
+        }]);
+
+        if (transError) console.error("History Log Error:", transError);
+
+        // 4. Create the Conversation record
+        const { data: conv, error: convError } = await supabase.from('conversations').insert([{
             product_id: account.id,
-product_name: "Facebook",
+            product_name: "Facebook",
             product_price: originalPrice.toString(),
             buyer_id: buyerId,
             seller_id: account.user_id,
             escrow_step: 0,
             status: 'active',
-            last_message: "System: Buyer has started the escrow process."
+            last_message: "System: Buyer has started the escrow process. Payment is secured."
         }]).select().single();
 
-        if (error) throw error;
+        if (convError) throw convError;
+
+        // 5. Success - Redirect to Chats
         window.location.href = `../chats?id=${conv.id}`;
+
     } catch (err) {
         console.error("Transaction Error:", err);
-        alert("Transaction failed. Please try again.");
+        Swal.fire("Error", "Transaction failed. Please contact support.", "error");
     }
 }
+
 
 window.closeEscrowModal = () => {
     document.getElementById('escrowModal').style.display = 'none';
@@ -341,9 +421,42 @@ window.copyToClipboard = (id) => {
 window.onclick = () => document.querySelectorAll('.dropdown-content').forEach(m => m.classList.remove('show'));
 window.closeModal = () => document.getElementById('modalOverlay').style.display = 'none';
 
-// Start App
+// Start App with URL Deep-Linking and Real-time Subscription
 async function init() {
+    // 1. Initial Identity & Data Load
     await getCurrentUser();
-    await fetchFacebookInventory();
+    await fetchFacebookInventory(); 
+
+    // 2. Handle Deep Linking (Read ID from URL)
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetId = urlParams.get('id');
+
+    if (targetId) {
+        // Small delay ensures activeAccounts is fully mapped before opening
+        setTimeout(() => {
+            const exists = activeAccounts.find(a => a.id === targetId);
+            if (exists) {
+                window.openDetails(targetId);
+            } else {
+                console.warn("Deep-linked account ID not found or not approved.");
+            }
+        }, 500); 
+    }
+
+    // 3. 🔴 Real-time Listener
+    // Instantly refreshes the grid if an account is bought (status change) or added
+    supabase
+        .channel('public:verifications')
+        .on('postgres_changes', { 
+            event: '*', 
+            schema: 'public', 
+            table: 'verifications' 
+        }, (payload) => {
+            console.log('Real-time update received:', payload.eventType);
+            fetchFacebookInventory(); // Re-fetch and re-render grid
+        })
+        .subscribe();
 }
+
+// Initialize the application
 init();

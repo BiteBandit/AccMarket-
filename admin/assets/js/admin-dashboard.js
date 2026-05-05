@@ -68,8 +68,12 @@ if (section === 'users') {
 } else if (section === 'banned') {
     loadRestrictedUsers();
 } else if (section === 'verification') {
-    loadAccountAudits(); // New function for the Audit section
+    loadAccountAudits(); 
+} else if (section === 'conversations') {
+    loadCommunicationLogs();
 }
+
+
 
 
     });
@@ -802,127 +806,356 @@ window.filterBannedTable = () => {
     });
 };
 
-
-
 /**
- * ADVANCED ACCOUNT AUDITS + DISPUTE MONITORING
+ * SYSTEM LIVE INTELLIGENCE FEED (v4.0)
+ * Aggregates: Wallet, Withdrawals, KYC, New Users, Blogs, and Chat Spaces.
+ * No action buttons - Pure AI-monitored observation.
  */
 window.loadAccountAudits = async () => {
     const tbody = document.getElementById('verificationTableBody');
     if (!tbody) return;
 
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:60px;"><i class="fa-solid fa-shield-halved fa-beat-low fa-2xl" style="color: #0b1e5b;"></i><div>Analyzing System Integrity & Active Disputes...</div></td></tr>`;
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="5" style="text-align:center; padding:60px;">
+                <i class="fa-solid fa-satellite-dish fa-spin fa-2xl" style="color: #0b1e5b; margin-bottom: 15px; display: block;"></i>
+                <div style="font-weight: 800; color: #0b1e5b; letter-spacing: 1px;">SYNCING SYSTEM LEDGERS...</div>
+                <div style="font-size: 11px; color: #64748b; font-family: monospace;">Accessing: Wallet | Withdrawals | KYC | Chats | Logs</div>
+            </td>
+        </tr>`;
 
     try {
-        // Fetch profiles
-        const { data: profiles, error: pError } = await supabase
-            .from('profiles')
-            .select('id, username, email, role, is_official_ban, kyc_status, created_at, balance, trust_score, telegram_chat_id')
-            .or('role.neq.buyer,is_official_ban.eq.true') 
-            .order('created_at', { ascending: false });
+        // 1. DATA ACQUISITION
+        const [wallet, withdrawals, verifications, newUsers, blogs, chats] = await Promise.all([
+            supabase.from('wallet').select('*, profiles(username)').order('created_at', { ascending: false }).limit(8),
+            supabase.from('withdrawals').select('*, profiles(username)').order('created_at', { ascending: false }).limit(8),
+            supabase.from('user_verifications').select('*, profiles(username)').order('created_at', { ascending: false }).limit(8),
+            supabase.from('profiles').select('username, created_at, id, trust_score').order('created_at', { ascending: false }).limit(8),
+            supabase.from('blogs').select('title, author, created_at').order('created_at', { ascending: false }).limit(3),
+            // Assuming 'conversations' table handles chat spaces
+            supabase.from('conversations').select('*, buyer:profiles!buyer_id(username), seller:profiles!seller_id(username)').order('created_at', { ascending: false }).limit(8)
+        ]);
 
-        if (pError) throw pError;
+        let events = [];
 
-        // Fetch count of open disputes for these users
-        // We assume your disputes table has 'buyer_id' or 'seller_id' and a 'status'
-        const { data: disputes, error: dError } = await supabase
-            .from('disputes')
-            .select('buyer_id, seller_id, status')
-            .eq('status', 'open');
+        // --- Process Wallet Credits ---
+        wallet.data?.forEach(w => events.push({
+            time: new Date(w.created_at),
+            type: 'WALLET',
+            icon: '<i class="fa-solid fa-circle-arrow-down" style="color: #22c55e;"></i>',
+            desc: `Credit: <b>${w.profiles?.username || 'User'}</b> received ₦${w.amount} (<i>${w.note}</i>)`,
+            status: `<span style="color:#166534; font-weight:700;">SUCCESS</span>`,
+            risk: w.amount > 20000 ? 'MODERATE' : 'LOW'
+        }));
 
-        if (dError) throw dError;
+        // --- Process Withdrawals ---
+        withdrawals.data?.forEach(wd => events.push({
+            time: new Date(wd.created_at),
+            type: 'WITHDRAWAL',
+            icon: '<i class="fa-solid fa-bank" style="color: #ef4444;"></i>',
+            desc: `Payout: <b>${wd.profiles?.username || 'User'}</b> requested ₦${wd.amount} via ${wd.method}`,
+            status: `<span style="color:#991b1b; font-weight:700;">${wd.status.toUpperCase()}</span>`,
+            risk: wd.status === 'pending' ? 'HIGH' : 'LOW'
+        }));
 
-        tbody.innerHTML = profiles.map(u => {
-            // Check if this specific user ID appears in any open disputes
-            const activeDisputes = disputes.filter(d => d.buyer_id === u.id || d.seller_id === u.id).length;
-            
-            let disputeWarning = '';
-            if (activeDisputes > 0) {
-                disputeWarning = `<div style="margin-top:5px; color: #f59e0b; font-size: 10px; font-weight: 800; background: #fffbeb; padding: 2px 6px; border-radius: 4px; border: 1px solid #fef3c7;">
-                    <i class="fa-solid fa-gavel"></i> ${activeDisputes} OPEN DISPUTE(S)
-                </div>`;
-            }
+        // --- Process KYC ---
+        verifications.data?.forEach(v => events.push({
+            time: new Date(v.created_at),
+            type: 'KYC',
+            icon: '<i class="fa-solid fa-user-shield" style="color: #7c3aed;"></i>',
+            desc: `Verification request: <b>${v.email}</b> paid ₦${v.amount}`,
+            status: `<span style="color:#7e22ce; font-weight:700;">${v.status.toUpperCase()}</span>`,
+            risk: 'LOW'
+        }));
 
-            const trust = u.trust_score || 0;
-            const trustColor = trust >= 80 ? '#22c55e' : (trust >= 50 ? '#f59e0b' : '#ef4444');
-            const roleStyles = u.role === 'admin' ? 'background: #7c3aed; color: white;' : 'background: #2563eb15; color: #2563eb;';
+        // --- Process Chat Spaces ---
+        chats.data?.forEach(c => events.push({
+            time: new Date(c.created_at),
+            type: 'CHAT',
+            icon: '<i class="fa-solid fa-comments" style="color: #3b82f6;"></i>',
+            desc: `New Space: <b>${c.buyer?.username}</b> & <b>${c.seller?.username}</b> initiated trade chat`,
+            status: `<span style="color:#1e40af; font-weight:700;">ACTIVE</span>`,
+            risk: 'LOW'
+        }));
+
+        // --- Process New Users ---
+        newUsers.data?.forEach(u => events.push({
+            time: new Date(u.created_at),
+            type: 'NEW USER',
+            icon: '<i class="fa-solid fa-user-plus" style="color: #0b1e5b;"></i>',
+            desc: `Registration: <b>${u.username || 'Anonymous'}</b> created a profile`,
+            status: `<span style="color:#64748b;">SCORE: ${u.trust_score || 0}%</span>`,
+            risk: (u.trust_score || 0) < 50 ? 'REVIEW' : 'LOW'
+        }));
+
+        // --- Process Blogs ---
+        blogs.data?.forEach(b => events.push({
+            time: new Date(b.created_at),
+            type: 'BLOG',
+            icon: '<i class="fa-solid fa-newspaper" style="color: #f59e0b;"></i>',
+            desc: `Editorial: "<b>${b.title}</b>" published by ${b.author}`,
+            status: `PUBLISHED`,
+            risk: 'NONE'
+        }));
+
+        // 2. SORT BY RECENT
+        events.sort((a, b) => b.time - a.time);
+
+        // 3. RENDER FEED
+        tbody.innerHTML = events.map(e => {
+            // AI Intelligence Color Logic
+            let aiColor = '#94a3b8'; // Default grey
+            if (e.risk === 'HIGH') aiColor = '#ef4444';
+            if (e.risk === 'MODERATE') aiColor = '#f59e0b';
+            if (e.risk === 'LOW') aiColor = '#22c55e';
 
             return `
                 <tr style="border-bottom: 1px solid #f1f5f9;">
                     <td>
-                        <div class="user-details">
-                            <span style="font-weight:700; display:block; color: #0b1e5b;">${u.username || u.email}</span>
-                            <span style="font-size: 10px; color: #94a3b8; font-family: monospace;">${u.id}</span>
-                            ${disputeWarning}
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            ${e.icon}
+                            <span style="font-size:10px; font-weight:900; color:#64748b; letter-spacing:0.5px;">${e.type}</span>
                         </div>
                     </td>
-                    <td>
-                        <span style="padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 900; ${roleStyles}">
-                            ${u.role.toUpperCase()}
-                        </span>
-                        <div style="font-size: 12px; font-weight: 700; margin-top: 5px;">₦${(u.balance || 0).toLocaleString()}</div>
-                    </td>
-                    <td>
-                        <div style="font-size: 10px; font-weight: 600; color: #64748b; margin-bottom: 4px;">TRUST LEVEL</div>
-                        <div style="height: 6px; width: 80px; background: #e2e8f0; border-radius: 3px; margin-bottom: 4px;">
-                            <div style="width: ${trust}%; background: ${trustColor}; height: 100%; border-radius: 3px;"></div>
-                        </div>
-                        <span style="font-size: 10px; font-weight: 800; color: ${trustColor}">${trust}%</span>
-                    </td>
-                    <td>
-                        <div style="font-size: 11px; color: #1e293b;">${new Date(u.created_at).toLocaleDateString()}</div>
-                        <div style="font-size: 10px; color: ${u.is_official_ban ? '#ef4444' : '#22c55e'}; font-weight: 700;">
-                            ${u.is_official_ban ? 'BANNED' : 'CLEAR'}
-                        </div>
+                    <td style="font-size:13px; color:#0b1e5b; font-weight:500;">${e.desc}</td>
+                    <td style="font-size:11px; font-weight:800;">${e.status}</td>
+                    <td class="date-text" style="font-size:11px; color:#64748b;">
+                        ${e.time.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                     </td>
                     <td style="text-align: right;">
-                        <button class="op-btn" onclick="viewUserFile('${u.id}')" style="background: #0b1e5b; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 12px;">
-                            <i class="fa-solid fa-fingerprint"></i> Inspect
-                        </button>
+                        <div style="display:inline-flex; align-items:center; gap:5px; font-size:10px; font-weight:900; color:${aiColor}; font-family: monospace;">
+                            <i class="fa-solid fa-robot"></i> ${e.risk}
+                        </div>
                     </td>
                 </tr>
             `;
         }).join('');
 
     } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color: #ef4444;">${err.message}</td></tr>`;
+        console.error("Audit System Failure:", err);
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:40px; color:#ef4444;">SYSTEM OFFLINE: ${err.message}</td></tr>`;
     }
 };
 
-window.runAITransactionScan = async (userId) => {
-    const output = document.getElementById('ai-output');
-    output.innerHTML = '<span class="fa-beat">AI ANALYZING TRANSACTIONS & DISPUTES...</span>';
+/**
+ * COMMUNICATION INTELLIGENCE (AI-POWERED)
+ * Pulls conversation logs and triggers Groq Llama 3 analysis on demand.
+ */
+window.loadCommunicationLogs = async () => {
+    const tbody = document.getElementById('conversationsTableBody');
+    if (!tbody) return;
+
+    // High-tech sync state
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="5" style="text-align:center; padding:60px;">
+                <i class="fa-solid fa-microchip fa-spin fa-2xl" style="color: #0b1e5b; margin-bottom: 20px; display: block;"></i>
+                <div style="font-weight: 800; color: #0b1e5b; letter-spacing: 1px;">SYNCHRONIZING SECURE CHANNELS...</div>
+                <div style="font-size: 11px; color: #64748b; font-family: monospace;">Accessing Encrypted Communication Logs</div>
+            </td>
+        </tr>`;
 
     try {
-        // 1. Fetch Transactions
-        const { data: transactions } = await supabase.from('transactions').select('*').eq('user_id', userId).limit(20);
-        
-        // 2. Fetch Disputes
-        const { data: disputes } = await supabase.from('disputes').select('*').or(`buyer_id.eq.${userId},seller_id.eq.${userId}`);
+        const { data: channels, error } = await supabase
+            .from('conversations')
+            .select(`id, created_at, buyer:profiles!buyer_id(username), seller:profiles!seller_id(username)`)
+            .order('created_at', { ascending: false });
 
-        // 3. Send to AI
-        const { data: aiResult, error } = await supabase.functions.invoke('ai-fraud-detector', {
-            body: { 
-                transactions, 
-                disputes, 
-                userId 
+        if (error) throw error;
+
+        if (!channels || channels.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:40px; color:#64748b;">No active communication channels found.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = channels.map(c => `
+            <tr id="row-${c.id}" style="border-bottom: 1px solid #f1f5f9; transition: 0.3s;">
+                <td><span style="font-family:monospace; font-size:10px; opacity:0.6;">#${c.id.substring(0,8)}</span></td>
+                <td>
+                    <div style="font-size:13px; font-weight:600;">
+                        <span style="color:#2563eb;">${c.buyer?.username || 'Buyer'}</span> 
+                        <i class="fa-solid fa-right-left" style="margin:0 8px; opacity:0.2; font-size: 10px;"></i>
+                        <span style="color:#7c3aed;">${c.seller?.username || 'Seller'}</span>
+                    </div>
+                </td>
+                <td id="last-msg-${c.id}" style="font-size:12px; color:#64748b; font-style:italic;">
+                    Manual audit required for security verdict.
+                </td>
+                <td class="date-text" style="font-size:11px; color: #94a3b8;">
+                    ${new Date(c.created_at).toLocaleDateString()}
+                </td>
+                <td style="text-align: right;" id="status-${c.id}">
+                    <button onclick="runAiAudit('${c.id}')" 
+                            title="Run AI Security Audit"
+                            style="background: #f1f5f9; color: #0b1e5b; border: none; width: 36px; height: 36px; border-radius: 8px; cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; justify-content: center;">
+                        <i class="fa-solid fa-microchip"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+
+    } catch (err) {
+        console.error("Feed Error:", err);
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:red;">FEED ERROR: ${err.message}</td></tr>`;
+    }
+};
+
+/**
+ * THE TRIGGER: Gathers history and calls the Edge Function with JWT
+ */
+window.runAiAudit = async (chatId) => {
+    const statusCell = document.getElementById(`status-${chatId}`);
+    const row = document.getElementById(`row-${chatId}`);
+    if (!statusCell) return;
+
+    // 1. Robot "Thinking" State
+    statusCell.innerHTML = `
+        <div style="text-align: right;">
+            <i class="fa-solid fa-robot fa-spin-pulse" style="color: #0b1e5b;"></i>
+            <span style="font-size: 8px; display: block; color: #64748b; font-weight: bold; margin-top: 2px;">AUDITING</span>
+        </div>`;
+
+    try {
+        // 2. Fetch transcript from 'messages' table
+        const { data: messages, error: msgError } = await supabase
+            .from('messages')
+            .select('content, sender_id')
+            .eq('conversation_id', chatId)
+            .order('created_at', { ascending: true });
+
+        if (msgError) throw msgError;
+        const transcriptText = messages.map(m => `User: ${m.content}`).join('\n');
+
+        // 3. GET JWT FROM SESSION
+        // We need the access_token to prove to Supabase that an Admin is calling this.
+        const { data: { session } } = await supabase.auth.getSession();
+        const jwt = session?.access_token;
+
+        if (!jwt) throw new Error("No active session found");
+
+        // 4. CALL THE URL DIRECTLY
+        const response = await fetch('https://qihzvglznpkytolxkuxz.supabase.co/functions/v1/ai-chat-auditor', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${jwt}`, // The JWT for authentication
+                'apikey': supabase.supabaseKey   // The project's public anon key for routing
+            },
+            body: JSON.stringify({ transcript: transcriptText })
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Audit Request Failed');
+
+        // 5. PROCESS VERDICT
+        let icon = 'fa-circle-check';
+        let color = '#22c55e';
+        let bg = '';
+
+        if (data.verdict === 'DANGEROUS') {
+            icon = 'fa-triangle-exclamation';
+            color = '#ef4444';
+            bg = '#fff1f2';
+        } else if (data.verdict === 'SUSPICIOUS') {
+            icon = 'fa-eye';
+            color = '#f59e0b';
+            bg = '#fffbeb';
+        }
+
+        // Apply highlights
+        row.style.background = bg;
+        statusCell.innerHTML = `
+            <div title="${data.reason}" style="color: ${color}; cursor: help; display: flex; flex-direction: column; align-items: flex-end;">
+                <i class="fa-solid ${icon} fa-xl"></i>
+                <span style="font-size: 8px; font-weight: 900; margin-top: 4px;">${data.verdict}</span>
+            </div>
+        `;
+
+    } catch (err) {
+        console.error("AI Audit Error:", err);
+        statusCell.innerHTML = `
+            <button onclick="runAiAudit('${chatId}')" style="background:none; border:none; color:red; cursor:pointer;">
+                <i class="fa-solid fa-circle-exmark"></i>
+                <small style="display:block; font-size:7px;">RETRY</small>
+            </button>`;
+    }
+};
+
+
+window.runAiAudit = async (chatId) => {
+    const statusCell = document.getElementById(`status-${chatId}`);
+    const row = document.getElementById(`row-${chatId}`);
+    if (!statusCell) return;
+
+    // 1. Initial State
+    statusCell.innerHTML = `<i class="fa-solid fa-robot fa-spin-pulse" style="color: #0b1e5b;"></i>`;
+
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        // 2. Fetch fresh messages with sender_id to distinguish between Human and System
+        const { data: messages, error: fetchError } = await supabase
+            .from('messages')
+            .select('content, sender_id')
+            .eq('conversation_id', chatId)
+            .order('created_at', { ascending: true });
+
+        if (fetchError) throw fetchError;
+
+        // 3. NOISE FILTERING
+        // We filter out the standard Escrow system messages so the AI doesn't get confused
+        const humanMessages = messages.filter(m => {
+            const content = m.content.toLowerCase();
+            const isSystem = content.includes('funds are now held in escrow') || 
+                             content.includes('seller, please send the login details') ||
+                             content.includes('payment confirmed');
+            return !isSystem && m.sender_id !== null; // Also ignore null senders (usually system)
+        });
+
+        // 4. FAST PASS: If chat is empty after filtering, it's SAFE
+        if (humanMessages.length === 0) {
+            statusCell.innerHTML = `
+                <div style="color: #22c55e; text-align: right;">
+                    <i class="fa-solid fa-circle-check"></i> 
+                    <span style="font-size: 10px; font-weight: 800; display: block;">SAFE</span>
+                    <div style="color: #64748b; font-size: 8px;">No human activity yet.</div>
+                </div>`;
+            return;
+        }
+
+        const history = humanMessages.map(m => `User: ${m.content}`).join('\n');
+
+        // 5. Invoke Edge Function
+        const { data, error } = await supabase.functions.invoke('ai-chat-auditor', {
+            body: { transcript: history }, 
+            headers: {
+                Authorization: `Bearer ${session?.access_token}`
             }
         });
 
         if (error) throw error;
 
-        // The AI will return a verdict based on both
-        // Example: "User has high wash-trading patterns and 2 open disputes for non-delivery."
-        output.innerHTML = `
-            <div style="border-left: 3px solid ${aiResult.riskScore > 60 ? '#ef4444' : '#22c55e'}; padding-left: 10px;">
-                <div style="font-weight: 800; font-size: 11px;">AI VERDICT:</div>
-                <div style="font-size: 12px; color: #fff;">${aiResult.summary}</div>
-                <div style="margin-top: 5px; font-size: 10px; opacity: 0.7;">RISK RATING: ${aiResult.riskScore}%</div>
-            </div>
-        `;
+        // 6. UI Render based on Verdict
+        const isDanger = data.verdict === 'DANGEROUS';
+        const color = isDanger ? '#ef4444' : (data.verdict === 'SUSPICIOUS' ? '#f59e0b' : '#22c55e');
+        const icon = isDanger ? 'fa-triangle-exclamation' : (data.verdict === 'SUSPICIOUS' ? 'fa-eye' : 'fa-circle-check');
+
+        if (row && isDanger) row.style.background = '#fff1f2';
+
+        statusCell.innerHTML = `
+            <div title="${data.reason}" style="color: ${color}; text-align: right; cursor: help;">
+                <i class="fa-solid ${icon}"></i> 
+                <span style="font-size: 10px; font-weight: 800; display: block;">${data.verdict}</span>
+                <div style="color: #64748b; font-weight: 400; font-size: 8px; line-height: 1.1;">${data.reason}</div>
+            </div>`;
 
     } catch (err) {
-        output.innerHTML = "SCAN FAILED: " + err.message;
+        console.error("Audit Error:", err);
+        statusCell.innerHTML = `
+            <div style="color:red; cursor:pointer;" onclick="runAiAudit('${chatId}')">
+                <i class="fa-solid fa-circle-exclamation"></i>
+                <div style="font-size: 8px;">RETRY</div>
+            </div>`;
     }
 };
 
