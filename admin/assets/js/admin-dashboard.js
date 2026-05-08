@@ -71,7 +71,10 @@ if (section === 'users') {
     loadAccountAudits(); 
 } else if (section === 'conversations') {
     loadCommunicationLogs();
+} else if (section === 'withdrawals') {
+    loadWithdrawalRequests();
 }
+
 
 
 
@@ -1159,6 +1162,131 @@ window.runAiAudit = async (chatId) => {
     }
 };
 
+
+/**
+ * 1. Load Payout Requests from Database
+ */
+/**
+ * 1. Load Payout Requests from Database
+ */
+window.loadWithdrawalRequests = async () => {
+    const tbody = document.getElementById('payoutsTableBody');
+    if (!tbody) return;
+
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</td></tr>';
+
+    try {
+        const { data: requests, error } = await supabase
+            .from('withdrawals')
+            .select(`*, profiles(username, full_name)`)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        tbody.innerHTML = requests.map(r => {
+            const isPending = r.status === 'pending';
+            const statusColor = isPending ? '#f59e0b' : (r.status === 'success' ? '#22c55e' : '#ef4444');
+
+            return `
+            <tr>
+                <td>
+                    <div style="font-weight:600;">${r.profiles?.username || 'User'}</div>
+                    <div style="font-size:11px; color:#64748b;">${r.profiles?.full_name || ''}</div>
+                </td>
+                <td>
+                    <div style="font-size:12px; font-weight:600; color:#0b1e5b;">${r.bank_name || 'N/A'}</div>
+                    <div style="font-family:monospace; font-size:11px; font-weight:bold;">${r.account_number || ''}</div>
+                    <div style="font-size:10px; color:#64748b; text-transform:uppercase; margin-top:2px;">
+                        ${r.account_name || 'No Name Provided'}
+                    </div>
+                </td>
+                <td style="font-weight:700;">₦${parseFloat(r.amount).toLocaleString()}</td>
+                <td style="font-size:11px;">${new Date(r.created_at).toLocaleDateString()}</td>
+                <td>
+                    <span style="color:${statusColor}; font-size:10px; font-weight:800; text-transform:uppercase;">
+                        ${r.status}
+                    </span>
+                </td>
+                <td style="text-align: right;">
+                    ${isPending ? `
+                        <button onclick="processKoraPayout('${r.id}', this)" class="btn-payout" 
+                                style="background:#0b1e5b; color:white; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; font-size:12px; transition: 0.3s;"
+                                title="Process via Kora Pay">
+                            <i class="fa-solid fa-credit-card"></i> Pay
+                        </button>
+                    ` : `
+                        <i class="fa-solid fa-circle-check" style="color:#22c55e; font-size:18px;" title="Disbursed"></i>
+                    `}
+                </td>
+            </tr>`;
+        }).join('');
+    } catch (err) {
+        console.error("Fetch error:", err);
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">Failed to load requests.</td></tr>';
+    }
+};
+
+
+/**
+ * 2. Trigger Kora Pay Disbursement via Edge Function
+ */
+ window.processKoraPayout = async (withdrawalId, btn) => {
+    const confirmation = await Swal.fire({
+        title: 'Confirm Disbursement',
+        text: "Send real funds via Kora Pay to this user?",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#0b1e5b'
+    });
+
+    if (!confirmation.isConfirmed) return;
+
+    // Save original icon to restore if it fails
+    const originalIcon = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+    try {
+        // --- 🔐 GET SESSION FOR AUTHORIZATION ---
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError || !session) {
+            throw new Error("Your admin session has expired. Please log in again.");
+        }
+
+        // --- 🚀 INVOKE FUNCTION WITH AUTH HEADER ---
+        const { data, error } = await supabase.functions.invoke('kora-pay-handler', {
+            body: { withdrawalId },
+            headers: {
+                Authorization: `Bearer ${session.access_token}` // Pass the JWT
+            }
+        });
+
+        if (error) throw error;
+
+        await Swal.fire({
+            title: 'Success',
+            text: 'Funds disbursed successfully via Kora Pay!',
+            icon: 'success',
+            confirmButtonColor: '#0b1e5b'
+        });
+        
+        loadWithdrawalRequests(); // Refresh table
+        
+    } catch (err) {
+        console.error("Payout Error:", err);
+        Swal.fire({
+            title: 'Payout Failed',
+            text: err.message || "An unexpected error occurred",
+            icon: 'error',
+            confirmButtonColor: '#0b1e5b'
+        });
+        
+        // Restore button state
+        btn.disabled = false;
+        btn.innerHTML = originalIcon;
+    }
+};
 
 
 

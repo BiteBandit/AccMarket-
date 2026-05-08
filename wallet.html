@@ -248,22 +248,43 @@
 
 </div>
 
-<div id="depositModal" class="modal-overlay">
+ <div id="depositModal" class="modal-overlay">
   <div class="wallet-deposit-card">
     <div class="modal-header">
       <h3>Fund Your Wallet</h3>
       <button id="closeModal" class="close-modal-btn">&times;</button>
     </div>
     
-    <p class="modal-subtitle">Enter the amount you wish to deposit below.</p>
+    <p class="modal-subtitle">Enter amount and choose your preferred gateway.</p>
     
     <div class="input-group">
       <span class="currency-symbol">₦</span>
       <input type="number" id="depositAmount" placeholder="0.00" min="100" class="form-control">
     </div>
 
-    <button id="confirmDepositBtn" class="btn-primary modal-btn">Deposit Now</button>
-    <small class="text-muted">Min deposit: ₦100</small>
+    <div class="payment-selection-area" style="display: flex; flex-direction: column; gap: 12px; margin-top: 20px;">
+      
+      <button id="payWithKora" class="gateway-btn kora-theme">
+        <span class="btn-content">
+          <i class="fas fa-credit-card"></i>
+          <span>Pay with Kora Pay</span>
+        </span>
+        <i class="fas fa-chevron-right arrow"></i>
+      </button>
+
+      <button id="payWithPaystack" class="gateway-btn paystack-theme">
+        <span class="btn-content">
+          <i class="fas fa-bolt"></i>
+          <span>Pay with Paystack</span>
+        </span>
+        <i class="fas fa-chevron-right arrow"></i>
+      </button>
+
+    </div>
+    
+    <div style="margin-top: 15px; text-align: center;">
+      <small class="text-muted">Min deposit: ₦100 • Secure Encrypted Payment</small>
+    </div>
   </div>
 </div>
 
@@ -296,6 +317,18 @@
     <button id="confirmWithdrawBtn" class="btn-primary modal-btn">Confirm Withdrawal</button>
   </div>
 </div>
+
+<div id="successModal" class="modal-overlay">
+  <div class="wallet-deposit-card text-center" style="text-align: center; padding: 30px;">
+    <div style="font-size: 50px; color: #00d26a; margin-bottom: 15px;">
+      <i class="fas fa-check-circle"></i>
+    </div>
+    <h3 style="margin-bottom: 10px;">Payment Successful!</h3>
+    <p class="text-muted" style="margin-bottom: 20px;">Your wallet has been funded successfully. It may take a moment for your balance to reflect.</p>
+    <button id="closeSuccessBtn" class="btn-primary" style="width: 100%;">Done</button>
+  </div>
+</div>
+
 
   <!-- Begin of Chaport Live Chat code -->
 <script type="text/javascript">

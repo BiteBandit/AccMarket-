@@ -856,6 +856,41 @@ body {
   font-size: 0.82rem;
 }
 
+/* Payment Gateway Button Styling */
+.gateway-btn {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    border-radius: 10px;
+    border: 1px solid #e0e0e0;
+    background: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    width: 100%;
+}
+
+.gateway-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.btn-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 600;
+}
+
+.kora-theme i { color: #00d26a; } /* Kora Green */
+.paystack-theme i { color: #00bbff; } /* Paystack Blue */
+
+.gateway-btn .arrow {
+    font-size: 12px;
+    color: #ccc;
+}
+
+
 /* =========================
    MOBILE OPTIMIZATION
 ========================= */

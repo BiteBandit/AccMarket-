@@ -290,6 +290,38 @@
     </div>
 </section>
  
+ <section id="withdrawalsSection" class="content-section" style="display: none;">
+    <div class="table-card">
+        <div class="table-header">
+            <div class="header-info">
+                <h2><i class="fa-solid fa-money-bill-transfer"></i> Payout Requests</h2>
+                <p>Manage and disburse seller earnings via Kora Pay Gateway.</p>
+            </div>
+            <div class="header-actions">
+                <button class="btn-refresh" onclick="loadWithdrawalRequests()">
+                    <i class="fa-solid fa-rotate"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Recipient</th>
+                        <th>Bank Details</th>
+                        <th>Amount</th>
+                        <th>Request Date</th>
+                        <th>Status</th>
+                        <th style="text-align: right;">Operations</th>
+                    </tr>
+                </thead>
+                <tbody id="payoutsTableBody">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+</section>
 
 
     </main>

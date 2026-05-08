@@ -229,10 +229,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 // 1. Select the elements
 const depositModal = document.getElementById("depositModal");
-const openModalBtn = document.getElementById("depositBtn"); // Button on dashboard
+const openModalBtn = document.getElementById("depositBtn"); 
 const closeModalBtn = document.getElementById("closeModal");
-const confirmBtn = document.getElementById("confirmDepositBtn"); // Button inside modal
 const amountInput = document.getElementById("depositAmount");
+
+// New Gateway-Specific Buttons
+const koraBtn = document.getElementById("payWithKora");
+const paystackBtn = document.getElementById("payWithPaystack");
 
 // 2. Open Modal
 if (openModalBtn && depositModal) {
@@ -246,57 +249,80 @@ if (openModalBtn && depositModal) {
 const handleClose = () => {
   if (depositModal) {
     depositModal.classList.remove("active");
-    if (amountInput) amountInput.value = ""; // Clear input for next time
+    if (amountInput) amountInput.value = ""; 
+    
+    // Reset buttons state
+    if(koraBtn) { koraBtn.disabled = false; koraBtn.innerHTML = '<span class="btn-content"><i class="fas fa-credit-card"></i><span>Pay with Kora Pay</span></span>'; }
+    if(paystackBtn) { paystackBtn.disabled = false; paystackBtn.innerHTML = '<span class="btn-content"><i class="fas fa-bolt"></i><span>Pay with Paystack</span></span>'; }
   }
 };
 
 if (closeModalBtn) closeModalBtn.addEventListener("click", handleClose);
 
-// Close if clicking the dark background
 window.addEventListener("click", (e) => {
   if (e.target === depositModal) handleClose();
 });
 
-// 4. THE BRIDGE: Connect button click to fundWallet()
-if (confirmBtn) {
-  confirmBtn.addEventListener("click", async () => {
-    // Get the amount from the modal input
+// 4. THE BRIDGE: GATEWAY LOGIC
+
+// --- 🟢 KORA PAY HANDLER ---
+if (koraBtn) {
+  koraBtn.addEventListener("click", async () => {
     const amount = amountInput ? parseFloat(amountInput.value) : 0;
 
-    // Validation
     if (!amount || amount < 100) {
       alert("Please enter a valid amount (Minimum ₦100).");
       return;
     }
 
-    // UI Feedback: Loading state
-    confirmBtn.disabled = true;
-    confirmBtn.textContent = "Redirecting to Payment...";
+    koraBtn.disabled = true;
+    koraBtn.textContent = "Connecting Kora...";
 
     try {
-      // Get the current user session from Supabase
       const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) throw new Error("Session expired. Please login.");
 
-      if (userError || !user) {
-        alert("Your session has expired. Please log in again.");
-        window.location.href = "auth.html";
-        return;
-      }
-
-      // CALL YOUR PAYMENT LOGIC
-      // Passes the 'amount' from input and 'user' from Supabase
+      // Calls your existing fundWallet function (Fixie/Kora logic)
       await fundWallet(amount, user);
 
     } catch (err) {
-      console.error("Deposit Error:", err);
-      alert("Failed to initiate payment. Please check your connection.");
-      
-      // Reset button if it fails
-      confirmBtn.disabled = false;
-      confirmBtn.textContent = "Deposit Now";
+      console.error("Kora Error:", err);
+      alert(err.message);
+      koraBtn.disabled = false;
+      koraBtn.innerHTML = '<span class="btn-content"><i class="fas fa-credit-card"></i><span>Pay with Kora Pay</span></span>';
     }
   });
 }
+// --- 🔵 PAYSTACK BUTTON HANDLER ---
+if (paystackBtn) {
+  paystackBtn.addEventListener("click", async () => {
+    const amount = amountInput ? parseFloat(amountInput.value) : 0;
+
+    if (!amount || amount < 100) {
+      alert("Please enter a valid amount (Minimum ₦100).");
+      return;
+    }
+
+    // UI Feedback
+    paystackBtn.disabled = true;
+    paystackBtn.textContent = "Connecting Paystack...";
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Please login to continue.");
+
+      // CALL THE FUNCTION SEPARATELY
+      await fundWithPaystack(amount, user);
+
+    } catch (err) {
+      alert(err.message);
+      // Reset button UI on error
+      paystackBtn.disabled = false;
+      paystackBtn.innerHTML = '<span class="btn-content"><i class="fas fa-bolt"></i><span>Pay with Paystack</span></span>';
+    }
+  });
+}
+
 
 // --- 🎯 WITHDRAWAL SYSTEM LOGIC ---
 const withdrawModal = document.getElementById('withdrawModal');
@@ -488,6 +514,44 @@ confirmWithdrawBtn?.addEventListener('click', async () => {
 });
 
 
+// --- 🔵 PAYSTACK LOGIC FUNCTION ---
+async function fundWithPaystack(amount, user) {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      alert("Session expired. Please login again.");
+      window.location.href = "auth.html";
+      return;
+    }
+
+    const res = await fetch("https://qihzvglznpkytolxkuxz.supabase.co/functions/v1/paystack-initialize", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({
+        amount: amount,
+        email: user.email,
+        user_id: user.id
+      })
+    });
+
+    const data = await res.json();
+
+    if (data.authorization_url) {
+      // Redirect the user to Paystack's secure payment page
+      window.location.href = data.authorization_url;
+    } else {
+      throw new Error(data.message || "Failed to initialize Paystack.");
+    }
+
+  } catch (err) {
+    console.error("Paystack API Error:", err);
+    throw err; // Pass error back to the button listener
+  }
+}
 
 
 // =========================
@@ -540,6 +604,36 @@ confirmWithdrawBtn?.addEventListener('click', async () => {
     }
   }
 }
+
+// --- 🏆 TRANSACTION SUCCESS HANDLER ---
+function checkTransactionStatus() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const reference = urlParams.get('reference');
+  const successModal = document.getElementById("successModal");
+  const closeSuccessBtn = document.getElementById("closeSuccessBtn");
+
+  if (reference) {
+    // 1. Show the success popup
+    successModal.classList.add("active");
+
+    // 2. Clear the URL parameters (removes ?reference=... from address bar)
+    const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+    window.history.replaceState({}, document.title, cleanUrl);
+
+    // 3. Optional: Trigger a balance refresh after 2 seconds
+    setTimeout(() => {
+      if (typeof fetchBalance === "function") fetchBalance(); 
+    }, 2000);
+  }
+
+  // Close button logic
+  closeSuccessBtn?.addEventListener("click", () => {
+    successModal.classList.remove("active");
+  });
+}
+
+// Run it immediately on page load
+document.addEventListener("DOMContentLoaded", checkTransactionStatus);
 
 (async () => {
   // 1. Check if user is logged in
