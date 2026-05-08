@@ -557,6 +557,10 @@ body {
   font-weight: 600;
 }
 
+.status-rejected {
+  color: var(--red);
+  font-weight: 600;
+}
 /* Reference column */
 .data-table td.reference {
   font-family: monospace;

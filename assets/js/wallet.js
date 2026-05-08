@@ -144,6 +144,7 @@ function renderTransactions(transactions) {
     let statusClass = "status-pending";
     if (status === "success") statusClass = "status-success";
     else if (status === "failed") statusClass = "status-failed";
+    else if (status === "rejected") statusClass = "status-rejected";
 
     let amountColor = "var(--black)";
     if (type === "deposit") amountColor = "var(--green)";
@@ -462,7 +463,23 @@ confirmWithdrawBtn?.addEventListener('click', async () => {
         confirmWithdrawBtn.disabled = true;
         confirmWithdrawBtn.innerText = "Processing...";
 
-        // --- 🟡 STEP 2: LOG TO WITHDRAWALS TABLE ---
+        // --- 🟢 STEP 2: LOG TO WALLET TABLE FIRST (To get the ID) ---
+        const { data: walletLog, error: walletTableError } = await supabase
+            .from('wallet')
+            .insert([{
+                user_id: currentUser.id,
+                type: 'withdrawal',
+                amount: -amount, // Should be negative as it's a deduction
+                note: `Withdrawal to ${bank} (${accNum})`,
+                status: 'pending',
+                reference: `WDR-${Date.now()}-${currentUser.id.slice(0, 5)}`
+            }])
+            .select() // Important: this returns the created row
+            .single();
+
+        if (walletTableError) throw walletTableError;
+
+        // --- 🔵 STEP 3: LOG TO WITHDRAWALS TABLE (Linked to Step 1) ---
         const { error: withdrawError } = await supabase
             .from('withdrawals')
             .insert([{
@@ -470,24 +487,11 @@ confirmWithdrawBtn?.addEventListener('click', async () => {
                 amount: amount,
                 method: 'Transfer',
                 details: `${bank} | Acc: ${accNum} | Name: ${accName}`,
-                status: 'pending'
+                status: 'pending',
+                transaction_id: walletLog.id // <--- Now we have the ID from Step 1
             }]);
 
         if (withdrawError) throw withdrawError;
-
-        // --- 🟠 STEP 3: LOG TO WALLET TABLE ---
-        const { error: walletTableError } = await supabase
-            .from('wallet')
-            .insert([{
-                user_id: currentUser.id,
-                type: 'withdrawal',
-                amount: amount,
-                note: `Withdrawal to ${bank} (${accNum})`,
-                status: 'success',
-                reference: `WDR-${Date.now()}-${currentUser.id.slice(0, 5)}`
-            }]);
-
-        if (walletTableError) throw walletTableError;
 
         // --- 🔴 STEP 4: DEDUCT FROM BALANCE ---
         const { error: updateError } = await supabase

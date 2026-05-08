@@ -1166,14 +1166,17 @@ window.runAiAudit = async (chatId) => {
 /**
  * 1. Load Payout Requests from Database
  */
-/**
- * 1. Load Payout Requests from Database
- */
 window.loadWithdrawalRequests = async () => {
     const tbody = document.getElementById('payoutsTableBody');
     if (!tbody) return;
 
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</td></tr>';
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="6" style="text-align:center; padding: 30px;">
+                <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 24px; color: #0b1e5b;"></i>
+                <div style="margin-top: 10px; font-size: 13px; color: #64748b;">Fetching payout requests...</div>
+            </td>
+        </tr>`;
 
     try {
         const { data: requests, error } = await supabase
@@ -1183,110 +1186,167 @@ window.loadWithdrawalRequests = async () => {
 
         if (error) throw error;
 
+        if (requests.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:#64748b;">No withdrawal requests found.</td></tr>';
+            return;
+        }
+
         tbody.innerHTML = requests.map(r => {
             const isPending = r.status === 'pending';
-            const statusColor = isPending ? '#f59e0b' : (r.status === 'success' ? '#22c55e' : '#ef4444');
+            
+            // Status Badge Config
+            const statusMap = {
+                pending: { color: '#f59e0b', bg: '#fffbeb', icon: 'fa-clock' },
+                success: { color: '#22c55e', bg: '#f0fdf4', icon: 'fa-check-circle' },
+                rejected: { color: '#ef4444', bg: '#fef2f2', icon: 'fa-times-circle' }
+            };
+            const config = statusMap[r.status] || statusMap.pending;
 
             return `
-            <tr>
-                <td>
-                    <div style="font-weight:600;">${r.profiles?.username || 'User'}</div>
+            <tr style="border-bottom: 1px solid #f1f5f9; transition: 0.3s;">
+                <td style="padding: 14px 12px;">
+                    <div style="font-weight:700; color:#0b1e5b;">${r.profiles?.username || 'User'}</div>
                     <div style="font-size:11px; color:#64748b;">${r.profiles?.full_name || ''}</div>
                 </td>
-                <td>
-                    <div style="font-size:12px; font-weight:600; color:#0b1e5b;">${r.bank_name || 'N/A'}</div>
-                    <div style="font-family:monospace; font-size:11px; font-weight:bold;">${r.account_number || ''}</div>
-                    <div style="font-size:10px; color:#64748b; text-transform:uppercase; margin-top:2px;">
-                        ${r.account_name || 'No Name Provided'}
+                <td style="padding: 14px 12px;">
+                    <div style="font-size:12px; color:#1e293b; line-height:1.4;">
+                        <i class="fa-solid fa-university" style="font-size:11px; color:#94a3b8; margin-right: 5px;"></i> 
+                        ${r.details || 'No details'}
                     </div>
                 </td>
-                <td style="font-weight:700;">₦${parseFloat(r.amount).toLocaleString()}</td>
-                <td style="font-size:11px;">${new Date(r.created_at).toLocaleDateString()}</td>
-                <td>
-                    <span style="color:${statusColor}; font-size:10px; font-weight:800; text-transform:uppercase;">
-                        ${r.status}
+                <td style="padding: 14px 12px; font-weight:800; color:#0b1e5b;">₦${parseFloat(r.amount).toLocaleString()}</td>
+                <td style="padding: 14px 12px; font-size:11px; color:#64748b;">${new Date(r.created_at).toLocaleDateString()}</td>
+                <td style="padding: 14px 12px;">
+                    <span style="background:${config.bg}; color:${config.color}; padding:5px 10px; border-radius:8px; font-size:10px; font-weight:800; text-transform:uppercase; display:inline-flex; align-items:center; gap:5px;">
+                        <i class="fa-solid ${config.icon}"></i> ${r.status}
                     </span>
                 </td>
-                <td style="text-align: right;">
+                <td style="padding: 14px 12px; text-align: right;">
                     ${isPending ? `
-                        <button onclick="processKoraPayout('${r.id}', this)" class="btn-payout" 
-                                style="background:#0b1e5b; color:white; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; font-size:12px; transition: 0.3s;"
-                                title="Process via Kora Pay">
-                            <i class="fa-solid fa-credit-card"></i> Pay
-                        </button>
+                        <div style="display:flex; gap:10px; justify-content:flex-end;">
+                            <button onclick="handleManualStatus('${r.id}', 'success')" 
+                                    style="background:#22c55e; color:white; border:none; width:35px; height:35px; border-radius:10px; cursor:pointer; transition:0.2s; box-shadow: 0 4px 10px rgba(34, 197, 94, 0.2);"
+                                    title="Approve & Mark as Paid">
+                                <i class="fa-solid fa-check"></i>
+                            </button>
+                            <button onclick="handleManualStatus('${r.id}', 'rejected')" 
+                                    style="background:#ef4444; color:white; border:none; width:35px; height:35px; border-radius:10px; cursor:pointer; transition:0.2s; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.2);"
+                                    title="Reject Request">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
                     ` : `
-                        <i class="fa-solid fa-circle-check" style="color:#22c55e; font-size:18px;" title="Disbursed"></i>
+                        <div style="color:#cbd5e1; font-size:14px; font-weight:600;">
+                            <i class="fa-solid fa-lock"></i> Settled
+                        </div>
                     `}
                 </td>
             </tr>`;
         }).join('');
     } catch (err) {
         console.error("Fetch error:", err);
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">Failed to load requests.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:red; padding:20px;">Failed to load requests. Check console.</td></tr>';
     }
 };
-
 
 /**
- * 2. Trigger Kora Pay Disbursement via Edge Function
+ * 2. Handle Manual Status Update (JavaScript Logic - No RPC)
  */
- window.processKoraPayout = async (withdrawalId, btn) => {
-    const confirmation = await Swal.fire({
-        title: 'Confirm Disbursement',
-        text: "Send real funds via Kora Pay to this user?",
+window.handleManualStatus = async (withdrawalId, newStatus) => {
+    const isApprove = newStatus === 'success';
+    
+    const result = await Swal.fire({
+        title: isApprove ? 'Confirm Payment' : 'Reject Request',
+        text: `Update status to ${newStatus}?`,
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonColor: '#0b1e5b'
+        confirmButtonColor: isApprove ? '#22c55e' : '#ef4444',
+        confirmButtonText: 'Yes, Proceed',
+        target: 'body'
     });
 
-    if (!confirmation.isConfirmed) return;
+    if (!result.isConfirmed) return;
 
-    // Save original icon to restore if it fails
-    const originalIcon = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+    Swal.fire({
+        title: 'Updating Records...',
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        target: 'body',
+        didOpen: () => Swal.showLoading()
+    });
 
     try {
-        // --- 🔐 GET SESSION FOR AUTHORIZATION ---
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError || !session) {
-            throw new Error("Your admin session has expired. Please log in again.");
+        // --- STEP 1: Get the Withdrawal row AND the transaction_id ---
+        const { data: withdrawal, error: fetchError } = await supabase
+            .from('withdrawals')
+            .select('transaction_id, user_id, amount')
+            .eq('id', withdrawalId)
+            .single();
+
+        if (fetchError || !withdrawal) throw new Error("Withdrawal record not found in database.");
+
+        // DEBUG: Uncomment the line below if you want to see the ID in your console
+        // console.log("Targeting Wallet ID:", withdrawal.transaction_id);
+
+        // --- STEP 2: Update the Wallet Table ---
+        // We match the 'id' column in your wallet structure
+        if (withdrawal.transaction_id) {
+            const { data: walletUpdate, error: walletError } = await supabase
+                .from('wallet')
+                .update({ status: newStatus })
+                .eq('id', withdrawal.transaction_id) 
+                .select(); // Selecting back to confirm it found something
+
+            if (walletError) throw walletError;
+            
+            if (!walletUpdate || walletUpdate.length === 0) {
+                console.error("Link broken: No row found in Wallet table with ID:", withdrawal.transaction_id);
+                // We don't throw an error here so the withdrawal status can still update
+            }
+        } else {
+            console.warn("This withdrawal has no transaction_id link.");
         }
 
-        // --- 🚀 INVOKE FUNCTION WITH AUTH HEADER ---
-        const { data, error } = await supabase.functions.invoke('kora-pay-handler', {
-            body: { withdrawalId },
-            headers: {
-                Authorization: `Bearer ${session.access_token}` // Pass the JWT
-            }
-        });
+        // --- STEP 3: Update the Withdrawals Table ---
+        const { error: withdrawUpdateError } = await supabase
+            .from('withdrawals')
+            .update({ 
+                status: newStatus,
+                processed_at: new Date().toISOString() 
+            })
+            .eq('id', withdrawalId);
 
-        if (error) throw error;
+        if (withdrawUpdateError) throw withdrawUpdateError;
 
-        await Swal.fire({
-            title: 'Success',
-            text: 'Funds disbursed successfully via Kora Pay!',
-            icon: 'success',
-            confirmButtonColor: '#0b1e5b'
-        });
-        
-        loadWithdrawalRequests(); // Refresh table
-        
-    } catch (err) {
-        console.error("Payout Error:", err);
+        // --- STEP 4: Handle Refund if Rejected ---
+        if (newStatus === 'rejected') {
+            await supabase.rpc('add_wallet_balance', {
+                target_user_id: withdrawal.user_id,
+                amount_to_add: Math.abs(parseFloat(withdrawal.amount)) // Ensure positive number
+            });
+        }
+
         Swal.fire({
-            title: 'Payout Failed',
-            text: err.message || "An unexpected error occurred",
-            icon: 'error',
-            confirmButtonColor: '#0b1e5b'
+            title: 'Successfully Updated',
+            icon: 'success',
+            timer: 2000,
+            showConfirmButton: false,
+            target: 'body'
         });
-        
-        // Restore button state
-        btn.disabled = false;
-        btn.innerHTML = originalIcon;
+
+        loadWithdrawalRequests();
+
+    } catch (err) {
+        console.error("Update Error:", err);
+        Swal.fire({
+            title: 'Update Failed',
+            text: err.message,
+            icon: 'error',
+            target: 'body'
+        });
     }
 };
+
 
 
 
