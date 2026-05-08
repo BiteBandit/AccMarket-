@@ -318,15 +318,21 @@
   </div>
 </div>
 
-<div id="successModal" class="modal-overlay">
-  <div class="wallet-deposit-card text-center" style="text-align: center; padding: 30px;">
-    <div style="font-size: 50px; color: #00d26a; margin-bottom: 15px;">
-      <i class="fas fa-check-circle"></i>
+ 
+<div id="successToast" class="toast-container">
+    <div class="toast-content">
+        <div class="toast-icon">
+            <i class="fas fa-check-circle"></i>
+        </div>
+        <div class="toast-details">
+            <span class="toast-title">Payment Successful</span>
+            <span class="toast-message">Wallet funded. Balance updating...</span>
+        </div>
+        <button id="closeToastBtn" class="toast-close">
+            <i class="fas fa-times"></i>
+        </button>
     </div>
-    <h3 style="margin-bottom: 10px;">Payment Successful!</h3>
-    <p class="text-muted" style="margin-bottom: 20px;">Your wallet has been funded successfully. It may take a moment for your balance to reflect.</p>
-    <button id="closeSuccessBtn" class="btn-primary" style="width: 100%;">Done</button>
-  </div>
+    <div class="toast-progress"></div>
 </div>
 
 

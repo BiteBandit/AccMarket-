@@ -271,55 +271,67 @@ if (koraBtn) {
     const amount = amountInput ? parseFloat(amountInput.value) : 0;
 
     if (!amount || amount < 100) {
-      alert("Please enter a valid amount (Minimum ₦100).");
+      Swal.fire({
+        title: 'Invalid Amount',
+        text: 'Please enter at least ₦100.',
+        icon: 'warning',
+        confirmButtonColor: '#0b1e5b',
+        target: 'body' // Ensures it pops over the modal
+      });
       return;
     }
 
-    koraBtn.disabled = true;
-    koraBtn.textContent = "Connecting Kora...";
-
-    try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) throw new Error("Session expired. Please login.");
-
-      // Calls your existing fundWallet function (Fixie/Kora logic)
-      await fundWallet(amount, user);
-
-    } catch (err) {
-      console.error("Kora Error:", err);
-      alert(err.message);
-      koraBtn.disabled = false;
-      koraBtn.innerHTML = '<span class="btn-content"><i class="fas fa-credit-card"></i><span>Pay with Kora Pay</span></span>';
-    }
+    Swal.fire({
+      title: 'Connecting to Kora...',
+      text: 'Please wait...',
+      allowOutsideClick: false,
+      showConfirmButton: false,
+      target: 'body', 
+      didOpen: async () => {
+        Swal.showLoading();
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          await fundWallet(amount, user);
+        } catch (err) {
+          Swal.fire({ title: 'Error', text: err.message, icon: 'error', target: 'body' });
+        }
+      }
+    });
   });
 }
-// --- 🔵 PAYSTACK BUTTON HANDLER ---
+
+// --- 🔵 PAYSTACK HANDLER ---
 if (paystackBtn) {
   paystackBtn.addEventListener("click", async () => {
     const amount = amountInput ? parseFloat(amountInput.value) : 0;
 
     if (!amount || amount < 100) {
-      alert("Please enter a valid amount (Minimum ₦100).");
+      Swal.fire({
+        title: 'Invalid Amount',
+        text: 'Please enter at least ₦100.',
+        icon: 'warning',
+        confirmButtonColor: '#0b1e5b',
+        target: 'body'
+      });
       return;
     }
 
-    // UI Feedback
-    paystackBtn.disabled = true;
-    paystackBtn.textContent = "Connecting Paystack...";
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Please login to continue.");
-
-      // CALL THE FUNCTION SEPARATELY
-      await fundWithPaystack(amount, user);
-
-    } catch (err) {
-      alert(err.message);
-      // Reset button UI on error
-      paystackBtn.disabled = false;
-      paystackBtn.innerHTML = '<span class="btn-content"><i class="fas fa-bolt"></i><span>Pay with Paystack</span></span>';
-    }
+    Swal.fire({
+      title: 'Connecting to Paystack...',
+      text: 'Redirecting to secure gateway...',
+      allowOutsideClick: false,
+      showConfirmButton: false,
+      target: 'body',
+      didOpen: async () => {
+        Swal.showLoading();
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          await fundWithPaystack(amount, user);
+        } catch (err) {
+          Swal.fire({ title: 'Error', text: err.message, icon: 'error', target: 'body' });
+        }
+      }
+    });
   });
 }
 
@@ -605,35 +617,47 @@ async function fundWithPaystack(amount, user) {
   }
 }
 
-// --- 🏆 TRANSACTION SUCCESS HANDLER ---
+// --- 🏆 UNIVERSAL SUCCESS CHECKER (Kora & Paystack) ---
 function checkTransactionStatus() {
   const urlParams = new URLSearchParams(window.location.search);
-  const reference = urlParams.get('reference');
+  
+  // Paystack uses 'reference', Kora uses 'reference' or 'order_id' depending on setup
+  const reference = urlParams.get('reference') || urlParams.get('trxref');
   const successModal = document.getElementById("successModal");
   const closeSuccessBtn = document.getElementById("closeSuccessBtn");
 
   if (reference) {
     // 1. Show the success popup
-    successModal.classList.add("active");
+    if (successModal) {
+      successModal.classList.add("active");
+    } else {
+      // Fallback if you haven't added the HTML modal yet
+      Swal.fire({
+        title: 'Payment Successful!',
+        text: 'Your wallet funding is being processed.',
+        icon: 'success',
+        confirmButtonColor: '#0b1e5b'
+      });
+    }
 
-    // 2. Clear the URL parameters (removes ?reference=... from address bar)
+    // 2. Clean the URL so the message doesn't repeat on refresh
     const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
     window.history.replaceState({}, document.title, cleanUrl);
 
-    // 3. Optional: Trigger a balance refresh after 2 seconds
+    // 3. Refresh the UI balance after a short delay for the webhook to finish
     setTimeout(() => {
-      if (typeof fetchBalance === "function") fetchBalance(); 
-    }, 2000);
+      window.location.reload(); 
+    }, 3000);
   }
 
-  // Close button logic
   closeSuccessBtn?.addEventListener("click", () => {
     successModal.classList.remove("active");
   });
 }
 
-// Run it immediately on page load
+// Ensure this runs when the page loads
 document.addEventListener("DOMContentLoaded", checkTransactionStatus);
+
 
 (async () => {
   // 1. Check if user is logged in
