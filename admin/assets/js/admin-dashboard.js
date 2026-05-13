@@ -73,8 +73,12 @@ if (section === 'users') {
     loadCommunicationLogs();
 } else if (section === 'withdrawals') {
     loadWithdrawalRequests();
+} else   if (section === 'transactions') {
+            loadLedgerReports();
+        }  else if (section === 'broadcast') {
+    // This ensures the targeting fields reset when you open the tab
+    if(typeof toggleTargetFields === 'function') toggleTargetFields();
 }
-
 
 
 
@@ -1250,14 +1254,43 @@ window.loadWithdrawalRequests = async () => {
 };
 
 /**
- * 2. Handle Manual Status Update (JavaScript Logic - No RPC)
+ * Helper to send Telegram alerts to the User (Recipient)
+ */
+const sendUserTelegramAlert = async (chatId, username, amount, status) => {
+    const botToken = '8436841265:AAHIh50C2bEamKqB649Dx_CRy7l8X6f2yqg';
+    const emoji = status === 'success' ? '✅' : '❌';
+    
+    const message = `
+🔔 *Withdrawal Update*
+Hello ${username},
+Your withdrawal of ₦${parseFloat(amount).toLocaleString()} has been ${status.toUpperCase()} ${emoji}.
+${status === 'rejected' ? 'The funds have been returned to your wallet.' : 'Please check your wallet.'}
+    `.trim();
+
+    try {
+        await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: chatId,
+                text: message,
+                parse_mode: 'Markdown'
+            })
+        });
+    } catch (err) {
+        console.error("User Telegram Alert Failed:", err);
+    }
+};
+
+/**
+ * Main Status Handler
  */
 window.handleManualStatus = async (withdrawalId, newStatus) => {
     const isApprove = newStatus === 'success';
     
     const result = await Swal.fire({
         title: isApprove ? 'Confirm Payment' : 'Reject Request',
-        text: `Update status to ${newStatus}?`,
+        text: `Mark this withdrawal as ${newStatus}?`,
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: isApprove ? '#22c55e' : '#ef4444',
@@ -1268,7 +1301,7 @@ window.handleManualStatus = async (withdrawalId, newStatus) => {
     if (!result.isConfirmed) return;
 
     Swal.fire({
-        title: 'Updating Records...',
+        title: 'Processing...',
         allowOutsideClick: false,
         showConfirmButton: false,
         target: 'body',
@@ -1276,54 +1309,72 @@ window.handleManualStatus = async (withdrawalId, newStatus) => {
     });
 
     try {
-        // --- STEP 1: Get the Withdrawal row AND the transaction_id ---
+        // --- STEP 1: Fetch Withdrawal & Recipient's Profile Preferences ---
         const { data: withdrawal, error: fetchError } = await supabase
             .from('withdrawals')
-            .select('transaction_id, user_id, amount')
+            .select(`
+                transaction_id, 
+                user_id, 
+                amount, 
+                profiles(username, telegram_chat_id, telegram_alerts)
+            `)
             .eq('id', withdrawalId)
             .single();
 
-        if (fetchError || !withdrawal) throw new Error("Withdrawal record not found in database.");
+        if (fetchError || !withdrawal) throw new Error("Withdrawal record not found.");
 
-        // DEBUG: Uncomment the line below if you want to see the ID in your console
-        // console.log("Targeting Wallet ID:", withdrawal.transaction_id);
+        const recipient = withdrawal.profiles;
 
         // --- STEP 2: Update the Wallet Table ---
-        // We match the 'id' column in your wallet structure
         if (withdrawal.transaction_id) {
-            const { data: walletUpdate, error: walletError } = await supabase
+            await supabase
                 .from('wallet')
                 .update({ status: newStatus })
-                .eq('id', withdrawal.transaction_id) 
-                .select(); // Selecting back to confirm it found something
-
-            if (walletError) throw walletError;
-            
-            if (!walletUpdate || walletUpdate.length === 0) {
-                console.error("Link broken: No row found in Wallet table with ID:", withdrawal.transaction_id);
-                // We don't throw an error here so the withdrawal status can still update
-            }
-        } else {
-            console.warn("This withdrawal has no transaction_id link.");
+                .eq('id', withdrawal.transaction_id);
         }
 
         // --- STEP 3: Update the Withdrawals Table ---
         const { error: withdrawUpdateError } = await supabase
             .from('withdrawals')
             .update({ 
-                status: newStatus,
+                status: newStatus, 
                 processed_at: new Date().toISOString() 
             })
             .eq('id', withdrawalId);
 
         if (withdrawUpdateError) throw withdrawUpdateError;
 
-        // --- STEP 4: Handle Refund if Rejected ---
+        // --- STEP 4: Insert In-App Notification (Always) ---
+        const notifTitle = isApprove ? "Withdrawal Approved" : "Withdrawal Rejected";
+        const notifMsg = isApprove 
+            ? `Your withdrawal of ₦${parseFloat(withdrawal.amount).toLocaleString()} has been paid.` 
+            : `Your withdrawal of ₦${parseFloat(withdrawal.amount).toLocaleString()} was rejected and refunded.`;
+
+        await supabase.from('notifications').insert([{
+            user_id: withdrawal.user_id,
+            title: `💰 ${notifTitle}`,
+            message: notifMsg,
+            icon: isApprove ? 'fas fa-check-circle' : 'fas fa-times-circle',
+            is_read: false,
+            type: 'payout'
+        }]);
+
+        // --- STEP 5: Handle Refund if Rejected ---
         if (newStatus === 'rejected') {
             await supabase.rpc('add_wallet_balance', {
                 target_user_id: withdrawal.user_id,
-                amount_to_add: Math.abs(parseFloat(withdrawal.amount)) // Ensure positive number
+                amount_to_add: Math.abs(parseFloat(withdrawal.amount))
             });
+        }
+
+        // --- STEP 6: Send Telegram Alert if USER has it enabled ---
+        if (recipient?.telegram_alerts && recipient?.telegram_chat_id) {
+            sendUserTelegramAlert(
+                recipient.telegram_chat_id,
+                recipient.username,
+                withdrawal.amount,
+                newStatus
+            );
         }
 
         Swal.fire({
@@ -1338,15 +1389,206 @@ window.handleManualStatus = async (withdrawalId, newStatus) => {
 
     } catch (err) {
         console.error("Update Error:", err);
-        Swal.fire({
-            title: 'Update Failed',
-            text: err.message,
-            icon: 'error',
-            target: 'body'
-        });
+        Swal.fire({ title: 'Update Failed', text: err.message, icon: 'error', target: 'body' });
     }
 };
 
+// ---ledger report---
+// Helper function to copy text
+window.copyToClipboard = (text, label) => {
+    navigator.clipboard.writeText(text).then(() => {
+        Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: `${label} Copied!`,
+            showConfirmButton: false,
+            timer: 1500
+        });
+    });
+};
+
+window.loadLedgerReports = async () => {
+    const tbody = document.getElementById('ledgerTableBody');
+    if (!tbody) return;
+
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:40px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading Ledger...</td></tr>';
+
+    try {
+        const { data: logs, error } = await supabase
+            .from('wallet')
+            .select(`*, profiles(username)`)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        tbody.innerHTML = logs.map(log => {
+            const isNegative = parseFloat(log.amount) < 0;
+            const amountFormatted = Math.abs(parseFloat(log.amount)).toLocaleString();
+            
+            return `
+            <tr>
+                <td style="font-size: 11px; color: #64748b;">
+                    ${new Date(log.created_at).toLocaleDateString()}
+                </td>
+                <td>
+                    <div style="font-weight: 700; color: #0b1e5b;">${log.profiles?.username || 'User'}</div>
+                    <div onclick="copyToClipboard('${log.user_id}', 'User UID')" 
+                         style="font-size: 10px; color: #94a3b8; cursor: pointer; text-decoration: underline;" 
+                         title="Click to copy UID">
+                         ID: ${log.user_id.substring(0, 8)}... <i class="fa-regular fa-copy"></i>
+                    </div>
+                </td>
+                <td>
+                    <div onclick="copyToClipboard('${log.id}', 'Transaction ID')" 
+                         style="font-size: 11px; color: #475569; cursor: pointer; background: #f1f5f9; padding: 2px 5px; border-radius: 4px; display: inline-block;" 
+                         title="Click to copy Transaction ID">
+                         #${log.id.substring(0, 12)} <i class="fa-regular fa-copy" style="font-size: 9px;"></i>
+                    </div>
+                </td>
+                <td>
+                    <span style="font-size: 10px; background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-weight: 800;">
+                        ${log.type.toUpperCase()}
+                    </span>
+                </td>
+                <td style="font-weight: 800; color: ${isNegative ? '#ef4444' : '#22c55e'};">
+                    ${isNegative ? '-' : '+'}₦${amountFormatted}
+                </td>
+                <td>
+                    <span style="font-size: 10px; font-weight: 800; color: ${log.status === 'success' ? '#22c55e' : '#f59e0b'};">
+                        ${log.status.toUpperCase()}
+                    </span>
+                </td>
+            </tr>`;
+        }).join('');
+
+    } catch (err) {
+        console.error("Ledger Error:", err);
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">Error loading ledger.</td></tr>';
+    }
+};
+
+// Toggle Visibility of targeting inputs
+window.toggleTargetFields = () => {
+    const type = document.getElementById('targetType').value;
+    document.getElementById('singleUserInput').style.display = type === 'single' ? 'block' : 'none';
+    document.getElementById('roleSelectInput').style.display = type === 'role' ? 'block' : 'none';
+};
+
+window.processBroadcast = async () => {
+    const title = document.getElementById('broadcastTitle').value.trim();
+    const message = document.getElementById('broadcastMessage').value.trim();
+    const targetType = document.getElementById('targetType').value;
+    
+    // Channels
+    const useInApp = document.getElementById('chanInApp').checked;
+    const useTelegram = document.getElementById('chanTelegram').checked;
+    const useEmail = document.getElementById('chanEmail').checked;
+
+    if (!title || !message) return Swal.fire('Error', 'Subject and Message are required.', 'error');
+    if (!useInApp && !useTelegram && !useEmail) return Swal.fire('Error', 'Select at least one channel.', 'warning');
+
+    Swal.fire({ 
+        title: 'Initializing Broadcast', 
+        text: 'Preparing transmission...', 
+        allowOutsideClick: false, 
+        didOpen: () => Swal.showLoading() 
+    });
+
+    try {
+        // 1. Resolve Target Users
+        let query = supabase.from('profiles').select('id, email, telegram_chat_id, telegram_alerts');
+
+        if (targetType === 'single') {
+            const uid = document.getElementById('targetUID').value.trim();
+            if (!uid) throw new Error("Please provide a valid User UID");
+            query = query.eq('id', uid);
+        } else if (targetType === 'role') {
+            const role = document.getElementById('targetRole').value;
+            query = query.eq('role', role);
+        }
+
+        const { data: targets, error: fetchError } = await query;
+        if (fetchError) throw fetchError;
+        if (!targets || targets.length === 0) throw new Error("No users found matching these criteria.");
+
+        const promises = [];
+        const emailList = [];
+
+        // 2. Queue Channel Tasks
+        targets.forEach(user => {
+            // Channel: In-App
+            if (useInApp) {
+                promises.push(supabase.from('notifications').insert({
+                    user_id: user.id,
+                    title: title,
+                    message: message,
+                    icon: 'fas fa-bullhorn',
+                    type: 'broadcast'
+                }));
+            }
+
+            // Channel: Telegram
+            if (useTelegram && user.telegram_chat_id && user.telegram_alerts !== false) {
+                promises.push(sendTelegramRaw(user.telegram_chat_id, `🔔 *${title}*\n\n${message}`));
+            }
+
+            // Channel: Email Collection
+            if (useEmail && user.email) {
+                emailList.push(user.email);
+            }
+        });
+
+        // 3. Trigger Edge Function for Emails
+        // Note: supabase.functions.invoke automatically includes the Authorization Bearer token
+        if (useEmail && emailList.length > 0) {
+            promises.push(
+                supabase.functions.invoke('Broadcast', {
+                    body: { 
+                        emails: emailList, 
+                        title: title, 
+                        message: message 
+                    }
+                })
+            );
+        }
+
+        // 4. Wait for results
+        const results = await Promise.all(promises);
+
+        // Check if the Edge Function call returned an error in its response body
+        const edgeResponse = results.find(r => r && r.error);
+        if (edgeResponse && edgeResponse.error) {
+            console.error("Edge Function Error:", edgeResponse.error);
+            throw new Error("Email service encountered an error.");
+        }
+
+        Swal.fire({
+            icon: 'success',
+            title: 'Success!',
+            text: `Broadcast sent to ${targets.length} users.`,
+            confirmButtonColor: '#0b1e5b'
+        });
+
+        // Clean up
+        document.getElementById('broadcastTitle').value = '';
+        document.getElementById('broadcastMessage').value = '';
+
+    } catch (err) {
+        console.error("Broadcast Error:", err);
+        Swal.fire('Failed', err.message, 'error');
+    }
+};
+
+// Raw Telegram Fetch
+async function sendTelegramRaw(chatId, text) {
+    const botToken = '8436841265:AAHIh50C2bEamKqB649Dx_CRy7l8X6f2yqg';
+    return fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text: text, parse_mode: 'Markdown' })
+    });
+}
 
 
 

@@ -499,3 +499,126 @@ hr { border: none; border-top: 1px solid #f1f5f9; margin: 15px 0; }
     border: none;
 }
 
+/* --- Advanced Communication Center (Mobile Fix) --- */
+.comm-card {
+    background: #ffffff;
+    border-radius: 16px; /* Slightly smaller for mobile */
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    max-width: 900px;
+    margin: 10px auto;
+    overflow: hidden;
+    border: 1px solid #f1f5f9;
+}
+
+.comm-header {
+    background: #0b1e5b;
+    padding: 15px 20px; /* Slimmer header for mobile */
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: white;
+}
+
+.header-icon {
+    font-size: 20px;
+    background: rgba(255, 255, 255, 0.1);
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    flex-shrink: 0;
+}
+
+.header-text h2 { margin: 0; font-size: 16px; font-weight: 700; }
+.header-text p { margin: 0; opacity: 0.7; font-size: 11px; }
+
+.comm-content { padding: 15px; } /* Breathable padding */
+
+/* --- Targeting Zone (The Fix) --- */
+.targeting-zone {
+    display: flex; /* Using flex instead of grid for better mobile stacking */
+    flex-direction: column;
+    gap: 15px;
+    background: #f8fafc;
+    padding: 15px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+}
+
+/* Switches to side-by-side on Tablets/Desktop */
+@media (min-width: 768px) {
+    .targeting-zone {
+        flex-direction: row;
+        align-items: flex-end;
+    }
+    .targeting-zone > div {
+        flex: 1; /* Equal width columns */
+    }
+}
+
+.input-box label {
+    display: block;
+    font-weight: 700;
+    color: #0b1e5b;
+    margin-bottom: 8px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Modern Inputs Fix */
+.modern-input, .modern-select, .modern-textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 14px;
+    background: white;
+    box-sizing: border-box; /* Crucial for width calculation */
+}
+
+.message-zone { margin-bottom: 20px; }
+.message-zone label { font-weight: 700; color: #0b1e5b; display: block; margin-bottom: 10px; }
+
+/* Channel Grid Fix */
+.channel-grid { 
+    display: grid; 
+    grid-template-columns: 1fr; /* Stack on mobile */
+    gap: 10px; 
+    margin-bottom: 25px; 
+}
+
+@media (min-width: 480px) {
+    .channel-grid {
+        grid-template-columns: repeat(3, 1fr); /* 3 columns on larger phones */
+    }
+}
+
+.channel-item .pill {
+    padding: 12px 5px;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 10px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: white;
+    white-space: nowrap;
+}
+
+.channel-item input:checked + .pill {
+    background: #0b1e5b;
+    color: white;
+    border-color: #0b1e5b;
+}
+
+/* Button Fix */
+.btn-execute {
+    width: 100%;
+    padding: 16px;
+    background: #0b1e5b;
+    color: white;
+    border
