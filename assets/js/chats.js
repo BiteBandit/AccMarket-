@@ -3,10 +3,12 @@ import { supabase } from './supabase-config.js';
 // State Management
 let activeChatId = new URLSearchParams(window.location.search).get('id'); 
 let currentUser = null;
-let messageSubscription = null;
-let statusSubscription = null; 
+let messageSubscription = null;    // Handles new chat messages
+let partnerStatusSub = null;       // Handles partner's Online/Offline status
+let conversationSub = null;        // Handles Deal Status (Cancel/Complete/Escrow)
 let heartbeatInterval = null;
 let replyingTo = null; 
+
 
 
 // --- 1. INITIALIZATION ---
@@ -47,21 +49,39 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Navigation Logic
     const backBtn = document.getElementById('backToList');
-    if (backBtn) {
-        backBtn.onclick = async () => {
-            document.querySelector('.app-container').classList.remove('chat-open');
-            if (activeChatId) await markMessagesAsRead(activeChatId);
-            
-            activeChatId = null;
-            if (messageSubscription) supabase.removeChannel(messageSubscription);
-            if (statusSubscription) supabase.removeChannel(statusSubscription);
-            
-            const newUrl = new URL(window.location);
-            newUrl.searchParams.delete('id');
-            window.history.pushState({}, '', newUrl);
-            await loadSidebar();
-        };
-    }
+if (backBtn) {
+    backBtn.onclick = async () => {
+        document.querySelector('.app-container').classList.remove('chat-open');
+        
+        // 1. Mark messages as read before closing
+        if (activeChatId) await markMessagesAsRead(activeChatId);
+        
+        // 2. Clear the active ID
+        activeChatId = null;
+
+        // 3. 🎯 NEW: CLEANUP ALL SEPARATE CHANNELS
+        // This stops the app from listening to the old chat in the background
+        if (messageSubscription) {
+            supabase.removeChannel(messageSubscription);
+            messageSubscription = null;
+        }
+        if (partnerStatusSub) {
+            supabase.removeChannel(partnerStatusSub);
+            partnerStatusSub = null;
+        }
+        if (conversationSub) {
+            supabase.removeChannel(conversationSub);
+            conversationSub = null;
+        }
+        
+        // 4. Update URL and Refresh Sidebar
+        const newUrl = new URL(window.location);
+        newUrl.searchParams.delete('id');
+        window.history.pushState({}, '', newUrl);
+        await loadSidebar();
+    };
+}
+
 
     // Input Listeners
     const sendBtn = document.getElementById('sendMessageBtn'); 
@@ -408,14 +428,21 @@ function watchPartnerPresence(partner) {
 
     calculateStatus(partner.last_seen, partner.show_online);
 
-    if (statusSubscription) supabase.removeChannel(statusSubscription);
-    statusSubscription = supabase.channel(`status-${partner.id}`)
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${partner.id}` }, (payload) => {
+    // 🎯 FIX: Use partnerStatusSub instead of the shared statusSubscription
+    if (partnerStatusSub) supabase.removeChannel(partnerStatusSub);
+    
+    partnerStatusSub = supabase.channel(`status-${partner.id}`)
+        .on('postgres_changes', { 
+            event: 'UPDATE', 
+            schema: 'public', 
+            table: 'profiles', 
+            filter: `id=eq.${partner.id}` 
+        }, (payload) => {
             calculateStatus(payload.new.last_seen, payload.new.show_online);
         })
         .subscribe();
 }
-
+ 
 // --- 7. MESSAGING HELPERS ---
  // --- 7. MESSAGING HELPERS (UPDATED WITH DELETE SYNC) ---
 function subscribeToMessages() {
@@ -494,9 +521,10 @@ function subscribeToMessages() {
 
 // --- NEW REALTIME: Listen for Deal Status & Escrow Changes ---
 function subscribeToConversationChanges() {
-    if (statusSubscription) supabase.removeChannel(statusSubscription);
+    // 🎯 FIX: Use conversationSub instead of the shared statusSubscription
+    if (conversationSub) supabase.removeChannel(conversationSub);
 
-    statusSubscription = supabase.channel(`conv-status-${activeChatId}`)
+    conversationSub = supabase.channel(`conv-status-${activeChatId}`)
         .on('postgres_changes', { 
             event: 'UPDATE', 
             schema: 'public', 
@@ -505,16 +533,18 @@ function subscribeToConversationChanges() {
         }, (payload) => {
             console.log("[REALTIME] Deal Update:", payload.new.status);
             
-            // Update global data object
+            // Update global data object so other functions know the status changed
             window.activeChatData = payload.new;
 
-            // 1. Instantly update progress bar for the partner
-            updateEscrowUI(payload.new.escrow_step);
+            // 1. Instantly update progress bar for the partner (Step 1 -> 2 -> 3)
+            if (typeof updateEscrowUI === 'function') {
+                updateEscrowUI(payload.new.escrow_step);
+            }
             
-            // 2. Instantly lock the chat for the partner
+            // 2. Instantly lock/unlock the chat for the partner
             syncLockdownUI(payload.new.status);
             
-            // 3. Refresh the sidebar list
+            // 3. Refresh the sidebar list to show "Cancelled" or "Completed" status
             loadSidebar();
         })
         .subscribe();
