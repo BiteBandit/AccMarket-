@@ -124,12 +124,19 @@
     <!--JAVASCRIPT-->
     <script src="script.js" defer></script>
 <script src="https://unpkg.com/@phosphor-icons/web"></script>
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+
 <script>
-  fetch("header.html")
-    .then(res => res.text())
-    .then(data => {
-      document.head.innerHTML += data;
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(async function(OneSignal) {
+    console.log("OneSignal loading...");
+
+    await OneSignal.init({
+      appId: "e0c81302-9932-420b-885f-f553995f432e",
     });
+
+    console.log("OneSignal initialized");
+  });
 </script>
   </head>
   <body>
