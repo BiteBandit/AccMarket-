@@ -41,50 +41,65 @@ async function init() {
     setupDirectoryListeners();
 }
 
-// --- Navigation Logic ---
+// --- UPDATED NAVIGATION LOGIC ---
 navItems.forEach(item => {
     item.addEventListener('click', (e) => {
         e.preventDefault();
-        
+        const section = item.getAttribute('data-section');
+
+        // 1. Update Sidebar UI
         navItems.forEach(i => i.classList.remove('active'));
         item.classList.add('active');
-        
-        const section = item.getAttribute('data-section');
-        sectionTitle.textContent = item.textContent.trim();
 
-        sidebar.classList.remove('active');
-        overlay.classList.remove('active');
+        // 2. Clear and Reset Visibility
+        // This ensures no two sections are visible at the same time
+        document.querySelectorAll('.content-section').forEach(sec => {
+            sec.style.display = 'none';
+        });
 
-        // Toggle Content Sections
-        document.querySelectorAll('.content-section').forEach(s => s.style.display = 'none');
-        const targetSection = document.getElementById(`${section}Section`);
-        if (targetSection) targetSection.style.display = 'block';
+        // 3. Update Header Title
+        if (sectionTitle) {
+            sectionTitle.textContent = item.innerText.trim();
+        }
 
-   // --- UPDATED LOGIC ---
-if (section === 'users') {
-    loadUserDirectory();
-} else if (section === 'kyc') {
-    loadPaidKYC();
-} else if (section === 'banned') {
-    loadRestrictedUsers();
-} else if (section === 'verification') {
-    loadAccountAudits(); 
-} else if (section === 'conversations') {
-    loadCommunicationLogs();
-} else if (section === 'withdrawals') {
-    loadWithdrawalRequests();
-} else   if (section === 'transactions') {
+        // 4. Show Target Section
+        const targetSection = document.getElementById(`${section}-section`);
+        if (targetSection) {
+            targetSection.style.display = 'block';
+        }
+
+        // 5. Route Data Loading
+        if (section === 'users') {
+            loadUserDirectory();
+        } else if (section === 'kyc') {
+            loadPaidKYC();
+        } else if (section === 'banned') {
+            loadRestrictedUsers();
+        } else if (section === 'verification') {
+            loadAccountAudits(); 
+        } else if (section === 'conversations') {
+            loadCommunicationLogs();
+        } else if (section === 'withdrawals') {
+            loadWithdrawalRequests();
+        } else if (section === 'transactions') {
             loadLedgerReports();
-        }  else if (section === 'broadcast') {
-    // This ensures the targeting fields reset when you open the tab
-    if(typeof toggleTargetFields === 'function') toggleTargetFields();
-}
+        } else if (section === 'broadcast') {
+            if (typeof toggleTargetFields === 'function') toggleTargetFields();
+        } else if (section === 'blog') {
+            // Trigger the robust loadBlogs function
+            if (typeof loadBlogs === 'function') {
+                loadBlogs();
+            }
+        }
 
-
-
-
+        // 6. Close Sidebar (For Mobile Users)
+        if (typeof sidebar !== 'undefined' && sidebar.classList.contains('active')) {
+            sidebar.classList.remove('active');
+            overlay.classList.remove('active');
+        }
     });
 });
+
 
 // --- User Directory Logic ---
 function setupDirectoryListeners() {
@@ -1589,6 +1604,136 @@ async function sendTelegramRaw(chatId, text) {
         body: JSON.stringify({ chat_id: chatId, text: text, parse_mode: 'Markdown' })
     });
 }
+
+// --- Platform News Global Logic ---
+
+window.loadBlogs = async function() {
+    const tbody = document.getElementById('blogTableBody');
+    if (!tbody) return;
+
+    const { data: blogs, error } = await supabase.from('blogs').select('*').order('created_at', { ascending: false });
+    if (error) return console.error(error);
+
+    tbody.innerHTML = blogs.map(post => {
+        // Updated check for videos to include more formats
+        const isVideo = post.image_url?.toLowerCase().match(/\.(mp4|webm|ogg|mov)$/);
+        
+        return `
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 15px;">
+                ${isVideo ? 
+                    `<div style="width:45px; height:30px; background:#0b1e5b; border-radius:4px; display:flex; align-items:center; justify-content:center; color:white;"><i class="fa-solid fa-video"></i></div>` : 
+                    `<img src="${post.image_url}" style="width:45px; height:30px; object-fit:cover; border-radius:4px;" onerror="this.src='https://via.placeholder.com/45x30?text=Error'">`
+                }
+            </td>
+            <td style="padding:15px; font-weight:600; color:#1e293b;">${post.title}</td>
+            <td style="padding:15px; color:#64748b;">${post.author}</td>
+            <td style="padding:15px; font-size:12px;">${new Date(post.created_at).toLocaleDateString()}</td>
+            <td style="padding:15px; text-align:center;">
+                <button onclick="window.editBlog('${post.id}')" style="color:#0b1e5b; background:none; border:none; cursor:pointer; margin-right:10px;"><i class="fa-solid fa-pen-to-square"></i></button>
+                <button onclick="window.deleteBlogPost('${post.id}', '${post.image_url}')" style="color:#ef4444; background:none; border:none; cursor:pointer;"><i class="fa-solid fa-trash"></i></button>
+            </td>
+        </tr>`;
+    }).join('');
+};
+
+window.openBlogModal = function() {
+    document.getElementById('editBlogId').value = "";
+    document.getElementById('blogTitle').value = "";
+    document.getElementById('blogAuthor').value = "Admin";
+    document.getElementById('blogContent').value = "";
+    document.getElementById('blogFile').value = ""; // Clear file input
+    document.getElementById('modalTitle').innerText = "Create News Post";
+    document.getElementById('blogModal').style.display = "flex";
+};
+
+window.closeBlogModal = function() {
+    document.getElementById('blogModal').style.display = "none";
+};
+
+window.editBlog = async function(id) {
+    const { data: post } = await supabase.from('blogs').select('*').eq('id', id).single();
+    if (post) {
+        document.getElementById('editBlogId').value = post.id;
+        document.getElementById('blogTitle').value = post.title;
+        document.getElementById('blogAuthor').value = post.author;
+        document.getElementById('blogContent').value = post.content;
+        document.getElementById('blogFile').value = ""; // File is optional on edit
+        document.getElementById('modalTitle').innerText = "Edit News Post";
+        document.getElementById('blogModal').style.display = "flex";
+    }
+};
+
+window.saveBlogPost = async function() {
+    const id = document.getElementById('editBlogId').value;
+    const title = document.getElementById('blogTitle').value;
+    const author = document.getElementById('blogAuthor').value;
+    const content = document.getElementById('blogContent').value;
+    const file = document.getElementById('blogFile').files[0];
+
+    if (!title || !content) return Swal.fire("Required", "Title and content are missing", "error");
+    if (!id && !file) return Swal.fire("Media Required", "Please upload an image or video for new posts", "warning");
+
+    Swal.fire({ title: 'Processing...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+    try {
+        let image_url = null;
+        
+        // Handle file upload if a new file is selected
+        if (file) {
+            const isVideo = file.type.includes('video') || file.name.toLowerCase().endsWith('.mp4');
+            const folder = isVideo ? 'videos' : 'images';
+            const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+            const path = `${folder}/${fileName}`;
+
+            const { error: uploadError } = await supabase.storage.from('blog-media').upload(path, file);
+            if (uploadError) throw uploadError;
+
+            const { data: urlData } = supabase.storage.from('blog-media').getPublicUrl(path);
+            image_url = urlData.publicUrl;
+        }
+
+        const payload = { title, author, content };
+        if (image_url) payload.image_url = image_url;
+
+        const { error: dbError } = id 
+            ? await supabase.from('blogs').update(payload).eq('id', id)
+            : await supabase.from('blogs').insert([payload]);
+
+        if (dbError) throw dbError;
+
+        Swal.fire("Success", "Platform News updated!", "success");
+        window.closeBlogModal();
+        window.loadBlogs();
+
+    } catch (err) {
+        console.error(err);
+        Swal.fire("Error", err.message || "Failed to save post", "error");
+    }
+};
+
+window.deleteBlogPost = async function(id, url) {
+    const { isConfirmed } = await Swal.fire({
+        title: 'Delete Post?',
+        text: "This action cannot be undone.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: 'Yes, delete it'
+    });
+
+    if (isConfirmed) {
+        // 1. Delete from DB
+        const { error } = await supabase.from('blogs').delete().eq('id', id);
+        
+        // 2. Optional: Add storage cleanup logic here if desired
+        
+        if (!error) {
+            Swal.fire("Deleted", "The post has been removed.", "success");
+            window.loadBlogs();
+        }
+    }
+};
 
 
 

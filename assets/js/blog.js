@@ -7,6 +7,12 @@ const blogSection = document.querySelector(".blog-section");
 const sectionTitle = document.querySelector(".section-title");
 const sectionSubtitle = document.querySelector(".section-subtitle");
 
+// ✅ Utility to check if a URL is a video
+function isVideo(url) {
+  if (!url) return false;
+  return url.toLowerCase().match(/\.(mp4|webm|ogg|mov)$/);
+}
+
 // ✅ Load blogs
 async function loadBlogs() {
   const { data: blogs, error } = await supabase
@@ -31,7 +37,9 @@ async function loadBlogs() {
 
 // ✅ Display blogs list
 function displayBlogs(blogs) {
+  if (!blogList) return;
   blogList.innerHTML = "";
+  
   blogs.forEach((blog) => {
     const article = document.createElement("article");
     article.classList.add("blog-card");
@@ -39,10 +47,27 @@ function displayBlogs(blogs) {
       year: "numeric", month: "short", day: "numeric"
     });
 
+    // Check if the primary media is a video or image
+    // Note: Checking both image_url and video_url for maximum compatibility
+    const mediaUrl = blog.image_url || blog.video_url;
+    const mediaIsVideo = isVideo(mediaUrl);
+
+    let mediaHtml = "";
+    if (mediaUrl) {
+      if (mediaIsVideo) {
+        mediaHtml = `
+          <div class="video-wrapper">
+            <video src="${mediaUrl}" muted playsinline class="card-video-preview"></video>
+            <div class="video-overlay-icon"><i class="fas fa-play"></i></div>
+          </div>`;
+      } else {
+        mediaHtml = `<img src="${mediaUrl}" alt="${blog.title}" loading="lazy">`;
+      }
+    }
+
     article.innerHTML = `
       <div class="blog-media">
-        ${blog.image_url ? `<img src="${blog.image_url}" alt="${blog.title}">` : 
-          blog.video_url ? `<video src="${blog.video_url}" controls></video>` : ""}
+        ${mediaHtml}
       </div>
       <div class="blog-content">
         <h3 class="blog-title">${blog.title}</h3>
@@ -74,12 +99,20 @@ async function handleSingleView() {
     const { data: blog, error } = await supabase.from("blogs").select("*").eq("id", blogId).single();
     if (error || !blog) return;
 
-    // Hide the list headers & grid
+    // Hide list headers
     if (sectionTitle) sectionTitle.style.display = "none";
     if (sectionSubtitle) sectionSubtitle.style.display = "none";
-    blogList.style.display = "none";
+    if (blogList) blogList.style.display = "none";
 
-    // Create the Single View Container
+    const mediaUrl = blog.image_url || blog.video_url;
+    const mediaIsVideo = isVideo(mediaUrl);
+
+    const mediaHtml = mediaIsVideo 
+      ? `<video src="${mediaUrl}" controls autoplay class="article-video"></video>` 
+      : mediaUrl 
+        ? `<img src="${mediaUrl}" alt="${blog.title}" class="article-image">` 
+        : "";
+
     const singleView = document.createElement("div");
     singleView.className = "single-article-view";
     singleView.innerHTML = `
@@ -94,7 +127,7 @@ async function handleSingleView() {
         </div>
       </div>
       <div class="article-media">
-        ${blog.image_url ? `<img src="${blog.image_url}">` : blog.video_url ? `<video src="${blog.video_url}" controls autoplay></video>` : ""}
+        ${mediaHtml}
       </div>
       <div class="article-body">${blog.content}</div>
       <div class="article-footer">
@@ -112,13 +145,11 @@ document.addEventListener("click", (e) => {
   const btn = e.target.closest("button");
   if (!btn) return;
 
-  // Handle "Read More" button click
   if (btn.classList.contains("read-more")) {
     const id = btn.dataset.id;
     window.location.search = `?id=${id}`;
   }
 
-  // Handle "Share" button click
   if (btn.classList.contains("share-blog-btn")) {
     const id = btn.dataset.id;
     const title = btn.dataset.title || document.querySelector(".article-header h1")?.textContent;
