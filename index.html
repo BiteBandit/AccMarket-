@@ -136,8 +136,12 @@
     });
 
     console.log("OneSignal initialized");
+
+    // This line triggers the browser's native permission prompt immediately
+    await OneSignal.Notifications.requestPermission(); 
   });
 </script>
+
   </head>
   <body>
 <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-M9WLK8GG"
