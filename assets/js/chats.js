@@ -235,6 +235,7 @@ async function initChatWindow() {
 
     console.log("[CHAT] Refreshing view for:", activeChatId);
     subscribeToMessages();
+subscribeToConversationChanges();
 
 
     const { data: chat } = await supabase
@@ -264,41 +265,8 @@ window.activeChatData = chat;
             updateEscrowUI(chat.escrow_step);
         }
 
-// --- 🎯 LOCKDOWN LOGIC (Updated) ---
-const footer = document.querySelector('.chat-footer'); 
-const attachBtn = document.getElementById('attachBtn'); // The plus/clip icon
-const messageInput = document.getElementById('messageInput');
+syncLockdownUI(chat.status);
 
-if (chat.status === 'cancelled' || chat.status === 'completed') {
-    if (footer) {
-        // 1. Hide the typing area and attachment button
-        footer.style.display = 'none'; 
-        
-        // 2. Extra Security: Disable the actual input element
-        if (messageInput) messageInput.disabled = true;
-        if (attachBtn) attachBtn.style.pointerEvents = 'none';
-
-        // 3. Add the "Closed" banner if it doesn't exist
-        if (!document.getElementById('closedNotice')) {
-            const notice = document.createElement('div');
-            notice.id = 'closedNotice';
-            notice.className = 'chat-closed-notice';
-            // Using Ph-Fill for a solid lock icon
-            notice.innerHTML = `<i class="ph-fill ph-lock"></i> Transaction Closed — Messaging Disabled`;
-            
-            // Insert the notice where the footer used to be
-            footer.parentNode.appendChild(notice);
-        }
-    }
-} else {
-    // 🔓 RE-ENABLE: If the chat is active (e.g., user switched chats)
-    if (footer) footer.style.display = 'flex';
-    if (messageInput) {
-        messageInput.disabled = false;
-        messageInput.placeholder = "Type a message...";
-    }
-    document.getElementById('closedNotice')?.remove();
-}
 
 
 // --- 🎯 PRODUCT CONTEXT BAR & LOGO LOGIC ---
@@ -524,6 +492,33 @@ function subscribeToMessages() {
 }
 
 
+// --- NEW REALTIME: Listen for Deal Status & Escrow Changes ---
+function subscribeToConversationChanges() {
+    if (statusSubscription) supabase.removeChannel(statusSubscription);
+
+    statusSubscription = supabase.channel(`conv-status-${activeChatId}`)
+        .on('postgres_changes', { 
+            event: 'UPDATE', 
+            schema: 'public', 
+            table: 'conversations', 
+            filter: `id=eq.${activeChatId}` 
+        }, (payload) => {
+            console.log("[REALTIME] Deal Update:", payload.new.status);
+            
+            // Update global data object
+            window.activeChatData = payload.new;
+
+            // 1. Instantly update progress bar for the partner
+            updateEscrowUI(payload.new.escrow_step);
+            
+            // 2. Instantly lock the chat for the partner
+            syncLockdownUI(payload.new.status);
+            
+            // 3. Refresh the sidebar list
+            loadSidebar();
+        })
+        .subscribe();
+}
 
 
 // --- 9. DELETE LOGIC WITH SWEETALERT ---
@@ -988,6 +983,31 @@ function updateEscrowUI(step) {
 }
 window.updateEscrowUI = updateEscrowUI;
 
+// --- NEW UTILITY: Sync UI Lockdown ---
+function syncLockdownUI(status) {
+    const footer = document.querySelector('.chat-footer');
+    const messageInput = document.getElementById('messageInput');
+    const attachBtn = document.getElementById('attachBtn');
+
+    if (status === 'cancelled' || status === 'completed' || status === 'disputed') {
+        if (footer) {
+            footer.style.display = 'none';
+            if (messageInput) messageInput.disabled = true;
+            if (attachBtn) attachBtn.style.pointerEvents = 'none';
+
+            if (!document.getElementById('closedNotice')) {
+                const notice = document.createElement('div');
+                notice.id = 'closedNotice';
+                notice.className = 'chat-closed-notice';
+                notice.innerHTML = `<i class="ph-fill ph-lock"></i> Transaction ${status.toUpperCase()} — Messaging Disabled`;
+                footer.parentNode.appendChild(notice);
+            }
+        }
+    } else {
+        if (footer) footer.style.display = 'flex';
+        document.getElementById('closedNotice')?.remove();
+    }
+}
 
 
 /**
@@ -1142,11 +1162,13 @@ const { error: rpcError } = await supabase.rpc('handle_cancel_refund', {
 
 if (rpcError) throw rpcError;
 
-// Proceed with updating the conversation UI
+  // Proceed with updating the conversation UI
 await supabase.from('conversations').update({ 
+    status: 'cancelled',           // 👈 CRITICAL: This triggers the real-time lockdown
     last_message: systemText,
     updated_at: now.toISOString()
 }).eq('id', activeChatId);
+
 
 
 
