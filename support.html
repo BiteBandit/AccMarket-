@@ -59,6 +59,21 @@
     <!-- 🔹 JavaScript -->
     <script type="module" src="assets/js/support.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<script>
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(async function(OneSignal) {
+    await OneSignal.init({
+      appId: "e0c81302-9932-420b-885f-f553995f432e",
+    });
+
+    // Only show the prompt if they are on the home page
+    if (window.location.pathname === "/" || window.location.pathname === "/index.html") {
+        await OneSignal.Notifications.requestPermission();
+    }
+  });
+</script>
+
   </head>
   <body>
 <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-M9WLK8GG"

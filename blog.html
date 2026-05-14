@@ -72,6 +72,21 @@
     <script type="module" src="assets/js/blog.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<script>
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(async function(OneSignal) {
+    await OneSignal.init({
+      appId: "e0c81302-9932-420b-885f-f553995f432e",
+    });
+
+    // Only show the prompt if they are on the home page
+    if (window.location.pathname === "/" || window.location.pathname === "/index.html") {
+        await OneSignal.Notifications.requestPermission();
+    }
+  });
+</script>
+
   </head>
   <body>
 <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-M9WLK8GG"
@@ -136,54 +151,15 @@
     Stay updated with the latest posts from AccMarket.
   </p>
 
-  <!-- Add Blog Button (hidden by default) -->
-<button id="addBlogBtn" style="display:none;" class="add-blog-btn">+ Add Blog</button>
-
-  <!-- Loading spinner -->
   <div id="loading-spinner" class="loading-spinner">
     <i class="fas fa-spinner fa-spin"></i> Loading blogs...
   </div>
 
-  <!-- Blog container -->
   <div id="blog-list" class="blog-list"></div>
 
-  <!-- No posts message -->
   <p id="no-posts" class="no-posts" style="display: none;">No blogs found yet 😢</p>
 </main>
 
-<!-- Modal for full blog view -->
-<div id="blog-modal" class="modal">
-  <div class="modal-content">
-    <span class="close-modal">&times;</span>
-    <h2 id="modal-title"></h2>
-    <div id="modal-media"></div>
-    <div id="modal-content"></div>
-  </div>
-</div>
-
-
-<!-- Blog Upload Modal -->
-<div id="blogModal" class="blog-modal">
-  <div class="modal-content">
-    <span class="close">&times;</span>
-    <h3>Upload New Blog</h3>
-    <form id="blogForm">
-      <input type="text" id="blogTitle" placeholder="Blog Title" required />
-      <textarea id="blogContent" placeholder="Blog Content" required></textarea>
-      <input type="text" id="blogAuthor" placeholder="Author Name" required />
-
-      <p><strong>Image Upload or URL:</strong></p>
-      <input type="url" id="blogImage" placeholder="Paste image URL (optional)" />
-      <input type="file" id="blogImageFile" accept="image/*" />
-
-      <p><strong>Video Upload or URL:</strong></p>
-      <input type="url" id="blogVideo" placeholder="Paste video URL (optional)" />
-      <input type="file" id="blogVideoFile" accept="video/*" />
-
-      <button type="submit">Upload Blog</button>
-    </form>
-  </div>
-</div>
 
 <footer class="site-footer">
         <div class="footer-inner container">
@@ -279,7 +255,7 @@
           </div>
         </div>
       </footer>
-    </main>
+    
   </body>
   <!-- Back to Top Button -->
   <button id="backToTop" class="back-to-top" title="Go to top">↑</button>
