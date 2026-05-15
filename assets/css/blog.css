@@ -528,40 +528,7 @@ main.blog-section {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* --- Professional Video Fix --- */
 
-/* 1. Fix for the main Blog Feed Grid */
-.blog-media video {
-  width: 100%;
-  height: 200px;         /* Matches your current card height */
-  background: #000;      /* Provides a black player background */
-  object-fit: contain;   /* Ensures the whole video is visible */
-  display: block;
-  border-bottom: 1px solid #eee;
-}
-
-/* 2. Fix for the Single Article/Full Page View */
-.article-media .article-video {
-  width: 100%;
-  height: auto;          /* Allows full video height in article view */
-  max-height: 500px;     /* Prevents it from being too tall on desktop */
-  background: #000;
-  border-radius: 12px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-  margin: 20px 0;
-  display: block;
-}
-
-/* 3. Hide the 'Broken Image' icon that appears in some browsers */
-video::-webkit-media-controls-panel {
-  display: flex !important;
-  opacity: 1 !important;
-}
-
-/* Ensure images and videos don't conflict */
-.blog-media img {
-  object-fit: cover;     /* Keep cover for images to avoid white gaps */
-}
 
 .modal-author,
 .modal-date {

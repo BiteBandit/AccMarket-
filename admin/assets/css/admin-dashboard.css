@@ -622,3 +622,7 @@ hr { border: none; border-top: 1px solid #f1f5f9; margin: 15px 0; }
     background: #0b1e5b;
     color: white;
     border
+/* Force SweetAlert2 to the very top layer */
+.swal2-container {
+    z-index: 99999 !important;
+}

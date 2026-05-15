@@ -1605,7 +1605,15 @@ async function sendTelegramRaw(chatId, text) {
     });
 }
 
+
 // --- Platform News Global Logic ---
+
+/** * CSS FIX FOR Z-INDEX 
+ * Adding this snippet to ensure SweetAlert is always on top of your modal
+ */
+const style = document.createElement('style');
+style.innerHTML = `.swal2-container { z-index: 999999 !important; }`;
+document.head.appendChild(style);
 
 window.loadBlogs = async function() {
     const tbody = document.getElementById('blogTableBody');
@@ -1615,15 +1623,17 @@ window.loadBlogs = async function() {
     if (error) return console.error(error);
 
     tbody.innerHTML = blogs.map(post => {
-        // Updated check for videos to include more formats
-        const isVideo = post.image_url?.toLowerCase().match(/\.(mp4|webm|ogg|mov)$/);
+        // ✅ Detect if it's a video by checking the video_url field
+        const hasVideo = post.video_url && post.video_url.trim() !== "";
         
         return `
         <tr style="border-bottom: 1px solid #f1f5f9;">
             <td style="padding: 15px;">
-                ${isVideo ? 
-                    `<div style="width:45px; height:30px; background:#0b1e5b; border-radius:4px; display:flex; align-items:center; justify-content:center; color:white;"><i class="fa-solid fa-video"></i></div>` : 
-                    `<img src="${post.image_url}" style="width:45px; height:30px; object-fit:cover; border-radius:4px;" onerror="this.src='https://via.placeholder.com/45x30?text=Error'">`
+                ${hasVideo ? 
+                    `<div style="width:45px; height:30px; background:#0b1e5b; border-radius:4px; display:flex; align-items:center; justify-content:center; color:white;" title="Video Post">
+                        <i class="fa-solid fa-video"></i>
+                     </div>` : 
+                    `<img src="${post.image_url}" style="width:45px; height:30px; object-fit:cover; border-radius:4px;" onerror="this.src='https://via.placeholder.com/45x30?text=Empty'">`
                 }
             </td>
             <td style="padding:15px; font-weight:600; color:#1e293b;">${post.title}</td>
@@ -1631,7 +1641,7 @@ window.loadBlogs = async function() {
             <td style="padding:15px; font-size:12px;">${new Date(post.created_at).toLocaleDateString()}</td>
             <td style="padding:15px; text-align:center;">
                 <button onclick="window.editBlog('${post.id}')" style="color:#0b1e5b; background:none; border:none; cursor:pointer; margin-right:10px;"><i class="fa-solid fa-pen-to-square"></i></button>
-                <button onclick="window.deleteBlogPost('${post.id}', '${post.image_url}')" style="color:#ef4444; background:none; border:none; cursor:pointer;"><i class="fa-solid fa-trash"></i></button>
+                <button onclick="window.deleteBlogPost('${post.id}')" style="color:#ef4444; background:none; border:none; cursor:pointer;"><i class="fa-solid fa-trash"></i></button>
             </td>
         </tr>`;
     }).join('');
@@ -1642,7 +1652,7 @@ window.openBlogModal = function() {
     document.getElementById('blogTitle').value = "";
     document.getElementById('blogAuthor').value = "Admin";
     document.getElementById('blogContent').value = "";
-    document.getElementById('blogFile').value = ""; // Clear file input
+    document.getElementById('blogFile').value = "";
     document.getElementById('modalTitle').innerText = "Create News Post";
     document.getElementById('blogModal').style.display = "flex";
 };
@@ -1658,7 +1668,7 @@ window.editBlog = async function(id) {
         document.getElementById('blogTitle').value = post.title;
         document.getElementById('blogAuthor').value = post.author;
         document.getElementById('blogContent').value = post.content;
-        document.getElementById('blogFile').value = ""; // File is optional on edit
+        document.getElementById('blogFile').value = ""; 
         document.getElementById('modalTitle').innerText = "Edit News Post";
         document.getElementById('blogModal').style.display = "flex";
     }
@@ -1671,18 +1681,26 @@ window.saveBlogPost = async function() {
     const content = document.getElementById('blogContent').value;
     const file = document.getElementById('blogFile').files[0];
 
-    if (!title || !content) return Swal.fire("Required", "Title and content are missing", "error");
-    if (!id && !file) return Swal.fire("Media Required", "Please upload an image or video for new posts", "warning");
+    if (!title || !content) {
+        return Swal.fire({ icon: "error", title: "Required", text: "Title and content are missing" });
+    }
+    
+    if (!id && !file) {
+        return Swal.fire({ icon: "warning", title: "Media Required", text: "Please upload an image or video" });
+    }
 
+    // Loading State
     Swal.fire({ title: 'Processing...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
     try {
-        let image_url = null;
+        let uploadedUrl = null;
+        let isVideoFile = false;
         
-        // Handle file upload if a new file is selected
         if (file) {
-            const isVideo = file.type.includes('video') || file.name.toLowerCase().endsWith('.mp4');
-            const folder = isVideo ? 'videos' : 'images';
+            // ✅ Improved detection: Check MIME type and extension
+            isVideoFile = file.type.startsWith('video/') || file.name.toLowerCase().match(/\.(mp4|webm|ogg|mov)$/);
+            
+            const folder = isVideoFile ? 'videos' : 'images';
             const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
             const path = `${folder}/${fileName}`;
 
@@ -1690,11 +1708,21 @@ window.saveBlogPost = async function() {
             if (uploadError) throw uploadError;
 
             const { data: urlData } = supabase.storage.from('blog-media').getPublicUrl(path);
-            image_url = urlData.publicUrl;
+            uploadedUrl = urlData.publicUrl;
         }
 
         const payload = { title, author, content };
-        if (image_url) payload.image_url = image_url;
+        
+        // ✅ Media Mapping: Save to the correct DB column
+        if (uploadedUrl) {
+            if (isVideoFile) {
+                payload.video_url = uploadedUrl;
+                payload.image_url = ""; // Clear image link if we upload a video
+            } else {
+                payload.image_url = uploadedUrl;
+                payload.video_url = ""; // Clear video link if we upload an image
+            }
+        }
 
         const { error: dbError } = id 
             ? await supabase.from('blogs').update(payload).eq('id', id)
@@ -1702,17 +1730,18 @@ window.saveBlogPost = async function() {
 
         if (dbError) throw dbError;
 
-        Swal.fire("Success", "Platform News updated!", "success");
+        // ✅ Success logic: Close modal before showing success alert
         window.closeBlogModal();
+        Swal.fire({ icon: "success", title: "Success", text: "News post saved!" });
         window.loadBlogs();
 
     } catch (err) {
         console.error(err);
-        Swal.fire("Error", err.message || "Failed to save post", "error");
+        Swal.fire({ icon: "error", title: "Error", text: err.message || "Failed to save post" });
     }
 };
 
-window.deleteBlogPost = async function(id, url) {
+window.deleteBlogPost = async function(id) {
     const { isConfirmed } = await Swal.fire({
         title: 'Delete Post?',
         text: "This action cannot be undone.",
@@ -1723,14 +1752,12 @@ window.deleteBlogPost = async function(id, url) {
     });
 
     if (isConfirmed) {
-        // 1. Delete from DB
         const { error } = await supabase.from('blogs').delete().eq('id', id);
-        
-        // 2. Optional: Add storage cleanup logic here if desired
-        
         if (!error) {
-            Swal.fire("Deleted", "The post has been removed.", "success");
+            Swal.fire("Deleted", "Post removed.", "success");
             window.loadBlogs();
+        } else {
+            Swal.fire("Error", "Could not delete post", "error");
         }
     }
 };
