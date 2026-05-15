@@ -622,7 +622,50 @@ hr { border: none; border-top: 1px solid #f1f5f9; margin: 15px 0; }
     background: #0b1e5b;
     color: white;
     border
-/* Force SweetAlert2 to the very top layer */
-.swal2-container {
-    z-index: 99999 !important;
+/* Custom Action Button Styling */
+.action-btn-group {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
 }
+
+.listing-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%; /* Circular buttons */
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: #f8fafc; /* Subtle light background */
+    font-size: 14px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+/* Individual Button Hover Effects */
+.btn-review { color: #0b1e5b; }
+.btn-review:hover { background: #0b1e5b; color: white; transform: translateY(-2px); }
+
+.btn-approve { color: #10b981; }
+.btn-approve:hover { background: #10b981; color: white; transform: translateY(-2px); }
+
+.btn-reject { color: #ef4444; }
+.btn-reject:hover { background: #ef4444; color: white; transform: translateY(-2px); }
+
+/* Link icon button */
+.link-icon-btn {
+    padding: 6px 12px;
+    background: #f1f5f9;
+    color: #2563eb;
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 600;
+    transition: 0.2s;
+}
+.link-icon-btn:hover { background: #2563eb; color: white; }
+
+
+

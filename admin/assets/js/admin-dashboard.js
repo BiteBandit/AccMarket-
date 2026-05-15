@@ -68,29 +68,31 @@ navItems.forEach(item => {
             targetSection.style.display = 'block';
         }
 
-        // 5. Route Data Loading
-        if (section === 'users') {
-            loadUserDirectory();
-        } else if (section === 'kyc') {
-            loadPaidKYC();
-        } else if (section === 'banned') {
-            loadRestrictedUsers();
-        } else if (section === 'verification') {
-            loadAccountAudits(); 
-        } else if (section === 'conversations') {
-            loadCommunicationLogs();
-        } else if (section === 'withdrawals') {
-            loadWithdrawalRequests();
-        } else if (section === 'transactions') {
-            loadLedgerReports();
-        } else if (section === 'broadcast') {
-            if (typeof toggleTargetFields === 'function') toggleTargetFields();
-        } else if (section === 'blog') {
-            // Trigger the robust loadBlogs function
-            if (typeof loadBlogs === 'function') {
-                loadBlogs();
-            }
-        }
+// 5. Route Data Loading
+if (section === 'users') {
+    loadUserDirectory();
+} else if (section === 'kyc') {
+    loadPaidKYC();
+} else if (section === 'banned') {
+    loadRestrictedUsers();
+} else if (section === 'verification') {
+    loadAccountAudits(); 
+} else if (section === 'conversations') {
+    loadCommunicationLogs();
+} else if (section === 'withdrawals') {
+    loadWithdrawalRequests();
+} else if (section === 'transactions') {
+    loadLedgerReports();
+} else if (section === 'listings') {
+    // ✅ Marketplace Listing Requests (verifications table)
+    window.loadListingRequests(); 
+} else if (section === 'broadcast') {
+    if (typeof toggleTargetFields === 'function') toggleTargetFields();
+} else if (section === 'blog') {
+    if (typeof loadBlogs === 'function') loadBlogs();
+}
+
+ 
 
         // 6. Close Sidebar (For Mobile Users)
         if (typeof sidebar !== 'undefined' && sidebar.classList.contains('active')) {
@@ -1760,6 +1762,157 @@ window.deleteBlogPost = async function(id) {
             Swal.fire("Error", "Could not delete post", "error");
         }
     }
+};
+
+
+// --- Listing Moderation Logic ---
+
+// ✅ 1. Load ONLY Pending Listings
+window.loadListingRequests = async function() {
+    const tbody = document.getElementById('listingsTableBody');
+    if (!tbody) return;
+    
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:30px; color:#64748b;">
+        <i class="fas fa-spinner fa-spin"></i> Loading pending requests...</td></tr>`;
+
+    const { data: listings, error } = await supabase
+        .from('verifications')
+        .select('*')
+        .eq('status', 'pending')
+        .order('submitted_at', { ascending: false });
+
+    if (error) {
+        tbody.innerHTML = `<tr><td colspan="6" style="color:#ef4444; text-align:center;">Error: ${error.message}</td></tr>`;
+        return;
+    }
+
+    if (listings.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:50px; color:#64748b;">
+            <i class="fa-solid fa-check-circle" style="font-size:30px; color:#10b981; display:block; margin-bottom:10px;"></i>
+            No pending listing requests.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = "";
+    listings.forEach(item => {
+        const details = typeof item.data === 'string' ? JSON.parse(item.data) : item.data;
+        const row = document.createElement('tr');
+        row.style.borderBottom = "1px solid #f1f5f9";
+        
+  row.innerHTML = `
+    <td style="padding:15px;">
+        <div style="width:75px; height:50px; border-radius:8px; overflow:hidden; border:1px solid #e2e8f0; background:#000; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <img src="${item.screenshot_url}" style="width:100%; height:100%; object-fit:contain; cursor:pointer;" 
+                 onclick="window.open('${item.screenshot_url}')" title="View Full Proof">
+        </div>
+    </td>
+    <td style="padding:15px; font-weight:700; color:#1e293b;">${details.platform?.toUpperCase() || 'N/A'}</td>
+    <td style="padding:15px; font-weight:700; color:#059669;">₦${Number(details.price).toLocaleString()}</td>
+    <td style="padding:15px;">
+        <a href="${details.profile_link}" target="_blank" class="link-icon-btn">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i> Visit Profile
+        </a>
+    </td>
+    <td style="padding:15px;"><span class="badge bg-warning" style="padding:5px 10px; border-radius:5px;">PENDING</span></td>
+    <td style="padding:15px; text-align: right;">
+        <div class="action-btn-group">
+            <button onclick="window.viewAndEditListing('${item.id}')" class="listing-btn btn-review" title="Review Details">
+                <i class="fa-solid fa-magnifying-glass"></i>
+            </button>
+            <button onclick="window.processListing('${item.id}', 'approved')" class="listing-btn btn-approve" title="Approve Listing">
+                <i class="fa-solid fa-check"></i>
+            </button>
+            <button onclick="window.processListing('${item.id}', 'rejected')" class="listing-btn btn-reject" title="Reject Listing">
+                <i class="fa-solid fa-trash-can"></i>
+            </button>
+        </div>
+    </td>
+`;
+
+        tbody.appendChild(row);
+    });
+};
+
+// ✅ 2. Open Real Modal (Editable: Region, Account Age, Description)
+window.viewAndEditListing = async function(id) {
+    const modal = document.getElementById('listingReviewModal');
+    const modalBody = document.getElementById('modalBody');
+    const saveBtn = document.getElementById('saveDetailsBtn');
+    
+    modal.style.display = 'block';
+    modalBody.innerHTML = '<p>Loading details...</p>';
+
+    const { data: item } = await supabase.from('verifications').select('*').eq('id', id).single();
+    if (!item) return;
+
+    const details = typeof item.data === 'string' ? JSON.parse(item.data) : item.data;
+    const editableFields = ['region', 'account_age', 'description'];
+
+    modalBody.innerHTML = "";
+    Object.entries(details).forEach(([key, value]) => {
+        const isEditable = editableFields.includes(key);
+        const container = document.createElement('div');
+        container.style.marginBottom = "15px";
+        
+        container.innerHTML = `
+            <label style="display:block; font-size:11px; font-weight:800; color:#64748b; margin-bottom:5px; text-transform:uppercase;">
+                ${key.replace(/_/g, ' ')} ${isEditable ? '<span style="color:#2563eb;">(Editable)</span>' : '🔒'}
+            </label>
+            ${isEditable ? 
+                `<input type="text" id="modal_edit_${key}" value="${value}" style="width:100%; padding:10px; border:2px solid #0b1e5b; border-radius:8px; box-sizing:border-box;">` :
+                `<div style="padding:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; font-size:14px; color:#64748b;">${value}</div>`
+            }
+        `;
+        modalBody.appendChild(container);
+    });
+
+    saveBtn.onclick = () => window.saveListingChanges(id, details);
+};
+
+// ✅ 3. Save Changes & Close Modal
+window.saveListingChanges = async function(id, originalData) {
+    const updatedData = { ...originalData };
+    const editableFields = ['region', 'account_age', 'description'];
+
+    editableFields.forEach(key => {
+        const input = document.getElementById(`modal_edit_${key}`);
+        if (input) updatedData[key] = input.value;
+    });
+
+    const { error } = await supabase.from('verifications').update({ data: updatedData }).eq('id', id);
+
+    if (!error) {
+        Swal.fire({ icon: 'success', title: 'Data Updated', timer: 1000, showConfirmButton: false });
+        window.closeReviewModal();
+        window.loadListingRequests();
+    }
+};
+
+// ✅ 4. Process Status (Sync Status Column + Status in JSON)
+window.processListing = async function(id, newStatus) {
+    const { data: item } = await supabase.from('verifications').select('data').eq('id', id).single();
+    const dataObj = typeof item.data === 'string' ? JSON.parse(item.data) : item.data;
+
+    // Update status string inside the JSON data
+    dataObj.status = newStatus;
+
+    const { error } = await supabase
+        .from('verifications')
+        .update({ 
+            status: newStatus, // Column
+            data: dataObj,      // JSON
+            verified_at: new Date().toISOString() 
+        })
+        .eq('id', id);
+
+    if (!error) {
+        Swal.fire({ icon: 'success', title: `Listing ${newStatus}`, timer: 1000, showConfirmButton: false });
+        window.loadListingRequests();
+    }
+};
+
+window.closeReviewModal = function() {
+    document.getElementById('listingReviewModal').style.display = 'none';
 };
 
 
