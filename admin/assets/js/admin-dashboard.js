@@ -2631,29 +2631,28 @@ window.sendAdminMessage = async function(disputeId, conversationId) {
         .eq('id', conversationId)
         .maybeSingle();
 
-// 🌟 Fetch the current logged-in Admin's user profile data dynamically from the database
-let adminUsername = "An administrator";
-try {
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    if (authUser) {
-        // Query your custom 'profiles' table using the logged-in admin's ID
-        const { data: adminProfile } = await supabase
-            .from('profiles')
-            .select('username')
-            .eq('id', authUser.id)
-            .maybeSingle();
+    // 🌟 Fetch the current logged-in Admin's user profile data dynamically from the database
+    let adminUsername = "An administrator";
+    try {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (authUser) {
+            // Query your custom 'profiles' table using the logged-in admin's ID
+            const { data: adminProfile } = await supabase
+                .from('profiles')
+                .select('username')
+                .eq('id', authUser.id)
+                .maybeSingle();
 
-        // Check our new database query first, then fall back to metadata or email
-        adminUsername = adminProfile?.username || 
-                        authUser.user_metadata?.username || 
-                        authUser.user_metadata?.full_name || 
-                        authUser.email?.split('@')[0] || 
-                        "An administrator";
+            // Check our new database query first, then fall back to metadata or email
+            adminUsername = adminProfile?.username || 
+                            authUser.user_metadata?.username || 
+                            authUser.user_metadata?.full_name || 
+                            authUser.email?.split('@')[0] || 
+                            "An administrator";
+        }
+    } catch (authErr) {
+        console.error("❌ Failed to parse admin user profile context:", authErr);
     }
-} catch (authErr) {
-    console.error("❌ Failed to parse admin user profile context:", authErr);
-}
- 
 
     // 3. Inject system notification message if conversation status is currently disputed
     if (currentConv && currentConv.status === 'disputed') {
@@ -2683,7 +2682,7 @@ try {
         return;
     }
 
-    // ====== START OF NOTIFICATION & TELEGRAM INJECTION SNIPPET ======
+    // ====== START OF NOTIFICATION & TELEGRAM & ONESIGNAL INJECTION SNIPPET ======
     try {
         // 1. Fetch the conversation data to grab the buyer and seller UUIDs
         const { data: convInfo } = await supabase
@@ -2695,7 +2694,7 @@ try {
         // 💡 ONLY execute if the conversation status is currently marked as 'disputed'
         if (convInfo && convInfo.status === 'disputed') {
             const notificationTitle = `⚖️ Dispute Update: ${convInfo.product_name}`;
-            const notificationBody = `${adminUsername} has joined the conversation session.`;
+            const notificationBody = `Admin ${adminUsername} has joined the conversation session.`;
             
             const notificationInserts = [];
             const targetUserIds = [];
@@ -2734,22 +2733,36 @@ try {
                 if (notifError) console.error("❌ Notification table insert error:", notifError);
             }
 
-            // --- PART B: Telegram Routing Engine ---
+            // --- PART B: Multi-Channel Routing Engine (Telegram & OneSignal) ---
             if (targetUserIds.length > 0) {
-                // 2. Query the profiles table using the gathered IDs
+                // 2. Query profiles for both Telegram chat IDs and OneSignal IDs
                 const { data: userProfiles, error: profileError } = await supabase
                     .from('profiles')
-                    .select('id, telegram_chat_id')
+                    .select('id, telegram_chat_id, onesignal_id')
                     .in('id', targetUserIds);
 
                 if (!profileError && userProfiles && userProfiles.length > 0) {
+                    
+                    // 📲 1️⃣ Telegram Dispatches
                     const TELEGRAM_BOT_TOKEN = "8436841265:AAHIh50C2bEamKqB649Dx_CRy7l8X6f2yqg"; 
                     const telegramApiUrl = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-                    
-                    const telegramMessageText = `*⚖️ Dispute Update: ${convInfo.product_name}*\n\n${adminUsername} has joined the conversation session.\n\n🔗 [Click here to join the chat](https://www.accmarket.name.ng/chats?id=${conversationId})`;
+                    const telegramMessageText = `*⚖️ Dispute Update: ${convInfo.product_name}*\n\nAdmin ${adminUsername} has joined the conversation session.\n\n🔗 [Click here to join the chat](https://www.accmarket.name.ng/chats?id=${conversationId})`;
 
-                    // 3. Loop over retrieved profiles and fire async HTTP requests to Telegram API endpoints
+                    // 🔔 2️⃣ OneSignal Credentials Setup
+                    const ONESIGNAL_APP_ID = "e0c81302-9932-420b-885f-f553995f432e";
+                    // ⚠️ REPLACE THIS with your secure OneSignal REST API Key from your OneSignal Dashboard Settings
+                    const ONESIGNAL_REST_API_KEY = "os_v2_app_4debgauzgjbaxcc76vjzsx2dfyaiwdjwqkmui6ex4ogyrp3rigtzhvqtewcjn7vus2o3ptpabahb3mbkybycayx4umx6aur3kqi5gha"; 
+                    
+                    const oneSignalDeviceIds = [];
+
+                    // Loop over retrieved profiles to route messages
                     userProfiles.forEach(async (profile) => {
+                        // Gather valid OneSignal user tokens
+                        if (profile.onesignal_id) {
+                            oneSignalDeviceIds.push(profile.onesignal_id);
+                        }
+
+                        // Fire Async HTTP requests to Telegram API endpoints
                         if (profile.telegram_chat_id) {
                             try {
                                 await fetch(telegramApiUrl, {
@@ -2766,15 +2779,39 @@ try {
                             }
                         }
                     });
+
+                    // 💥 3️⃣ Fire OneSignal HTTP Push Notification Request
+                    if (oneSignalDeviceIds.length > 0) {
+                        try {
+                            await fetch("https://onesignal.com/api/v1/notifications", {
+                                method: "POST",
+                                headers: {
+                                    "Content-Type": "application/json; charset=utf-8",
+                                    "Authorization": `Basic ${ONESIGNAL_REST_API_KEY}`
+                                },
+                                body: JSON.stringify({
+                                    app_id: ONESIGNAL_APP_ID,
+                                    include_subscription_ids: oneSignalDeviceIds, 
+                                    headings: { "en": notificationTitle },
+                                    contents: { "en": notificationBody },
+                                    url: `https://www.accmarket.name.ng/chats?id=${conversationId}`
+                                })
+                            });
+                            console.log(`✅ OneSignal push notification payload dispatched to ${oneSignalDeviceIds.length} users.`);
+                        } catch (pushErr) {
+                            console.error("❌ OneSignal Push Delivery pipeline failure:", pushErr);
+                        }
+                    }
+
                 } else if (profileError) {
-                    console.error("❌ Error fetching profiles for Telegram distribution:", profileError);
+                    console.error("❌ Error fetching profiles for distribution:", profileError);
                 }
             }
         }
     } catch (err) {
         console.error("❌ Unexpected notification system failure:", err);
     }
-    // ====== END OF NOTIFICATION & TELEGRAM INJECTION SNIPPET ======
+    // ====== END OF NOTIFICATION & TELEGRAM & ONESIGNAL INJECTION SNIPPET ======
 
     // 5. Update parent conversations lifecycle schema states
     const { error: updateError } = await supabase
@@ -2792,6 +2829,7 @@ try {
         inputField.value = ""; 
     }
 };
+
 
 
 // ✅ 3. Settle Dispute Database Records
