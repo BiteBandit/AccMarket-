@@ -184,6 +184,15 @@
     </header>
 
     <div id="filterBar" class="filter-bar">
+        <div class="filter-group following-filter-wrapper" style="border-bottom: 1px solid var(--border, #eee); padding-bottom: 12px; margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                <label for="followingOnlyToggle" style="font-size: 0.85rem; font-weight: 700; color: var(--text-color, #333); cursor: pointer; user-select: none; display: flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-user-check" style="color: var(--primary, #007bff); font-size: 0.85rem;"></i> Sellers I Follow
+                </label>
+                <input type="checkbox" id="followingOnlyToggle" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary, #007bff);">
+            </div>
+        </div>
+
         <div class="filter-group">
             <div class="filter-label-row">
                 <label>Max Price</label>
@@ -208,7 +217,7 @@
             <input type="range" id="yearRange" class="filter-slider" min="1999" max="2026" step="1" value="1999">
         </div>
     </div>
-   
+
 
         <div class="search-area">
             <div class="search-box">

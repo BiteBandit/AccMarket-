@@ -7,17 +7,17 @@ const closeLeft = document.getElementById("closeLeft");
 const closeRight = document.getElementById("closeRight");
 
 // Toggle Left Sidebar
-sidebarToggle?.addEventListener("click", () => leftSidebar.classList.add("active"));
-closeLeft?.addEventListener("click", () => leftSidebar.classList.remove("active"));
+sidebarToggle?.addEventListener("click", () => leftSidebar?.classList.add("active"));
+closeLeft?.addEventListener("click", () => leftSidebar?.classList.remove("active"));
 
 // Toggle Right Sidebar
-profileToggle?.addEventListener("click", () => rightSidebar.classList.add("active"));
-closeRight?.addEventListener("click", () => rightSidebar.classList.remove("active"));
+profileToggle?.addEventListener("click", () => rightSidebar?.classList.add("active"));
+closeRight?.addEventListener("click", () => rightSidebar?.classList.remove("active"));
 
 // ✅ Global State for Filtering/Sorting
 let activeAccounts = [];
 
-// --- UPDATED FILTER LOGIC (BYBIT STYLE) ---
+// --- UPDATED FIXED FILTER LOGIC (100% REAL-TIME REACTIVE FIX) ---
 const filterBtn = document.querySelector(".fa-sliders");
 const filterBar = document.getElementById("filterBar");
 
@@ -25,38 +25,92 @@ filterBtn?.addEventListener("click", () => {
     filterBar?.classList.toggle("active");
 });
 
-const applyFilters = () => {
-    const maxPrice = parseFloat(document.getElementById('priceRange')?.value) || 100000;
-    const minFollowers = parseInt(document.getElementById('followerRange')?.value) || 0;
-    const minYear = parseInt(document.getElementById('yearRange')?.value) || 1999;
-    const searchTerm = document.getElementById('assetSearch')?.value.toLowerCase() || "";
+// Cache structures that populate synchronously during execution loops
+let cachedCurrentUserId = null;
+let cachedMyFollowingList = [];
 
-    // Update UI Labels
-    if(document.getElementById('priceVal')) document.getElementById('priceVal').textContent = `₦${maxPrice.toLocaleString()}`;
-    if(document.getElementById('followerVal')) document.getElementById('followerVal').textContent = `${minFollowers.toLocaleString()}+`;
-    if(document.getElementById('yearVal')) document.getElementById('yearVal').textContent = `${minYear}+`;
+const applyFilters = async () => {
+    // 🟢 STEP 1: Always load user ID & following array asynchronously inline to prevent race states
+    try {
+        if (!cachedCurrentUserId) {
+            const { data: authData } = await supabase.auth.getUser();
+            cachedCurrentUserId = authData?.user ? authData.user.id : null;
+        }
+        
+        if (cachedCurrentUserId && window.currentGlobalProfiles) {
+            const myProfileData = window.currentGlobalProfiles.find(p => p.id === cachedCurrentUserId);
+            cachedMyFollowingList = myProfileData?.following?.uids || [];
+        }
+    } catch (e) {
+        console.error("Auth routing sync warning:", e);
+    }
 
+    // 🟢 STEP 2: Instantly parse the slider values
+    const maxPrice = document.getElementById('priceRange') ? parseFloat(document.getElementById('priceRange').value) : 100000;
+    const minFollowers = document.getElementById('followerRange') ? parseInt(document.getElementById('followerRange').value) : 0;
+    const minYear = document.getElementById('yearRange') ? parseInt(document.getElementById('yearRange').value) : 1999;
+    const searchTerm = document.getElementById('assetSearch') ? document.getElementById('assetSearch').value.toLowerCase() : "";
+    const followingOnlyChecked = document.getElementById('followingOnlyToggle')?.checked || false;
+
+    // Update Text Value UI Labels
+    if(document.getElementById('priceVal') && document.getElementById('priceRange')) {
+        document.getElementById('priceVal').textContent = `₦${parseFloat(document.getElementById('priceRange').value).toLocaleString()}`;
+    }
+    if(document.getElementById('followerVal') && document.getElementById('followerRange')) {
+        document.getElementById('followerVal').textContent = `${parseInt(document.getElementById('followerRange').value).toLocaleString()}+`;
+    }
+    if(document.getElementById('yearVal') && document.getElementById('yearRange')) {
+        document.getElementById('yearVal').textContent = `${document.getElementById('yearRange').value}+`;
+    }
+
+    // 🟢 STEP 3: Pure functional filter that leaves activeAccounts unaltered so it safely scales back out
     const filtered = activeAccounts.filter(row => {
+        if (row.status !== 'approved') return false;
+
         const meta = row.data;
-        const price = parseFloat(meta.price) || 0;
-        const followers = parseInt(meta.followers) || 0;
-        const year = parseInt(String(meta.account_age).match(/\d{4}/)?.[0]) || 0;
+        if (!meta) return false;
+        
+        // Handle variations in pricing fields (like idx 4 missing price)
+        const price = meta.price !== undefined ? parseFloat(meta.price) : 0;
+        
+        // Sanitize string metrics containing 'k', 'm', or 'b' values safely
+        let followersRaw = String(meta.followers || "0").toLowerCase();
+        if (followersRaw.includes('b')) followersRaw = parseFloat(followersRaw) * 1000000000;
+        else if (followersRaw.includes('m')) followersRaw = parseFloat(followersRaw) * 1000000;
+        else if (followersRaw.includes('k')) followersRaw = parseFloat(followersRaw) * 1000;
+        const followers = parseInt(followersRaw) || 0;
 
-        const matchesSearch = meta.username.toLowerCase().includes(searchTerm) || meta.region.toLowerCase().includes(searchTerm);
-        const matchesPrice = price <= maxPrice;
+        const year = parseInt(String(meta.account_age || "").match(/\d{4}/)?.[0]) || 0;
+
+        const usernameStr = String(meta.username || "").toLowerCase();
+        const regionStr = String(meta.region || "").toLowerCase();
+
+        // Structural matching boundaries
+        const matchesSearch = usernameStr.includes(searchTerm) || regionStr.includes(searchTerm);
+        const matchesPrice = price === 0 || price <= maxPrice;
         const matchesFollowers = followers >= minFollowers;
-        const matchesYear = year >= minYear;
+        const matchesYear = year === 0 || year >= minYear;
+        
+        // Relational profile switch checklist
+        const matchesFollowingFilter = !followingOnlyChecked || cachedMyFollowingList.includes(row.user_id);
 
-        return matchesSearch && matchesPrice && matchesFollowers && matchesYear;
+        return matchesSearch && matchesPrice && matchesFollowers && matchesYear && matchesFollowingFilter;
     });
 
+    // Re-render layout grid dynamically
     renderGrid(filtered);
 };
 
-// Listen for slider/search input
-document.addEventListener('input', (e) => {
+// 🟢 FIX LISTENERS: Fire async handler instantly on adjustments
+document.addEventListener('input', async (e) => {
     if (e.target.classList.contains('filter-slider') || e.target.id === 'assetSearch') {
-        applyFilters();
+        await applyFilters();
+    }
+});
+
+document.addEventListener('change', async (e) => {
+    if (e.target.id === 'followingOnlyToggle') {
+        await applyFilters();
     }
 });
 // --- END UPDATED FILTER LOGIC ---
@@ -69,8 +123,17 @@ document.addEventListener("DOMContentLoaded", () => {
     sidebarSearch?.addEventListener("keyup", () => {
         let input = sidebarSearch.value.toLowerCase().trim();
         categoryItems.forEach((item) => {
-            item.parentElement.style.display = item.textContent.toLowerCase().includes(input) ? "block" : "none";
+            if (item.parentElement) {
+                item.parentElement.style.display = item.textContent.toLowerCase().includes(input) ? "block" : "none";
+            }
         });
+    });
+
+    // Wire up quick access logout action if available
+    document.querySelector('.logout')?.addEventListener('click', async (e) => {
+        e.preventDefault();
+        await supabase.auth.signOut();
+        window.location.href = '../login.html';
     });
 });
 
@@ -83,38 +146,14 @@ async function getCurrentUser() {
     if (error || !user) return null;
 
     const userNameDisplay = document.querySelector('.user-name');
-    if (userNameDisplay && user.user_metadata.full_name) {
+    if (userNameDisplay && user.user_metadata?.full_name) {
         userNameDisplay.textContent = user.user_metadata.full_name;
     }
     return user;
 }
 
-// 1. Helper for Trust Badges
-const getTrustInfo = (row) => {
-    const score = parseFloat(row.profiles?.trust_score) || 0;
-    
-    // Level 5: 95+ (The Highest Honor)
-    if (score >= 95) return { 
-        label: "LEGENDARY", 
-        class: "trust-meta" 
-    };
-    
-    // Level 4: 80-94
-    if (score >= 80) return { label: "ELITE", class: "trust-high" };
-    
-    // Level 3: 60-79
-    if (score >= 60) return { label: "PRO SELLER", class: "trust-pro" };
-    
-    // Level 2: 30-59
-    if (score >= 30) return { label: "RISING", class: "trust-mid" };
-    
-    // Level 1: 0-29
-    return { label: "NEW SELLER", class: "trust-low" };
-};
 
-
-// 2. Main Fetch Function
-// 2. Main Fetch Function (Refined for Deep-Linking vs Grid Visibility)
+// 2. Main Fetch Function (REAL-TIME COMPATIBLE FIX)
 async function fetchFacebookInventory() {
     try {
         const urlParams = new URLSearchParams(window.location.search);
@@ -122,7 +161,6 @@ async function fetchFacebookInventory() {
 
         let query = supabase.from('verifications').select('*');
 
-        // Fetch approved items OR the specific ID from the URL
         if (targetId) {
             query = query.or(`status.eq.approved,id.eq.${targetId}`);
         } else {
@@ -132,30 +170,48 @@ async function fetchFacebookInventory() {
         const { data: inventory, error: invError } = await query;
         if (invError) throw invError;
 
+        // Get all unique user IDs from listings PLUS the current logged-in user ID
+        const { data: { user } } = await supabase.auth.getUser();
+        const currentUserId = user ? user.id : null;
+        
         const userIds = [...new Set(inventory.map(row => row.user_id))];
+        if (currentUserId && !userIds.includes(currentUserId)) {
+            userIds.push(currentUserId);
+        }
+
+        // Fetch profile data including the 'following' and 'followers' JSON arrays
         const { data: profileList } = await supabase
             .from('profiles')
-            .select('id, trust_score')
+            .select('id, username, full_name, following, followers')
             .in('id', userIds);
 
+        // 🟢 FIXED: Small 'w' on window to avoid undefined profile lookup race conditions
+        window.currentGlobalProfiles = profileList;
+
         activeAccounts = inventory.map(row => {
-            const meta = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+            // Safe JSON Parsing fallback to prevent broken account drops
+            let meta = row.data;
+            if (typeof meta === 'string') {
+                try {
+                    meta = JSON.parse(meta);
+                } catch(e) {
+                    meta = {};
+                }
+            }
             const userProfile = profileList?.find(p => p.id === row.user_id);
             return {
                 ...row,
                 data: meta,
-                profiles: userProfile || { trust_score: "0" }
+                profiles: userProfile || { username: "anonymous", full_name: "Anonymous Seller" }
             };
         }).filter(row => {
-            // Check if it's a Facebook account
-            return row.data && row.data.platform?.toLowerCase() === 'facebook';
+            // Keeps items even if platform text has varying string formatting
+            const platform = row.data?.platform?.toLowerCase();
+            return !platform || platform === 'facebook';
         });
 
-        // ✅ THE FIX: Separate the data used for the Modal from the data used for the Grid
-        // We only want to show 'approved' accounts in the marketplace cards
-        const gridAccounts = activeAccounts.filter(row => row.status === 'approved');
-        
-        renderGrid(gridAccounts);
+        // 🟢 FIXED: Route initial load & real-time refreshes through filters instead of hard-rendering!
+        await applyFilters();
 
     } catch (err) {
         console.error("Master Fetch Error:", err.message);
@@ -164,12 +220,14 @@ async function fetchFacebookInventory() {
 
 
 
-// 3. Render Function (Updated to handle self-purchase protection)
+
+
+// 3. Render Function (Updated to show Seller Username instead of numerical Trust badges)
 async function renderGrid(accounts) {
     const grid = document.getElementById('inventoryGrid');
     if (!grid) return;
 
-    // Fetch the current user to check for ownership
+    // Fetch the current user to check for ownership and follow state
     const { data: { user } } = await supabase.auth.getUser();
     const currentUserId = user ? user.id : null;
 
@@ -178,9 +236,19 @@ async function renderGrid(accounts) {
         return;
     }
 
+    // Find the logged-in user's profile details from the global window data we just saved
+    const myProfileData = window.currentGlobalProfiles?.find(p => p.id === currentUserId);
+    const myFollowingList = myProfileData?.following?.uids || [];
+
+    // 🟢 OPTIONAL: Automatically prioritize profiles you follow by floating them to top
+    accounts.sort((a, b) => {
+        const aFollowed = myFollowingList.includes(a.user_id) ? 1 : 0;
+        const bFollowed = myFollowingList.includes(b.user_id) ? 1 : 0;
+        return bFollowed - aFollowed;
+    });
+
     grid.innerHTML = accounts.map(row => {
         const meta = row.data; 
-        const trust = getTrustInfo(row);
 
         const rawAge = String(meta.account_age || "");
         const yearMatch = rawAge.match(/\d{4}/); 
@@ -189,6 +257,12 @@ async function renderGrid(accounts) {
         // Check if the current user is the seller of this specific account
         const isOwner = row.user_id === currentUserId;
 
+        // RESOLVE SELLER IDENTITY FROM ATTACHED PROFILE SYSTEM 
+        const sellerUsername = row.profiles?.username || row.profiles?.full_name || `User_${String(row.user_id).slice(0, 5)}`;
+
+        // FIXED: Check against YOUR following array, not the seller's profile list
+        const isFollowing = myFollowingList.includes(row.user_id);
+
         return `
             <div class="card">
                 <div class="options-menu">
@@ -196,12 +270,23 @@ async function renderGrid(accounts) {
                         <i class="fa-solid fa-ellipsis-vertical"></i>
                     </button>
                     <div class="dropdown-content" id="dropdown-${row.id}">
-                        <button onclick="window.open('${meta.profile_link}', '_blank')"><i class="fa-solid fa-eye"></i> View Live</button>
-                        <button onclick="copyToClipboard('${row.id}')"><i class="fa-solid fa-copy"></i> Copy ID</button>
+                        <button onclick="window.open('${meta.profile_link || '#'}', '_blank')">
+                            <i class="fa-solid fa-eye"></i> View Live
+                        </button>
+                        <button onclick="copyMarketplaceUrl(event, '${row.id}')">
+                            <i class="fa-solid fa-link"></i> Copy URL
+                        </button>
+                        
+                        <button onclick="toggleFollowSeller(event, '${row.user_id}', '${sellerUsername}')">
+                            <i class="${isFollowing ? 'fa-solid fa-user-minus' : 'fa-solid fa-user-plus'}"></i> 
+                            ${isFollowing ? 'Unfollow Seller' : 'Follow Seller'}
+                        </button>
                     </div>
                 </div>
-                
-                <div class="card-tag ${trust.class}">${trust.label}</div>
+
+                <div class="card-tag seller-username-tag">
+                    <i class="fa-regular fa-user" style="font-size: 0.7rem;"></i> @${sellerUsername}
+                </div>
                 
                 <div class="card-img">
                     <img src="https://accmarket.name.ng/images/facebook.png" alt="FB">
@@ -217,13 +302,13 @@ async function renderGrid(accounts) {
                     <span class="price">₦${parseFloat(meta.price || 0).toLocaleString()}</span>
                 </div>
                 
- <div class="card-action-container">
-        <button class="btn purchase-btn ${isOwner ? 'owner-btn' : ''}" 
-                onclick="${isOwner ? '' : `initiatePurchase('${row.id}')`}"
-                ${isOwner ? 'disabled' : ''}>
-            ${isOwner ? 'YOUR LISTING' : 'PURCHASE'}
-        </button>
-    </div>
+                <div class="card-action-container">
+                    <button class="btn purchase-btn ${isOwner ? 'owner-btn' : ''}" 
+                            onclick="${isOwner ? '' : `initiatePurchase('${row.id}')`}"
+                            ${isOwner ? 'disabled' : ''}>
+                        ${isOwner ? 'YOUR LISTING' : 'PURCHASE'}
+                    </button>
+                </div>
             </div>
         `;
     }).join('');
@@ -231,9 +316,8 @@ async function renderGrid(accounts) {
 
 
 
-
-// Main Marketplace Search
-document.getElementById('assetSearch')?.addEventListener('input', (e) => {
+// Main Marketplace Search Input Route Binding
+document.getElementById('assetSearch')?.addEventListener('input', () => {
     applyFilters();
 });
 
@@ -255,10 +339,10 @@ window.openDetails = async (id) => {
     const displayYear = yearMatch ? yearMatch[0] : rawAge;
     
     body.innerHTML = `
-        <img src="${acc.screenshot_url}" style="width:100%; border-radius:12px; margin-bottom:15px; border:1px solid var(--border);">
-        <div class="detail-item"><span class="detail-label">Username</span><span class="detail-value">@${meta.username}</span></div>
+        <img src="${acc.screenshot_url || 'https://accmarket.name.ng/images/facebook.png'}" style="width:100%; border-radius:12px; margin-bottom:15px; border:1px solid var(--border);">
+        <div class="detail-item"><span class="detail-label">Username</span><span class="detail-value">@${meta.username || 'Unknown'}</span></div>
         <div class="detail-item"><span class="detail-label">Verification Code</span><span class="detail-value" style="color:var(--primary); font-weight:bold;">${meta.verification_code || 'N/A'}</span></div>
-        <div class="detail-item"><span class="detail-label">Region</span><span class="detail-value">${meta.region}</span></div>
+        <div class="detail-item"><span class="detail-label">Region</span><span class="detail-value">${meta.region || 'N/A'}</span></div>
         <div class="detail-item"><span class="detail-label">Followers</span><span class="detail-value">${(meta.followers || 0).toLocaleString()}</span></div>
         <div class="detail-item"><span class="detail-label">Account Year</span><span class="detail-value">${displayYear}</span></div>
         <div class="detail-item"><span class="detail-label">Formats</span><span class="detail-value">${meta.login_formats ? meta.login_formats.join(', ') : 'N/A'}</span></div>
@@ -267,43 +351,46 @@ window.openDetails = async (id) => {
             <span class="detail-label" style="display:block; margin-bottom:5px;">Description</span>
             <p style="font-size:0.8rem; color:var(--text-muted); line-height:1.4; margin:0;">${meta.description || 'No description provided.'}</p>
         </div>
+    `;
 
-        <div class="card-action-container" style="padding-top:20px; display: flex; justify-content: center;">
-             <button class="btn purchase-btn ${isOwner ? 'owner-btn' : ''}" 
+    // Dynamic injection into footer to maintain layout standard
+    const footer = document.querySelector('#modalOverlay .modal-footer');
+    if (footer) {
+        footer.innerHTML = `
+            <button class="btn-cancel" onclick="closeModal()">Close Window</button>
+            <button class="btn purchase-btn ${isOwner ? 'owner-btn' : ''}" 
                 onclick="${isOwner ? '' : `closeModal(); initiatePurchase('${acc.id}')`}"
                 ${isOwner ? 'disabled' : ''}
-                style="width: 100%; ${isOwner ? 'background: #94a3b8; cursor: not-allowed;' : ''}">
+                style="flex: 2; margin: 0; ${isOwner ? 'background: #94a3b8; cursor: not-allowed;' : ''}">
                 ${isOwner ? 'YOUR LISTING' : 'PROCEED TO PURCHASE'}
             </button>
-        </div>
-    `;
+        `;
+    }
     
     document.getElementById('modalOverlay').style.display = 'flex';
 };
 
-
-// Purchase Flow
+// Purchase Flow with contextual dynamic validation
 window.initiatePurchase = async (id) => {
     const acc = activeAccounts.find(a => a.id === id);
     if (!acc) return;
 
     const basePrice = parseFloat(acc.data.price) || 0;
-    // 5% fee for 1500 accounts, otherwise 3%
     const feeRate = (basePrice === 1500) ? 0.05 : 0.03;
     const fee = basePrice * feeRate;
     const total = basePrice + fee;
 
     try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return alert("Please login to purchase.");
+        if (!user) return Swal.fire("Authentication Required", "Please login to purchase accounts.", "info");
 
         const { data: profile } = await supabase.from('profiles').select('balance').eq('id', user.id).single();
         const balance = profile?.balance || 0;
 
-        // Ensure elements exist before setting values
         const modal = document.getElementById('escrowModal');
         const baseEl = document.getElementById('displayBasePrice');
         const feeEl = document.getElementById('displayFee');
+        const feeLabel = document.getElementById('feeLabel');
         const totalEl = document.getElementById('displayTotal');
         const balanceEl = document.getElementById('displayUserBalance');
         const continueBtn = document.getElementById('btnContinuePurchase');
@@ -313,8 +400,8 @@ window.initiatePurchase = async (id) => {
             return;
         }
 
-        // Fill Data
         baseEl.innerText = `₦${basePrice.toLocaleString()}`;
+        if (feeLabel) feeLabel.innerText = `Escrow Fee (${feeRate * 100}%)`;
         if (feeEl) feeEl.innerText = `₦${fee.toLocaleString()}`;
         totalEl.innerText = `₦${total.toLocaleString()}`;
         if (balanceEl) {
@@ -325,7 +412,10 @@ window.initiatePurchase = async (id) => {
         if (continueBtn) {
             continueBtn.disabled = (balance < total);
             continueBtn.innerText = (balance < total) ? "Insufficient Balance" : "Continue Purchase";
-            continueBtn.onclick = () => processTransaction(acc, total, basePrice, user.id);
+            continueBtn.onclick = () => {
+                window.closeEscrowModal();
+                processTransaction(acc, total, basePrice, user.id);
+            };
         }
 
         modal.style.display = 'flex';
@@ -336,19 +426,19 @@ window.initiatePurchase = async (id) => {
 
 async function processTransaction(account, totalWithFee, originalPrice, buyerId) {
     try {
-        // 1. Atomic Status Change: Lock the account so no one else can buy it
+        Swal.fire({ title: 'Processing Transaction...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
         const { data: lockCheck, error: lockError } = await supabase
             .from('verifications')
             .update({ status: 'in_progress' })
             .eq('id', account.id)
-            .eq('status', 'approved') // Only update if still available
+            .eq('status', 'approved') 
             .select();
 
         if (lockError || !lockCheck || lockCheck.length === 0) {
             return Swal.fire("Unavailable", "This account was just taken or is no longer available.", "error");
         }
 
-        // 2. Deduct Balance from Buyer Profile
         const { data: buyer, error: balanceError } = await supabase
             .from('profiles')
             .select('balance')
@@ -356,7 +446,6 @@ async function processTransaction(account, totalWithFee, originalPrice, buyerId)
             .single();
 
         if (balanceError || buyer.balance < totalWithFee) {
-            // Rollback: set status back to approved if balance is insufficient
             await supabase.from('verifications').update({ status: 'approved' }).eq('id', account.id);
             return Swal.fire("Insufficient Balance", "You do not have enough funds for this purchase.", "warning");
         }
@@ -365,19 +454,15 @@ async function processTransaction(account, totalWithFee, originalPrice, buyerId)
             .update({ balance: buyer.balance - totalWithFee })
             .eq('id', buyerId);
 
-        // 3. Insert into Transactions Table (Matching your schema)
-        const { error: transError } = await supabase.from('wallet').insert([{
+        await supabase.from('wallet').insert([{
             user_id: buyerId,
             type: 'Payment',
-            amount: `-${totalWithFee.toFixed(2)}`, // Negative decimal string
-            note: `Payment for Facebook account: @${account.data.username}`,
+            amount: `-${totalWithFee.toFixed(2)}`, 
+            note: `Payment for Facebook account: @${account.data.username || 'Unknown'}`,
             status: 'success',
             reference: `PUR_${account.id.slice(0, 8)}_${Date.now()}`
         }]);
 
-        if (transError) console.error("History Log Error:", transError);
-
-        // 4. Create the Conversation record
         const { data: conv, error: convError } = await supabase.from('conversations').insert([{
             product_id: account.id,
             product_name: "Facebook",
@@ -391,48 +476,137 @@ async function processTransaction(account, totalWithFee, originalPrice, buyerId)
 
         if (convError) throw convError;
 
-        // 5. Success - Redirect to Chats
-        window.location.href = `../chats?id=${conv.id}`;
+        Swal.fire({ icon: 'success', title: 'Purchase Secured!', text: 'Redirecting to your escrow workspace...', timer: 2000, showConfirmButton: false });
+        setTimeout(() => { window.location.href = `../chats?id=${conv.id}`; }, 2000);
 
     } catch (err) {
         console.error("Transaction Error:", err);
+        await supabase.from('verifications').update({ status: 'approved' }).eq('id', account.id);
         Swal.fire("Error", "Transaction failed. Please contact support.", "error");
     }
 }
-
 
 window.closeEscrowModal = () => {
     document.getElementById('escrowModal').style.display = 'none';
 };
 
-
 // Utilities
 window.toggleDropdown = (event, id) => {
     event.stopPropagation();
     document.querySelectorAll('.dropdown-content').forEach(m => m.id !== `dropdown-${id}` && m.classList.remove('show'));
-    document.getElementById(`dropdown-${id}`).classList.toggle('show');
+    document.getElementById(`dropdown-${id}`)?.classList.toggle('show');
 };
 
-window.copyToClipboard = (id) => {
-    navigator.clipboard.writeText(id);
-    Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'ID Copied', showConfirmButton: false, timer: 1500 });
+window.copyMarketplaceUrl = (event, id) => {
+    event.stopPropagation(); 
+    
+    const baseUri = window.location.origin + window.location.pathname;
+    const shareableLink = `${baseUri}?id=${id}`;
+
+    navigator.clipboard.writeText(shareableLink).then(() => {
+        Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: 'Product URL Copied!',
+            showConfirmButton: false,
+            timer: 1500
+        });
+    }).catch(err => {
+        console.error("Could not copy marketplace URL: ", err);
+    });
+
+    document.querySelectorAll('.dropdown-content').forEach(m => m.classList.remove('show'));
 };
+
+window.toggleFollowSeller = async (event, sellerId, sellerUsername) => {
+    event.stopPropagation(); 
+    
+    try {
+        const { data: { user }, error: authErr } = await supabase.auth.getUser();
+        if (authErr || !user) {
+            return Swal.fire("Authentication Required", "Please log in to follow sellers.", "info");
+        }
+        
+        const buyerId = user.id;
+        if (buyerId === sellerId) {
+            return Swal.fire("Action Denied", "You cannot follow your own profile listing.", "warning");
+        }
+
+        Swal.fire({ title: 'Updating follow status...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+        const { data: buyerProfile } = await supabase.from('profiles').select('following').eq('id', buyerId).single();
+        const { data: sellerProfile } = await supabase.from('profiles').select('followers').eq('id', sellerId).single();
+
+        let buyerFollowing = buyerProfile?.following?.uids || [];
+        let sellerFollowers = sellerProfile?.followers?.uids || [];
+
+        const isCurrentlyFollowing = buyerFollowing.includes(sellerId);
+        let alertTitle = "";
+        let alertIcon = "success";
+
+        if (isCurrentlyFollowing) {
+            buyerFollowing = buyerFollowing.filter(id => id !== sellerId);
+            sellerFollowers = sellerFollowers.filter(id => id !== buyerId);
+            alertTitle = `Unfollowed @${sellerUsername}`;
+            alertIcon = "info";
+        } else {
+            buyerFollowing.push(sellerId);
+            sellerFollowers.push(buyerId);
+            alertTitle = `Now following @${sellerUsername}`;
+            alertIcon = "success";
+        }
+
+        const updateBuyer = supabase.from('profiles').update({ following: { uids: buyerFollowing } }).eq('id', buyerId);
+        const updateSeller = supabase.from('profiles').update({ followers: { uids: sellerFollowers } }).eq('id', sellerId);
+
+        const [buyerRes, sellerRes] = await Promise.all([updateBuyer, updateSeller]);
+        if (buyerRes.error || sellerRes.error) throw new Error("Database sync failed");
+
+        // Update global memory snapshot instantly to prevent race-rendering glitches
+        if (window.currentGlobalProfiles) {
+            const index = window.currentGlobalProfiles.findIndex(p => p.id === buyerId);
+            if(index !== -1) window.currentGlobalProfiles[index].following = { uids: buyerFollowing };
+        }
+
+        // 🟢 FIXED: Keep real-time inline filter cache perfectly synchronized
+        if (typeof cachedMyFollowingList !== 'undefined') {
+            cachedMyFollowingList = buyerFollowing;
+        }
+
+        Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: alertIcon,
+            title: alertTitle,
+            showConfirmButton: false,
+            timer: 2000
+        });
+
+        // 🟢 FIXED: Await the async filter execution pipeline so it finishes rendering completely
+        await applyFilters(); 
+
+    } catch (err) {
+        console.error("Follow System Error:", err);
+        Swal.fire("Error", "Could not complete follow update action.", "error");
+    }
+
+    document.querySelectorAll('.dropdown-content').forEach(m => m.classList.remove('show'));
+};
+
 
 window.onclick = () => document.querySelectorAll('.dropdown-content').forEach(m => m.classList.remove('show'));
 window.closeModal = () => document.getElementById('modalOverlay').style.display = 'none';
 
 // Start App with URL Deep-Linking and Real-time Subscription
 async function init() {
-    // 1. Initial Identity & Data Load
     await getCurrentUser();
     await fetchFacebookInventory(); 
 
-    // 2. Handle Deep Linking (Read ID from URL)
     const urlParams = new URLSearchParams(window.location.search);
     const targetId = urlParams.get('id');
 
     if (targetId) {
-        // Small delay ensures activeAccounts is fully mapped before opening
         setTimeout(() => {
             const exists = activeAccounts.find(a => a.id === targetId);
             if (exists) {
@@ -443,20 +617,16 @@ async function init() {
         }, 500); 
     }
 
-    // 3. 🔴 Real-time Listener
-    // Instantly refreshes the grid if an account is bought (status change) or added
     supabase
         .channel('public:verifications')
         .on('postgres_changes', { 
             event: '*', 
             schema: 'public', 
             table: 'verifications' 
-        }, (payload) => {
-            console.log('Real-time update received:', payload.eventType);
-            fetchFacebookInventory(); // Re-fetch and re-render grid
+        }, () => {
+            fetchFacebookInventory(); 
         })
         .subscribe();
 }
 
-// Initialize the application
 init();

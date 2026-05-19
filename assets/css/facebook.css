@@ -730,57 +730,7 @@ body {
     to { opacity: 1; transform: translateY(0); }
 }
 
- /* LEVEL 5: LEGENDARY (Metallic Gold) */
-.trust-meta {
-    background: linear-gradient(135deg, #FFD700 0%, #D4AF37 100%) !important; /* Gold Gradient */
-    color: #000000 !important; /* Dark text for better contrast on gold */
-    border: none !important;
-    font-weight: 900 !important;
-    letter-spacing: 0.5px;
-    padding: 4px 14px !important;
-    border-radius: 50px !important;
-    box-shadow: 0 4px 15px rgba(212, 175, 55, 0.4); /* Golden glow */
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    text-shadow: 0px 1px 0px rgba(255, 255, 255, 0.3);
-}
 
-/* LEVEL 4: ELITE (Solid Green) */
-.trust-high {
-    background: #00b894 !important;
-    color: white !important;
-    border: none !important;
-    padding: 4px 12px !important;
-    border-radius: 50px !important;
-}
-
-/* LEVEL 3: PRO (Purple Outline) */
-.trust-pro {
-    background: rgba(162, 0, 255, 0.1) !important;
-    color: #a200ff !important;
-    border: 1px solid #a200ff !important;
-    padding: 4px 12px !important;
-    border-radius: 50px !important;
-}
-
-/* LEVEL 2: RISING STAR (Orange Outline) */
-.trust-mid { 
-    background: rgba(255, 159, 67, 0.1) !important; 
-    color: #ff9f43 !important; 
-    border: 1px solid #ff9f43 !important; 
-    padding: 4px 12px !important;
-    border-radius: 50px !important;
-}
-
-/* LEVEL 1: NEW SELLER (Gray) */
-.trust-low { 
-    background: rgba(108, 117, 125, 0.1) !important; 
-    color: #6c757d !important; 
-    border: 1px solid #6c757d !important; 
-    padding: 4px 12px !important;
-    border-radius: 50px !important;
-}
 
 /* ---------- Purchase Escrow Modal ---------- */
 .modal-overlay {
