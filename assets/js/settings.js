@@ -973,116 +973,139 @@ const handleProfilePicStats = async () => {
 
 handleProfilePicStats();
 
-// ✅ Push Notifications Settings Toggle (OneSignal + Supabase Integration)
+// ✅ Push Notifications Settings Toggle (With Full Debugging Console Logs)
 document.addEventListener("DOMContentLoaded", async () => {
+  console.log("🚀 OneSignal Toggle Script: DOMContentLoaded triggered.");
+  
   const pushToggle = document.getElementById("oneSignalSetupBtn");
-  if (!pushToggle) return;
+  if (!pushToggle) {
+    console.error("❌ OneSignal Toggle Script: Element with ID 'oneSignalSetupBtn' not found in HTML layout!");
+    return;
+  }
+  console.log("🎯 OneSignal Toggle Script: Bound successfully to #oneSignalSetupBtn element.");
 
-  // Get current logged-in user from Supabase
+  // Get current logged-in user context from Supabase
+  console.log("🔍 OneSignal Toggle Script: Requesting user authentication context from Supabase...");
   const { data: { user }, error: userError } = await supabase.auth.getUser();
-  if (userError || !user) {
-    console.warn("⚠️ No authenticated user detected for Push Notifications setup.");
+  
+  if (userError) {
+    console.error("❌ OneSignal Toggle Script: Supabase auth check error:", userError.message);
+    return;
+  }
+  if (!user) {
+    console.warn("⚠️ OneSignal Toggle Script: No authenticated user detected. Halting registration setup.");
     return;
   }
 
   const userId = user.id;
+  console.log("👤 OneSignal Toggle Script: Authenticated User ID matched:", userId);
 
-  // 1️⃣ Load initial toggle status from the database on page load
+  // 1️⃣ Load initial toggle status from database on refresh/page load
   try {
+    console.log("📂 OneSignal Toggle Script: Fetching existing notification flags from profiles table...");
     const { data: profile, error: fetchError } = await supabase
       .from("profiles")
-      .select("onesignal_id")
+      .select("push_notifications_enabled, onesignal_id")
       .eq("id", userId)
       .single();
 
     if (fetchError) throw fetchError;
 
-    // If an ID already exists, flip the switch to true
-    if (profile && profile.onesignal_id) {
+    console.log("📋 OneSignal Toggle Script: Profile raw notification data retrieved:", {
+      push_notifications_enabled: profile?.push_notifications_enabled,
+      onesignal_id: profile?.onesignal_id
+    });
+
+    // Turn the switch graphic ON if the tracking flag is true OR if a token already exists
+    if (profile && (profile.push_notifications_enabled || profile.onesignal_id)) {
+      console.log("💡 OneSignal Toggle Script: Existing active record found! Forcing visual toggle state to CHECKED.");
       pushToggle.checked = true;
+    } else {
+      console.log("⚪ OneSignal Toggle Script: No existing push registration parameters found. Leaving toggle UNCHECKED.");
+      pushToggle.checked = false;
     }
   } catch (err) {
-    console.error("❌ Failed to load initial push notification state:", err.message);
+    console.error("❌ OneSignal Toggle Script: Failed to download initial push notification parameters from Supabase:", err.message);
   }
 
-  // Helper utility for cleanly pausing execution async-style
+  // Modern asynchronous pause utility
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  // 2️⃣ Listen for user interaction on the switch toggle
+  // 2️⃣ Listen for user interactions on the switch toggle element
   pushToggle.addEventListener("change", async () => {
     const isTurningOn = pushToggle.checked;
+    console.log(`🔄 OneSignal Toggle Event: User flipped the switch slider graphic. New visual state: [${isTurningOn ? "ON" : "OFF"}]`);
 
     // --- CASE A: USER IS TURNING NOTIFICATIONS ON ---
     if (isTurningOn) {
-      // Temporarily lock switch interactions during authorization workflows
-      pushToggle.disabled = true;
+      console.log("⏳ OneSignal Toggle Event: Queueing OneSignal background operations via window.OneSignalDeferred...");
+      
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+      window.OneSignalDeferred.push(async (OneSignal) => {
+        console.log("📦 OneSignal Queue: Deferred environment container running. Checking initialized core object context:", OneSignal);
+        
+        try {
+          console.log("🔔 OneSignal Queue: Triggering explicit device prompt via OneSignal.Notifications.requestPermission()...");
+          await OneSignal.Notifications.requestPermission();
+          console.log("⏳ OneSignal Queue: Permission sequence requested. Pausing execution for 1500ms to allow async registration tokens to bake...");
+          
+          await sleep(1500);
 
-      try {
-        // Double check that OneSignal SDK is loaded on the page window object
-        if (!window.OneSignal) {
-          Swal.fire({
-            icon: "warning",
-            title: "System Lag",
-            text: "Notification engines are still initializing. Please wait a moment and try again."
-          });
-          pushToggle.checked = false;
-          pushToggle.disabled = false;
-          return;
-        }
+          console.log("🔍 OneSignal Queue: Scanning active browser instance properties for generated token data...");
+          const subscriptionId = OneSignal.User.PushSubscription?.id;
+          console.log("🔑 OneSignal Queue: Retrieved Subscription ID result token string:", subscriptionId);
 
-        console.log("Requesting explicit device push authorization via OneSignal...");
-        await window.OneSignal.Notifications.requestPermission();
+          if (subscriptionId) {
+            console.log("💾 OneSignal Queue: Valid registration token found! Transporting update payloads to Supabase profiles row...");
+            
+            const { error: patchError } = await supabase
+              .from("profiles")
+              .update({ 
+                onesignal_id: subscriptionId,
+                push_notifications_enabled: true,
+                updated_at: new Date().toISOString()
+              })
+              .eq("id", userId);
 
-        // Pause briefly to give OneSignal background tasks time to register the platform token ID
-        await sleep(1200);
-
-        const subscriptionId = window.OneSignal.User.PushSubscription?.id;
-
-        if (subscriptionId) {
-          // Save registration token string right back to the user's Supabase profile row
-          const { error: patchError } = await supabase
-            .from("profiles")
-            .update({ 
-              onesignal_id: subscriptionId,
-              updated_at: new Date().toISOString()
-            })
-            .eq("id", userId);
-
-          if (!patchError) {
-            Swal.fire({
-              icon: "success",
-              title: "Alerts Activated!",
-              text: "Your device has been linked to your account. You will now receive real-time updates.",
-              timer: 2500,
-              showConfirmButton: false
-            });
+            if (!patchError) {
+              console.log("✅ OneSignal Queue: Database parameters synchronised successfully. Rendering sweetalert success confirmation.");
+              Swal.fire({
+                icon: "success",
+                title: "Alerts Activated!",
+                text: "Your device has been linked to your account. You will now receive real-time updates.",
+                timer: 2500,
+                showConfirmButton: false
+              });
+            } else {
+              console.error("❌ OneSignal Queue: Supabase patch query rejected:", patchError.message);
+              throw new Error(patchError.message);
+            }
           } else {
-            throw new Error(patchError.message);
+            console.warn("⚠️ OneSignal Queue: Subscription ID came back empty/null. The user likely denied or closed the authorization prompt panel.");
+            Swal.fire({
+              icon: "info",
+              title: "Permission Needed",
+              text: "Notifications were not enabled. Please check your browser's site settings permission and allow alerts manually."
+            });
+            console.log("📉 OneSignal Queue: Snapping switch graphic back to UNCHECKED off position.");
+            pushToggle.checked = false; 
           }
-        } else {
-          // Triggered if the user hits 'Block/Deny' or prematurely breaks the active native window prompt
+        } catch (err) {
+          console.error("❌ OneSignal Queue: Operational exception thrown during permission configuration cycles:", err);
           Swal.fire({
-            icon: "info",
-            title: "Permission Needed",
-            text: "Notifications were not enabled. Please check your browser's site settings permission and allow alerts manually."
+            icon: "error",
+            title: "Sync Error",
+            text: "We couldn't save your device key to your profile. Please try again later."
           });
-          pushToggle.checked = false;
+          console.log("📉 OneSignal Queue: Catch block triggered. Forcing switch graphic back to UNCHECKED off position.");
+          pushToggle.checked = false; 
         }
-      } catch (err) {
-        console.error("❌ Settings layout device registration transaction anomaly:", err);
-        Swal.fire({
-          icon: "error",
-          title: "Sync Error",
-          text: "We couldn't save your device key to your profile. Please try again later."
-        });
-        pushToggle.checked = false;
-      } finally {
-        pushToggle.disabled = false;
-      }
+      });
 
     // --- CASE B: USER IS TURNING NOTIFICATIONS OFF ---
     } else {
-      // Prompt user to confirm they want to turn off alerts
+      console.log("⚠️ OneSignal Toggle Event: Opt-out request caught. Spawning cancel confirmation alert modal...");
+      
       const confirmOptOut = await Swal.fire({
         title: "Disable Alerts?",
         text: "You will stop receiving updates regarding active disputes and transaction statuses on this device.",
@@ -1093,20 +1116,23 @@ document.addEventListener("DOMContentLoaded", async () => {
         confirmButtonText: "Yes, turn off"
       });
 
+      console.log("❓ OneSignal Toggle Event: Prompt closed. Did user confirm subscription deletion?:", confirmOptOut.isConfirmed);
+
       if (confirmOptOut.isConfirmed) {
-        pushToggle.disabled = true;
+        console.log("🗑️ OneSignal Toggle Event: User confirmed opt-out. Connecting to Supabase to purge registration tokens...");
         try {
-          // Remove token field trace reference directly out of your Supabase records
           const { error: clearError } = await supabase
             .from("profiles")
             .update({ 
               onesignal_id: null,
+              push_notifications_enabled: false,
               updated_at: new Date().toISOString()
             })
             .eq("id", userId);
 
           if (clearError) throw clearError;
 
+          console.log("✅ OneSignal Toggle Event: DB target columns cleared successfully.");
           Swal.fire({
             icon: "success",
             title: "Deactivated",
@@ -1115,14 +1141,13 @@ document.addEventListener("DOMContentLoaded", async () => {
             showConfirmButton: false
           });
         } catch (err) {
-          console.error("❌ Failed to clear notification parameters:", err.message);
-          pushToggle.checked = true; // Rollback switch toggle view back to true 
-        } finally {
-          pushToggle.disabled = false;
+          console.error("❌ OneSignal Toggle Event: Failed to clear registration indexes from target profile row:", err.message);
+          console.log("📈 OneSignal Toggle Event: Reverting visual slider back to CHECKED active position due to update failure.");
+          pushToggle.checked = true; 
         }
       } else {
-        // If the cancel button was clicked, snap the visual toggle back to true
-        pushToggle.checked = true;
+        console.log("❌ OneSignal Toggle Event: User clicked cancel. Rolling visual switch graphic back to CHECKED active position.");
+        pushToggle.checked = true; 
       }
     }
   });
