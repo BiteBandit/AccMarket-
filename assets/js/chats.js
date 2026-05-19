@@ -211,13 +211,20 @@ async function loadSidebar(filter = "") {
 
     if (error) return;
 
-    chatList.innerHTML = '';
+        chatList.innerHTML = '';
     conversations.forEach(chat => {
         const isMeBuyer = chat.buyer_id === currentUser.id;
         const otherUser = isMeBuyer ? chat.seller : chat.buyer;
         if (filter && !otherUser.username.toLowerCase().includes(filter.toLowerCase())) return;
 
-        const hasUnread = chat.messages.some(m => !m.is_read && m.sender_id !== currentUser.id);
+        // 🎯 UPDATED READ/UNREAD CALCULATOR
+        const hasUnread = chat.messages.some(m => 
+            m && 
+            m.is_read === false && 
+            m.sender_id && 
+            m.sender_id !== currentUser.id &&
+            chat.id !== activeChatId
+        );
         const isActive = chat.id === activeChatId ? 'active' : '';
         const timeDisplay = new Date(chat.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -232,6 +239,7 @@ async function loadSidebar(filter = "") {
                     ${hasUnread ? '<span class="unread-dot"></span>' : ''}
                 </div>
             </div>`;
+
 
         item.onclick = async () => {
             activeChatId = chat.id;

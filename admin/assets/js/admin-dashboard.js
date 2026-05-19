@@ -59,48 +59,57 @@ navItems.forEach(item => {
 
         // 3. Update Header Title
         if (sectionTitle) {
-            sectionTitle.textContent = item.innerText.trim();
+            // Using textContent handles clean text parsing safely
+            sectionTitle.textContent = item.textContent.trim();
         }
 
         // 4. Show Target Section
-        const targetSection = document.getElementById(`${section}-section`);
+        // Fallback approach dynamically checks for both camelCase and kebab-case IDs present in your HTML
+        const targetSection = document.getElementById(`${section}Section`) || 
+                              document.getElementById(`${section}-section`);
+                              
         if (targetSection) {
             targetSection.style.display = 'block';
+        } else {
+            console.warn(`Target view wrapper matching format "${section}Section" or "${section}-section" could not be detected in the DOM.`);
         }
 
-// 5. Route Data Loading
-if (section === 'users') {
-    loadUserDirectory();
-} else if (section === 'kyc') {
-    loadPaidKYC();
-} else if (section === 'banned') {
-    loadRestrictedUsers();
-} else if (section === 'verification') {
-    loadAccountAudits(); 
-} else if (section === 'conversations') {
-    loadCommunicationLogs();
-} else if (section === 'withdrawals') {
-    loadWithdrawalRequests();
-} else if (section === 'transactions') {
-    loadLedgerReports();
-} else if (section === 'listings') {
-    // ✅ Marketplace Listing Requests (verifications table)
-    window.loadListingRequests(); 
-} else if (section === 'broadcast') {
-    if (typeof toggleTargetFields === 'function') toggleTargetFields();
-} else if (section === 'blog') {
-    if (typeof loadBlogs === 'function') loadBlogs();
-}
-
- 
+        // 5. Route Data Loading
+        if (section === 'users' && typeof loadUserDirectory === 'function') {
+            loadUserDirectory();
+        } else if (section === 'kyc' && typeof loadPaidKYC === 'function') {
+            loadPaidKYC();
+        } else if (section === 'banned' && typeof loadRestrictedUsers === 'function') {
+            loadRestrictedUsers();
+        } else if (section === 'verification' && typeof loadAccountAudits === 'function') {
+            loadAccountAudits(); 
+        } else if (section === 'conversations' && typeof loadCommunicationLogs === 'function') {
+            loadCommunicationLogs();
+        } else if (section === 'withdrawals' && typeof loadWithdrawalRequests === 'function') {
+            loadWithdrawalRequests();
+        } else if (section === 'transactions' && typeof loadLedgerReports === 'function') {
+            loadLedgerReports();
+        } else if (section === 'listings' && typeof window.loadListingRequests === 'function') {
+            window.loadListingRequests();
+        } else if (section === 'disputes' && typeof window.loadActiveDisputes === 'function') {
+            window.loadActiveDisputes();
+        } else if (section === 'tickets' && typeof window.loadSupportTickets === 'function') {
+            // ✅ Service Tickets Workspace (support_tickets table)
+            window.loadSupportTickets();
+        } else if (section === 'broadcast' && typeof toggleTargetFields === 'function') {
+            toggleTargetFields();
+        } else if (section === 'blog' && typeof loadBlogs === 'function') {
+            loadBlogs();
+        }
 
         // 6. Close Sidebar (For Mobile Users)
-        if (typeof sidebar !== 'undefined' && sidebar.classList.contains('active')) {
+        if (sidebar && sidebar.classList.contains('active')) {
             sidebar.classList.remove('active');
-            overlay.classList.remove('active');
+            if (overlay) overlay.classList.remove('active');
         }
     });
 });
+
 
 
 // --- User Directory Logic ---
@@ -222,7 +231,7 @@ window.viewUserFile = async (userId) => {
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
                         <div style="background: #f1f5f9; padding: 12px; border-radius: 10px; text-align: center; border: 1px solid #e2e8f0;">
                             <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase;">Trust Score</div>
-                            <div style="font-size: 18px; font-weight: 800; color: ${scoreColor};">${score.toFixed(1)} <span style="font-size: 12px; color: #94a3b8;">/ 100</span></div>
+                            <div style="font-size: 18px; font-weight: 800; color: ${scoreColor};">${score.toFixed(1)} <span style="font-size: 12px; color: #94⁷ya3b8;">/ 100</span></div>
                         </div>
                         <div style="background: #f1f5f9; padding: 12px; border-radius: 10px; text-align: center; border: 1px solid #e2e8f0;">
                             <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase;">Verification</div>
@@ -1765,9 +1774,69 @@ window.deleteBlogPost = async function(id) {
 };
 
 
-// --- Listing Moderation Logic ---
+// --- Marketplace Listing Moderation ---
 
-// ✅ 1. Load ONLY Pending Listings
+// ✅ Inject Listing Workspace Panel Styles dynamically into document head
+(function injectListingStyles() {
+    if (document.getElementById('listing-panel-styles')) return;
+    const styleBlock = document.createElement('style');
+    styleBlock.id = 'listing-panel-styles';
+    styleBlock.innerHTML = `
+        /* Container for the circular buttons */
+        .action-btn-group {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        /* Base circular button style */
+        .listing-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: #f8fafc;
+            font-size: 14px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        /* Review / Eye Button */
+        .btn-review { color: #0b1e5b; }
+        .btn-review:hover { background: #0b1e5b; color: white; transform: scale(1.1); }
+
+        /* Approve / Check Button */
+        .btn-approve { color: #10b981; }
+        .btn-approve:hover { background: #10b981; color: white; transform: scale(1.1); }
+
+        /* Reject / Trash Button */
+        .btn-reject { color: #ef4444; }
+        .btn-reject:hover { background: #ef4444; color: white; transform: scale(1.1); }
+
+        /* Visit Profile Link Button */
+        .link-icon-btn {
+            padding: 7px 14px;
+            background: #eff6ff;
+            color: #2563eb;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 700;
+            transition: 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .link-icon-btn:hover { background: #2563eb; color: white; }
+    `;
+    document.head.appendChild(styleBlock);
+})();
+
+// ✅ Fetch and Display Pending Marketplace Listings
 window.loadListingRequests = async function() {
     const tbody = document.getElementById('listingsTableBody');
     if (!tbody) return;
@@ -1799,39 +1868,40 @@ window.loadListingRequests = async function() {
         const row = document.createElement('tr');
         row.style.borderBottom = "1px solid #f1f5f9";
         
-  row.innerHTML = `
-    <td style="padding:15px;">
-        <div style="width:75px; height:50px; border-radius:8px; overflow:hidden; border:1px solid #e2e8f0; background:#000; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <img src="${item.screenshot_url}" style="width:100%; height:100%; object-fit:contain; cursor:pointer;" 
-                 onclick="window.open('${item.screenshot_url}')" title="View Full Proof">
-        </div>
-    </td>
-    <td style="padding:15px; font-weight:700; color:#1e293b;">${details.platform?.toUpperCase() || 'N/A'}</td>
-    <td style="padding:15px; font-weight:700; color:#059669;">₦${Number(details.price).toLocaleString()}</td>
-    <td style="padding:15px;">
-        <a href="${details.profile_link}" target="_blank" class="link-icon-btn">
-            <i class="fa-solid fa-arrow-up-right-from-square"></i> Visit Profile
-        </a>
-    </td>
-    <td style="padding:15px;"><span class="badge bg-warning" style="padding:5px 10px; border-radius:5px;">PENDING</span></td>
-    <td style="padding:15px; text-align: right;">
-        <div class="action-btn-group">
-            <button onclick="window.viewAndEditListing('${item.id}')" class="listing-btn btn-review" title="Review Details">
-                <i class="fa-solid fa-magnifying-glass"></i>
-            </button>
-            <button onclick="window.processListing('${item.id}', 'approved')" class="listing-btn btn-approve" title="Approve Listing">
-                <i class="fa-solid fa-check"></i>
-            </button>
-            <button onclick="window.processListing('${item.id}', 'rejected')" class="listing-btn btn-reject" title="Reject Listing">
-                <i class="fa-solid fa-trash-can"></i>
-            </button>
-        </div>
-    </td>
-`;
+        row.innerHTML = `
+            <td style="padding:15px;">
+                <div style="width:75px; height:50px; border-radius:8px; overflow:hidden; border:1px solid #e2e8f0; background:#000; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <img src="${item.screenshot_url}" style="width:100%; height:100%; object-fit:contain; cursor:pointer;" 
+                         onclick="window.open('${item.screenshot_url}')" title="View Full Proof">
+                </div>
+            </td>
+            <td style="padding:15px; font-weight:700; color:#1e293b;">${details.platform?.toUpperCase() || 'N/A'}</td>
+            <td style="padding:15px; font-weight:700; color:#059669;">₦${Number(details.price).toLocaleString()}</td>
+            <td style="padding:15px;">
+                <a href="${details.profile_link}" target="_blank" class="link-icon-btn">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Visit Profile
+                </a>
+            </td>
+            <td style="padding:15px;"><span class="badge bg-warning" style="padding:5px 10px; border-radius:5px;">PENDING</span></td>
+            <td style="padding:15px; text-align: right;">
+                <div class="action-btn-group">
+                    <button onclick="window.viewAndEditListing('${item.id}')" class="listing-btn btn-review" title="Review Details">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </button>
+                    <button onclick="window.processListing('${item.id}', 'approved')" class="listing-btn btn-approve" title="Approve Listing">
+                        <i class="fa-solid fa-check"></i>
+                    </button>
+                    <button onclick="window.processListing('${item.id}', 'rejected')" class="listing-btn btn-reject" title="Reject Listing">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </div>
+            </td>
+        `;
 
         tbody.appendChild(row);
     });
 };
+
 
 // ✅ 2. Open Real Modal (Editable: Region, Account Age, Description)
 window.viewAndEditListing = async function(id) {
@@ -1913,6 +1983,816 @@ window.processListing = async function(id, newStatus) {
 
 window.closeReviewModal = function() {
     document.getElementById('listingReviewModal').style.display = 'none';
+};
+
+
+// --- Service Ticket Governance (support_tickets) ---
+
+// ✅ Inject Service Tickets Panel Styles dynamically into document head
+(function injectTicketStyles() {
+    if (document.getElementById('ticket-panel-styles')) return;
+    const styleBlock = document.createElement('style');
+    styleBlock.id = 'ticket-panel-styles';
+    styleBlock.innerHTML = `
+        .ticket-btn-group {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        .ticket-action-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: #f8fafc;
+            font-size: 14px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .ticket-btn-inspect { color: #0b1e5b; }
+        .ticket-btn-inspect:hover { background: #0b1e5b; color: white; transform: scale(1.1); }
+
+        .ticket-btn-close { color: #10b981; }
+        .ticket-btn-close:hover { background: #10b981; color: white; transform: scale(1.1); }
+
+        .ticket-btn-drop { color: #ef4444; }
+        .ticket-btn-drop:hover { background: #ef4444; color: white; transform: scale(1.1); }
+
+        .attachment-thumbnail-btn {
+            padding: 7px 14px;
+            background: #eff6ff;
+            color: #2563eb;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 700;
+            transition: 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .attachment-thumbnail-btn:hover { background: #2563eb; color: white; }
+    `;
+    document.head.appendChild(styleBlock);
+})();
+
+// ✅ Helper Function: Direct Copy-to-Clipboard Action with Visual Feedback
+window.copyUidToClipboard = function(fullUid, event) {
+    event.stopPropagation(); // Avoid triggering row events if any exist
+    
+    navigator.clipboard.writeText(fullUid).then(() => {
+        // Find the specific icon clicked to provide subtle visual confirmation
+        const targetBtn = event.currentTarget;
+        const icon = targetBtn.querySelector('i');
+        
+        // Temporarily shift icon states to indicate a successful transfer
+        icon.className = "fa-solid fa-check";
+        targetBtn.style.color = "#10b981";
+        targetBtn.style.background = "#d1fae5";
+        
+        // Revert back to copy state after 1.5 seconds
+        setTimeout(() => {
+            icon.className = "fa-solid fa-copy";
+            targetBtn.style.color = "#475569";
+            targetBtn.style.background = "#f1f5f9";
+        }, 1500);
+    }).catch(err => {
+        console.error("Failed to copy text: ", err);
+    });
+};
+
+// ✅ 1. Fetch and Display Pending Support Tickets (With Copyable UIDs)
+window.loadSupportTickets = async function() {
+    const tbody = document.getElementById('ticketsTableBody');
+    if (!tbody) return;
+    
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:40px; color:#64748b;">
+        <i class="fas fa-spinner fa-spin"></i> Loading active issues...</td></tr>`;
+
+    // Only pull pending service requests
+    const { data: tickets, error } = await supabase
+        .from('support_tickets')
+        .select('*')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        tbody.innerHTML = `<tr><td colspan="6" style="color:#ef4444; text-align:center;">Error: ${error.message}</td></tr>`;
+        return;
+    }
+
+    if (tickets.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:50px; color:#64748b;">
+            <i class="fa-solid fa-square-check" style="font-size:30px; color:#10b981; display:block; margin-bottom:10px;"></i>
+            All customer issues resolved. Helpdesk is clear!</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = "";
+    tickets.forEach(ticket => {
+        const row = document.createElement('tr');
+        row.style.borderBottom = "1px solid #f1f5f9";
+        
+        // Attachment conditional render
+        const attachmentContent = ticket.attachment_url ? 
+            `<a href="${ticket.attachment_url}" target="_blank" class="attachment-thumbnail-btn">
+                <i class="fa-solid fa-paperclip"></i> View Proof
+             </a>` : `<span style="color:#94a3b8; font-size:12px;">None</span>`;
+
+        row.innerHTML = `
+            <td style="padding:15px; font-weight:700; color:#0b1e5b;">${ticket.ticket_number}</td>
+            <td style="padding:15px; font-weight:600; color:#1e293b;">${ticket.subject}</td>
+            <td style="padding:15px;">
+                <div style="display: inline-flex; align-items: center; gap: 8px;">
+                    <span style="color:#64748b; font-size:13px; font-family:monospace; background:#f8fafc; padding:4px 8px; border:1px solid #e2e8f0; border-radius:6px;" title="${ticket.user_id}">
+                        ${ticket.user_id.substring(0,8)}...
+                    </span>
+                    <button onclick="window.copyUidToClipboard('${ticket.user_id}', event)" 
+                            style="border:none; background:#f1f5f9; color:#475569; padding:5px 8px; border-radius:6px; cursor:pointer; font-size:12px; transition:all 0.2s;" 
+                            title="Copy Full UID">
+                        <i class="fa-solid fa-copy"></i>
+                    </button>
+                </div>
+            </td>
+            <td style="padding:15px;">${attachmentContent}</td>
+            <td style="padding:15px;"><span class="badge bg-warning" style="padding:5px 10px; border-radius:5px;">PENDING</span></td>
+            <td style="padding:15px; text-align: right;">
+                <div class="ticket-btn-group">
+                    <button onclick="window.inspectTicket('${ticket.id}')" class="ticket-action-btn ticket-btn-inspect" title="Read Message">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </button>
+                    <button onclick="window.updateTicketStatus('${ticket.id}', 'resolved')" class="ticket-action-btn ticket-btn-close" title="Mark Resolved">
+                        <i class="fa-solid fa-check"></i>
+                    </button>
+                    <button onclick="window.updateTicketStatus('${ticket.id}', 'dismissed')" class="ticket-action-btn ticket-btn-drop" title="Dismiss Ticket">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+};
+
+// ✅ 2. Open Real Ticket Inspection Modal
+window.inspectTicket = async function(id) {
+    const modal = document.getElementById('ticketReviewModal');
+    const modalBody = document.getElementById('ticketModalBody');
+    const resolveBtn = document.getElementById('resolveTicketBtn');
+    
+    modal.style.display = 'block';
+    modalBody.innerHTML = '<p><i class="fas fa-spinner fa-spin"></i> Reading ticket index...</p>';
+
+    const { data: ticket } = await supabase.from('support_tickets').select('*').eq('id', id).single();
+    if (!ticket) return;
+
+    modalBody.innerHTML = `
+        <div style="margin-bottom:18px;">
+            <label style="display:block; font-size:11px; font-weight:800; color:#64748b; margin-bottom:4px; text-transform:uppercase;">Ticket Reference</label>
+            <div style="padding:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; font-size:14px; font-weight:600; color:#0b1e5b;">${ticket.ticket_number}</div>
+        </div>
+        <div style="margin-bottom:18px;">
+            <label style="display:block; font-size:11px; font-weight:800; color:#64748b; margin-bottom:4px; text-transform:uppercase;">Subject</label>
+            <div style="padding:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; font-size:14px; color:#1e293b; font-weight:500;">${ticket.subject}</div>
+        </div>
+        <div style="margin-bottom:18px;">
+            <label style="display:block; font-size:11px; font-weight:800; color:#64748b; margin-bottom:4px; text-transform:uppercase;">User Message</label>
+            <div style="padding:15px; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:10px; font-size:14px; color:#334155; line-height:1.5; white-space:pre-wrap;">${ticket.message}</div>
+        </div>
+        <div>
+            <label style="display:block; font-size:11px; font-weight:800; color:#64748b; margin-bottom:4px; text-transform:uppercase;">Submitted On</label>
+            <div style="padding:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; font-size:13px; color:#64748b;">${new Date(ticket.created_at).toLocaleString()}</div>
+        </div>
+    `;
+
+    resolveBtn.onclick = () => {
+        window.closeTicketModal();
+        window.updateTicketStatus(id, 'resolved');
+    };
+};
+
+// ✅ 3. Update Ticket Workflow Status
+window.updateTicketStatus = async function(id, nextStatus) {
+    const { error } = await supabase
+        .from('support_tickets')
+        .update({ status: nextStatus })
+        .eq('id', id);
+
+    if (!error) {
+        Swal.fire({ icon: 'success', title: `Ticket ${nextStatus}`, timer: 1200, showConfirmButton: false });
+        window.loadSupportTickets();
+    } else {
+        Swal.fire("System Error", error.message, "error");
+    }
+};
+
+window.closeTicketModal = function() {
+    document.getElementById('ticketReviewModal').style.display = 'none';
+};
+
+
+// --- Escrow Dispute Governance Module ---
+
+// ✅ Inject Disputes Workspace Panel Styles dynamically into document head
+(function injectDisputeStyles() {
+    if (document.getElementById('dispute-panel-styles')) return;
+    const styleBlock = document.createElement('style');
+    styleBlock.id = 'dispute-panel-styles';
+    styleBlock.innerHTML = `
+        .dispute-btn-group {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        .dispute-action-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: #f8fafc;
+            font-size: 14px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .dispute-btn-inspect { color: #0b1e5b; }
+        .dispute-btn-inspect:hover { background: #0b1e5b; color: white; transform: scale(1.1); }
+
+        .dispute-btn-settle { color: #10b981; }
+        .dispute-btn-settle:hover { background: #10b981; color: white; transform: scale(1.1); }
+
+        .dispute-btn-cancel { color: #ef4444; }
+        .dispute-btn-cancel:hover { background: #ef4444; color: white; transform: scale(1.1); }
+
+        .dispute-id-badge {
+            color: #64748b; 
+            font-size: 13px; 
+            font-family: monospace; 
+            background: #f8fafc; 
+            padding: 4px 8px; 
+            border: 1px solid #e2e8f0; 
+            border-radius: 6px;
+        }
+        
+        /* Interactive Chat Utility Layout Styles */
+        .admin-chat-input-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 12px;
+            background: #ffffff;
+            border-top: 1px solid #e2e8f0;
+        }
+        .admin-chat-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .admin-chat-input {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .admin-chat-input:focus {
+            border-color: #0b1e5b;
+            box-shadow: 0 0 0 2px rgba(11, 30, 91, 0.1);
+        }
+        .admin-chat-send-btn {
+            background: #0b1e5b;
+            color: #ffffff;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .admin-chat-send-btn:hover { background: #1e3a8a; }
+        
+        .chat-rendered-media-asset {
+            max-width: 100%;
+            max-height: 240px;
+            border-radius: 8px;
+            margin-top: 6px;
+            cursor: pointer;
+            border: 1px solid #e2e8f0;
+            display: block;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+    `;
+    document.head.appendChild(styleBlock);
+})();
+
+window.activeDisputeChannel = null;
+
+// ✅ 1. Load Main Workspace Table Rows
+window.loadActiveDisputes = async function() {
+    const tbody = document.getElementById('disputesTableBody');
+    if (!tbody) return;
+    
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:40px; color:#64748b;">
+        <i class="fas fa-spinner fa-spin"></i> Analyzing active system conflicts...</td></tr>`;
+
+    const { data: disputes, error } = await supabase
+        .from('disputes')
+        .select('*')
+        .eq('status', 'open')
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        tbody.innerHTML = `<tr><td colspan="6" style="color:#ef4444; text-align:center;">Error: ${error.message}</td></tr>`;
+        return;
+    }
+
+    if (disputes.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:50px; color:#64748b;">
+            <i class="fa-solid fa-scale-balanced" style="font-size:30px; color:#10b981; display:block; margin-bottom:10px;"></i>
+            No active transaction disputes found. Ledger is clean!</td></tr>`;
+        return;
+    }
+
+    const conversationIds = disputes.map(d => d.conversation_id).filter(Boolean);
+    let conversationsMap = {};
+    
+    if (conversationIds.length > 0) {
+        const { data: convData } = await supabase
+            .from('conversations')
+            .select('id, product_name, product_price, buyer_id, seller_id, escrow_step')
+            .in('id', conversationIds);
+            
+        if (convData) {
+            convData.forEach(c => { conversationsMap[c.id] = c; });
+        }
+    }
+
+    tbody.innerHTML = "";
+    disputes.forEach(dispute => {
+        const row = document.createElement('tr');
+        row.style.borderBottom = "1px solid #f1f5f9";
+        
+        const matchedConv = conversationsMap[dispute.conversation_id];
+        
+        // Dynamic Fallback Mapping to resolve "Unknown Product" and "N/A"
+        const productName = matchedConv?.product_name || dispute.product_name || 'General Escrow Contract';
+        const rawPrice = matchedConv?.product_price || dispute.amount;
+        const productPrice = rawPrice ? `₦${Number(rawPrice).toLocaleString()}` : '₦0.00';
+        const targetBuyerId = matchedConv?.buyer_id || dispute.buyer_id || '';
+
+        row.innerHTML = `
+            <td style="padding:15px; font-weight:700; color:#0b1e5b;">${productName}</td>
+            <td style="padding:15px;">
+                <div style="display: inline-flex; align-items: center; gap: 8px;">
+                    <span class="dispute-id-badge" title="${targetBuyerId}">${targetBuyerId ? targetBuyerId.substring(0,8) + '...' : 'N/A'}</span>
+                    <button onclick="window.copyUidToClipboard('${targetBuyerId}', event)" 
+                            style="border:none; background:#f1f5f9; color:#475569; padding:5px 8px; border-radius:6px; cursor:pointer; font-size:12px; transition:all 0.2s;" 
+                            title="Copy Buyer ID">
+                        <i class="fa-solid fa-copy"></i>
+                    </button>
+                </div>
+            </td>
+            <td style="padding:15px; font-weight:600; color:#1e293b;">${dispute.reason || 'No reason specified'}</td>
+            <td style="padding:15px; font-weight:700; color:#b45309;">${productPrice}</td>
+            <td style="padding:15px;"><span class="badge bg-warning" style="padding:5px 10px; border-radius:5px; text-transform: uppercase;">${dispute.status}</span></td>
+            <td style="padding:15px; text-align: right;">
+                <div class="dispute-btn-group">
+                    <button onclick="window.inspectDispute('${dispute.id}')" class="dispute-action-btn dispute-btn-inspect" title="Arbitrate & View Chats">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </button>
+                    <button onclick="window.processDisputeResolution('${dispute.id}', 'resolved')" class="dispute-action-btn dispute-btn-settle" title="Settle Case">
+                        <i class="fa-solid fa-check"></i>
+                    </button>
+                    <button onclick="window.processDisputeResolution('${dispute.id}', 'dismissed')" class="dispute-action-btn dispute-btn-cancel" title="Dismiss Dispute">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+};
+
+// ✅ Helper to render individual message bubbles dynamically
+window.appendSingleBubble = function(msg, dispute, conversation) {
+    const container = document.getElementById('chatBubblesScrollArea');
+    if (!container) return;
+
+    let bubbleBg = '#f1f5f9';
+    let textAlignment = 'flex-end';
+    let borderShape = 'border-radius:12px 12px 2px 12px;';
+    let partyLabel = 'PARTICIPANT';
+    let displayedContent = (msg.content || '').trim();
+
+    if (msg.type === 'system') {
+        if (displayedContent.startsWith('⚠️ [ADMIN RESOLUTION]:')) {
+            bubbleBg = '#f3e8ff'; 
+            textAlignment = 'center';
+            borderShape = 'border-radius:8px; border: 1px solid #d8b4fe;';
+            partyLabel = '⚖️ SYSTEM ARBITRATOR (ADMIN)';
+            displayedContent = displayedContent.replace('⚠️ [ADMIN RESOLUTION]:', '').trim();
+        } else {
+            bubbleBg = '#fffbeb';
+            textAlignment = 'center';
+            borderShape = 'border-radius:8px;';
+            partyLabel = '🤖 SYSTEM ACTION ALERT';
+        }
+    } else if (msg.sender_id === conversation?.buyer_id || msg.sender_id === dispute.buyer_id) {
+        bubbleBg = '#eff6ff';
+        textAlignment = 'flex-start';
+        borderShape = 'border-radius:12px 12px 12px 2px;';
+        partyLabel = 'BUYER';
+    } else if (msg.sender_id === conversation?.seller_id || msg.sender_id === dispute.seller_id) {
+        bubbleBg = '#f0fdf4';
+        textAlignment = 'flex-end';
+        borderShape = 'border-radius:12px 12px 2px 12px;';
+        partyLabel = 'SELLER';
+    }
+
+    const isImageUrl = /^(https?:\/\/.*\.(?:png|jpg|jpeg|gif|webp|svg|bmp))/i.test(displayedContent);
+    const isBase64Image = /^data:image\/(?:png|jpg|jpeg|gif|webp);base64,/i.test(displayedContent);
+
+    if (isImageUrl || isBase64Image) {
+        displayedContent = `<img src="${displayedContent}" class="chat-rendered-media-asset" onclick="window.open('${displayedContent}', '_blank')">`;
+    }
+
+    const itemRow = document.createElement('div');
+    itemRow.style.cssText = `display:flex; flex-direction:column; align-items: ${textAlignment}; max-width:85%; align-self: ${textAlignment}; width: 100%; margin-bottom: 12px;`;
+    
+    itemRow.innerHTML = `
+        <span style="font-size:10px; font-weight:700; color:#64748b; margin-bottom:2px; padding:0 4px;">${partyLabel}</span>
+        <div style="padding:10px 14px; background:${bubbleBg}; border:1px solid #e2e8f0; ${borderShape} font-size:13px; color:#1e293b; line-height:1.4; word-break:break-word;">
+            ${displayedContent || '[Empty Message Body]'}
+        </div>
+        <span style="font-size:9px; color:#94a3b8; margin-top:2px; padding:0 4px;">${new Date(msg.created_at || new Date()).toLocaleString()}</span>
+    `;
+    
+    container.appendChild(itemRow);
+    container.scrollTop = container.scrollHeight;
+};
+
+// ✅ 2. Open Arbitration Dashboard Modal
+window.inspectDispute = async function(id) {
+    if (window.activeDisputeChannel) {
+        await supabase.removeChannel(window.activeDisputeChannel);
+    }
+
+    const modal = document.getElementById('disputeReviewModal');
+    const chatStream = document.getElementById('disputeChatStream');
+    const caseDetails = document.getElementById('disputeCaseDetails');
+    const settleBtn = document.getElementById('arbitrateResolveBtn');
+    
+    modal.style.display = 'block';
+    chatStream.innerHTML = '<p style="color:#64748b; font-size:14px; text-align:center; padding-top:40px;"><i class="fas fa-spinner fa-spin"></i> Loading logs...</p>';
+    caseDetails.innerHTML = '<p style="color:#64748b; font-size:14px;"><i class="fas fa-spinner fa-spin"></i> Loading structural layout data...</p>';
+
+    // --- STEP A: Fetch Disputes Profile Entry ---
+    const { data: dispute, error: disputeError } = await supabase
+        .from('disputes')
+        .select('*')
+        .eq('id', id)
+        .single();
+        
+    if (disputeError) {
+        caseDetails.innerHTML = `<p style="color:#ef4444;">Error: ${disputeError.message}</p>`;
+        return;
+    }
+    
+    const linkedConversationId = dispute?.conversation_id;
+
+    // --- STEP B: Query Target Conversations Table Row ---
+    const { data: conversation } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('id', linkedConversationId)
+        .maybeSingle();
+
+    // --- STEP C: Fetch Message History Archive ---
+    const { data: chatMessages, error: chatError } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('conversation_id', linkedConversationId) 
+        .order('created_at', { ascending: true });
+
+    // --- STEP D: Build Out Chat View DOM Nodes ---
+    chatStream.innerHTML = `
+        <div style="display: flex; flex-direction: column; height: 100%; min-height: 450px; justify-content: space-between;">
+            <div id="chatBubblesScrollArea" style="flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; max-height: 400px; background: #f8fafc; border-radius:8px; border:1px solid #e2e8f0;"></div>
+            <div class="admin-chat-input-container">
+                <div class="admin-chat-row">
+                    <input type="text" id="adminConsoleMessageInput" class="admin-chat-input" placeholder="Type a message to post as Administrator...">
+                    <button onclick="window.sendAdminMessage('${id}', '${linkedConversationId}')" class="admin-chat-send-btn">
+                        <span>Send</span><i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const scrollArea = document.getElementById('chatBubblesScrollArea');
+
+    if (chatError || !chatMessages || chatMessages.length === 0) {
+        scrollArea.innerHTML = `<div id="chatFallbackAlertNotice" style="text-align:center; padding:40px 15px; color:#94a3b8;">No structural message entries found.</div>`;
+    } else {
+        chatMessages.forEach(msg => {
+            window.appendSingleBubble(msg, dispute, conversation);
+        });
+    }
+
+    // --- STEP E: Open Live Postgres Realtime Broadcast Stream Channels ---
+    window.activeDisputeChannel = supabase
+        .channel(`realtime-dispute-feed-${linkedConversationId}`)
+        .on('postgres_changes', { 
+            event: 'INSERT', 
+            schema: 'public', 
+            table: 'messages', 
+            filter: `conversation_id=eq.${linkedConversationId}` 
+        }, payload => {
+            const fallbackAlert = document.getElementById('chatFallbackAlertNotice');
+            if (fallbackAlert) fallbackAlert.remove();
+            
+            window.appendSingleBubble(payload.new, dispute, conversation);
+        })
+        .subscribe();
+
+    // --- STEP F: Parse AI Analytics Metric Engine Records ---
+    let aiHtml = `<div style="padding:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; color:#64748b; font-size:12px;">No automated analytics captured.</div>`;
+    if (dispute.ai_result) {
+        try {
+            const ai = typeof dispute.ai_result === 'string' ? JSON.parse(dispute.ai_result) : dispute.ai_result;
+            aiHtml = `
+                <div style="padding:12px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                        <span style="font-size:11px; font-weight:800; color:#16a34a;">AI COPILOT RUNTIME EVALUATION</span>
+                        <span style="font-size:11px; font-weight:800; color:#16a34a;">🎯 Confidence: ${ai.confidence}%</span>
+                    </div>
+                    <div style="font-size:13px; font-weight:700; color:#14532d; margin-bottom:4px; text-transform:uppercase;">Proposed Resolution: ${ai.decision?.replace(/_/g, ' ')}</div>
+                    <div style="font-size:12px; color:#166534; line-height:1.3;">"${ai.reason}"</div>
+                </div>
+            `;
+        } catch(e) { console.error("❌ JSON Error parsing dispute.ai_result", e); }
+    }
+
+    // --- STEP G: Build the Arbitration Data Sidebar Metadata View Panel ---
+    const finalPriceDisplay = conversation?.product_price ? `₦${Number(conversation.product_price).toLocaleString()}` : '₦0.00';
+    const finalBuyerId = conversation?.buyer_id || dispute.buyer_id || 'N/A';
+    const finalSellerId = conversation?.seller_id || dispute.seller_id || 'N/A';
+    const finalEscrowStep = conversation?.escrow_step !== undefined ? conversation.escrow_step : 'N/A';
+
+    caseDetails.innerHTML = `
+        <div style="margin-bottom:14px;">
+            <label style="display:block; font-size:10px; font-weight:800; color:#64748b; margin-bottom:3px; text-transform:uppercase;">Relational Conversation ID</label>
+            <div style="padding:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; font-size:12px; font-family:monospace; color:#0b1e5b; word-break:break-all;">${linkedConversationId}</div>
+        </div>
+        
+        <div style="margin-bottom:14px; display:flex; gap:10px;">
+            <div style="flex:1;">
+                <label style="display:block; font-size:10px; font-weight:800; color:#64748b; margin-bottom:3px; text-transform:uppercase;">Contract Item Product</label>
+                <div style="padding:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; font-size:13px; font-weight:700; color:#1e293b;">${conversation?.product_name || dispute.product_name || 'N/A'}</div>
+            </div>
+            <div style="flex:1;">
+                <label style="display:block; font-size:10px; font-weight:800; color:#64748b; margin-bottom:3px; text-transform:uppercase;">Escrow Value Cost</label>
+                <div style="padding:10px; background:#fff7ed; border:1px solid #ffedd5; border-radius:8px; font-size:13px; color:#c2410c; font-weight:800;">
+                    ${finalPriceDisplay}
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-bottom:14px; display:flex; gap:10px;">
+            <div style="flex:1;">
+                <label style="display:block; font-size:10px; font-weight:800; color:#64748b; margin-bottom:3px; text-transform:uppercase;">Escrow Step Level</label>
+                <div style="padding:10px; background:#f0fdfa; border:1px solid #ccfbf1; border-radius:8px; font-size:13px; font-weight:700; color:#0d9488;">Step ${finalEscrowStep}</div>
+            </div>
+        </div>
+
+        <div style="margin-bottom:14px;">
+            <label style="display:block; font-size:10px; font-weight:800; color:#64748b; margin-bottom:3px; text-transform:uppercase;">Contract Buyer UUID Ref</label>
+            <div style="padding:8px 10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; font-size:11px; font-family:monospace; color:#334155; word-break:break-all;">${finalBuyerId}</div>
+        </div>
+
+        <div style="margin-bottom:14px;">
+            <label style="display:block; font-size:10px; font-weight:800; color:#64748b; margin-bottom:3px; text-transform:uppercase;">Contract Seller UUID Ref</label>
+            <div style="padding:8px 10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; font-size:11px; font-family:monospace; color:#334155; word-break:break-all;">${finalSellerId}</div>
+        </div>
+        
+        <div style="margin-bottom:14px;">
+            <label style="display:block; font-size:10px; font-weight:800; color:#64748b; margin-bottom:3px; text-transform:uppercase;">Dispute Trigger Subject</label>
+            <div style="padding:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; font-size:13px; color:#1e293b; font-weight:600;">${dispute.reason || 'General Claim File'}</div>
+        </div>
+        
+      <div style="margin-bottom:14px;">
+            <label style="display:block; font-size:10px; font-weight:800; color:#64748b; margin-bottom:3px; text-transform:uppercase;">Claimant Narrative Accusation</label>
+            <div style="padding:12px; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:8px; font-size:13px; color:#334155; line-height:1.4; max-height:100px; overflow-y:auto; white-space:pre-wrap;">"${dispute.description || 'No written declaration evidence uploaded.'}"</div>
+        </div>
+        
+        <div>
+            <label style="display:block; font-size:10px; font-weight:800; color:#64748b; margin-bottom:4px; text-transform:uppercase;">AI Copilot Recommendation Engine</label>
+            ${aiHtml}
+        </div>
+    `;
+
+    settleBtn.onclick = () => {
+        window.closeDisputeModal();
+        window.processDisputeResolution(id, 'resolved');
+    };
+};
+
+// ✅ Broadcast Text Entry & Perform Downstream Interlinked Relational State Machine Mutations
+window.sendAdminMessage = async function(disputeId, conversationId) {
+    const inputField = document.getElementById('adminConsoleMessageInput');
+    if (!inputField) return;
+    
+    const textRaw = inputField.value.trim();
+    if (!textRaw) return; 
+
+    // 1. Establish structural prefixing properties
+    const formattedAdminMessageText = `⚠️ [ADMIN RESOLUTION]: ${textRaw}`;
+
+    // 2. Fetch the target conversational record to analyze current workflow state
+    const { data: currentConv } = await supabase
+        .from('conversations')
+        .select('status')
+        .eq('id', conversationId)
+        .maybeSingle();
+
+    // 3. Inject system notification message if conversation status is currently disputed
+    if (currentConv && currentConv.status === 'disputed') {
+        await supabase
+            .from('messages')
+            .insert([{
+                conversation_id: conversationId,
+                content: `⚖️ An administrator has joined the conversation session.`,
+                type: 'system',
+                is_read: false
+            }]);
+    }
+
+    // 4. Save the administrator's operational entry message parameters
+    const { error: insertError } = await supabase
+        .from('messages')
+        .insert([{
+            conversation_id: conversationId,
+            content: formattedAdminMessageText,
+            type: 'system', 
+            is_read: false
+        }]);
+
+    if (insertError) {
+        console.error("❌ Failed to save admin text message:", insertError);
+        Swal.fire("Transmission Error", insertError.message, "error");
+        return;
+    }
+
+// ====== START OF NOTIFICATION & TELEGRAM INJECTION SNIPPET ======
+try {
+    // 1. Fetch the conversation data to grab the buyer and seller UUIDs
+    const { data: convInfo } = await supabase
+        .from('conversations')
+        .select('buyer_id, seller_id, product_name, status')
+        .eq('id', conversationId)
+        .maybeSingle();
+
+    // 💡 ONLY execute if the conversation status is currently marked as 'disputed'
+    if (convInfo && convInfo.status === 'disputed') {
+        const notificationTitle = `⚖️ Dispute Update: ${convInfo.product_name}`;
+        const notificationBody = `An administrator has joined the conversation session.`;
+        
+        const notificationInserts = [];
+        const targetUserIds = [];
+
+        if (convInfo.buyer_id) targetUserIds.push(convInfo.buyer_id);
+        if (convInfo.seller_id) targetUserIds.push(convInfo.seller_id);
+
+        // --- PART A: In-App Database Notifications Setup ---
+        if (convInfo.buyer_id) {
+            notificationInserts.push({
+                user_id: convInfo.buyer_id,
+                title: notificationTitle,
+                message: notificationBody,
+                icon: "fas fa-scale-balanced",
+                is_read: false,
+                type: "dispute_alert"
+            });
+        }
+
+        if (convInfo.seller_id) {
+            notificationInserts.push({
+                user_id: convInfo.seller_id,
+                title: notificationTitle,
+                message: notificationBody,
+                icon: "fas fa-scale-balanced",
+                is_read: false,
+                type: "dispute_alert"
+            });
+        }
+
+        if (notificationInserts.length > 0) {
+            const { error: notifError } = await supabase
+                .from('notifications')
+                .insert(notificationInserts);
+
+            if (notifError) console.error("❌ Notification table insert error:", notifError);
+        }
+
+        // --- PART B: Telegram Routing Engine ---
+        if (targetUserIds.length > 0) {
+            // 2. Query the profiles table using the gathered IDs
+            const { data: userProfiles, error: profileError } = await supabase
+                .from('profiles')
+                .select('id, telegram_chat_id')
+                .in('id', targetUserIds);
+
+            if (!profileError && userProfiles && userProfiles.length > 0) {
+                // ⚠️ REPLACE THIS STRING WITH YOUR ACTUAL TELEGRAM BOT TOKEN CONFIGURATION VALUE
+                const TELEGRAM_BOT_TOKEN = "8436841265:AAHIh50C2bEamKqB649Dx_CRy7l8X6f2yqg"; 
+                const telegramApiUrl = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+                
+                const telegramMessageText = `*⚖️ Dispute Update: ${convInfo.product_name}*\n\nAn administrator has joined the conversation session.`;
+
+                // 3. Loop over retrieved profiles and fire async HTTP requests to Telegram API endpoints
+                userProfiles.forEach(async (profile) => {
+                    if (profile.telegram_chat_id) {
+                        try {
+                            await fetch(telegramApiUrl, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    chat_id: profile.telegram_chat_id,
+                                    text: telegramMessageText,
+                                    parse_mode: 'Markdown'
+                                })
+                            });
+                        } catch (telegramHttpErr) {
+                            console.error(`❌ Telegram transmission failed for user profile ${profile.id}:`, telegramHttpErr);
+                        }
+                    }
+                });
+            } else if (profileError) {
+                console.error("❌ Error fetching profiles for Telegram distribution:", profileError);
+            }
+        }
+    }
+} catch (err) {
+    console.error("❌ Unexpected notification system failure:", err);
+}
+// ====== END OF NOTIFICATION & TELEGRAM INJECTION SNIPPET ======
+
+
+    // 5. Update parent conversations lifecycle schema states
+    // Changes status flag to 'active' and updates last_message using the raw un-prefixed clean text
+    const { error: updateError } = await supabase
+        .from('conversations')
+        .update({
+            status: 'active',
+            last_message: textRaw,
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', conversationId);
+
+    if (updateError) {
+        console.error("❌ Failed to mutate parent conversation record:", updateError);
+    } else {
+        inputField.value = ""; 
+    }
+};
+
+// ✅ 3. Settle Dispute Database Records
+window.processDisputeResolution = async function(id, statusOutcome) {
+    const { error } = await supabase
+        .from('disputes')
+        .update({ 
+            status: statusOutcome,
+            resolved_at: new Date().toISOString()
+        })
+        .eq('id', id);
+
+    if (!error) {
+        Swal.fire({ icon: 'success', title: `Dispute Case Settled: ${statusOutcome}`, timer: 1200, showConfirmButton: false });
+        window.loadActiveDisputes();
+    } else {
+        Swal.fire("Arbitration Update Error", error.message, "error");
+    }
+};
+
+window.closeDisputeModal = async function() {
+    document.getElementById('disputeReviewModal').style.display = 'none';
+    if (window.activeDisputeChannel) {
+        await supabase.removeChannel(window.activeDisputeChannel);
+        window.activeDisputeChannel = null;
+    }
 };
 
 

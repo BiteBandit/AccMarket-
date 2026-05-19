@@ -87,7 +87,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
-  // ✅ Fill all fields
+    // ✅ Fill all fields
   fullNameEl.textContent = profile.full_name || "Not set";
   usernameEl.textContent = profile.username || "@username";
   emailEl.textContent = user.email || "No email";
@@ -125,56 +125,128 @@ document.addEventListener("DOMContentLoaded", async () => {
     console.error("🌍 Failed to get country info:", err);
   }
 
-  // ✅ Auto-save with 14-Day Cooldown for Name and Username
+  // ✅ Auto-save with Unique Username & Phone Number Scanner (No Cooldowns)
   [fullNameEl, usernameEl, phoneEl, aboutEl].forEach((el) => {
     el.addEventListener("blur", async () => {
-      const isNameField = el === fullNameEl || el === usernameEl;
-      const newValue = el.textContent.trim();
+      const isUsernameField = el === usernameEl;
+      const isPhoneField = el === phoneEl;
+      let newValue = el.textContent.trim();
       
-      // Get the values currently saved in the database (from the profile object)
-      const originalValue = el === fullNameEl ? profile.full_name : profile.username;
+      // Map original value from memory safely
+      const originalValue = 
+        el === fullNameEl ? profile.full_name :
+        el === usernameEl ? profile.username :
+        el === phoneEl ? profile.phone : 
+        profile.about;
 
-      // Skip if the user didn't actually change the text
+      // Skip if the user didn't actually change anything
       if (newValue === (originalValue || "")) return;
 
-      // --- 1. COOLDOWN CHECK FOR NAME/USERNAME ---
-      if (isNameField && profile?.last_name_update) {
-        const cooldownDays = 7; 
-        const lastUpdate = new Date(profile.last_name_update).getTime();
-        const now = Date.now();
-        const msInCooldown = cooldownDays * 24 * 60 * 60 * 1000;
-
-        if (now - lastUpdate < msInCooldown) {
-          const diff = msInCooldown - (now - lastUpdate);
-          const daysLeft = Math.ceil(diff / (1000 * 60 * 60 * 24));
-
+      // --- 🎯 UNIQUE USERNAME SCANNER (Facebook Style with Warnings) ---
+      if (isUsernameField) {
+        newValue = newValue.toLowerCase();
+        
+        // Test if the username contains forbidden characters
+        const hasInvalidCharacters = /[^a-z0-9___-]/g.test(newValue);
+        
+        if (hasInvalidCharacters) {
           Swal.fire({
-            icon: "warning",
-            title: "Wait a bit!",
-            text: `Names can only be changed once every ${cooldownDays} days. ${daysLeft} days remaining.`,
+            icon: "error",
+            title: "Invalid Characters",
+            text: "Usernames can only contain letters, numbers, underscores (_), and hyphens (-). No symbols like @ allowed!",
+            confirmButtonColor: "#3b82f6"
           });
-          
-          // Revert the text back to the database value
-          el.textContent = originalValue || "";
+          usernameEl.textContent = originalValue || "@username";
+          return; 
+        }
+
+        if (newValue.length === 0) {
+          Swal.fire({ icon: "warning", title: "Invalid Username", text: "Username cannot be empty." });
+          usernameEl.textContent = originalValue || "@username";
           return;
+        }
+
+        // Scan the database to see if any other profile has already taken this name
+        const { data: existingUser, error: scanError } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("username", newValue)
+          .neq("id", userId) // Ignore the user's current record so they can re-save their own name
+          .maybeSingle();
+
+        if (scanError) {
+          console.error("Database lookup error:", scanError);
+          return;
+        }
+
+        if (existingUser) {
+          Swal.fire({
+            icon: "error",
+            title: "Username Taken",
+            text: `@${newValue} is already claimed by another user. Choose a different one!`,
+            confirmButtonColor: "#3b82f6"
+          });
+          usernameEl.textContent = originalValue || "@username";
+          return; // Stop execution, reject database updates
+        }
+        
+        usernameEl.textContent = newValue;
+      }
+
+      // --- 📞 SMART UNIQUE PHONE VALIDATOR ---
+      if (isPhoneField && newValue.length > 0) {
+        // Strip out common formatting characters like spaces, hyphens, and parentheses to check raw digits
+        const cleanNewPhone = newValue.replace(/[\s+\-()]/g, "");
+        
+        // 1. Syntax Check: Check if the clean version contains any letters or symbols
+        const hasInvalidPhoneChars = /[^0-9]/g.test(cleanNewPhone);
+
+        if (hasInvalidPhoneChars) {
+          Swal.fire({
+            icon: "error",
+            title: "Invalid Phone Number",
+            text: "Phone numbers can only contain digits and standard formatting characters like +, -, or (). Letters are not allowed.",
+            confirmButtonColor: "#3b82f6"
+          });
+          phoneEl.textContent = originalValue || ""; 
+          return; // Block save execution
+        }
+
+        // 2. Uniqueness Scanner: Scan the database to see if this number is already attached to another user
+        const { data: existingPhone, error: phoneScanError } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("phone", newValue) // Compares against the entered value string
+          .neq("id", userId)     // Ignores your own account profile ID
+          .maybeSingle();
+
+        if (phoneScanError) {
+          console.error("Phone lookup database error:", phoneScanError);
+          return;
+        }
+
+        if (existingPhone) {
+          Swal.fire({
+            icon: "error",
+            title: "Phone Number In Use",
+            text: "This phone number is already registered to another account. Please use a different one.",
+            confirmButtonColor: "#3b82f6"
+          });
+          phoneEl.textContent = originalValue || ""; // Revert UI text back
+          return; // Stop execution
         }
       }
 
-      // --- 2. PREPARE UPDATES ---
+      // --- 🛠️ PREPARE UPDATES ---
       const updates = {
         full_name: fullNameEl.textContent.trim(),
-        username: usernameEl.textContent.trim(),
+        username: usernameEl.textContent.trim().toLowerCase(), // Normalize saved handles
         phone: phoneEl.textContent.trim(),
         about: aboutEl.textContent.trim(),
         updated_at: new Date().toISOString(),
       };
 
-      // Only lock the cooldown if a name field was changed
-      if (isNameField) {
-        updates.last_name_update = new Date().toISOString();
-      }
-
-      // --- 3. EXECUTE UPDATE ---
+      // --- ⚡ EXECUTE UPDATE ---
       const { error: updateError } = await supabase
         .from("profiles")
         .update(updates)
@@ -182,13 +254,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       if (updateError) {
         Swal.fire({ icon: "error", title: "Update Failed", text: updateError.message });
+        el.textContent = originalValue || ""; // Revert to old text if save fails
       } else {
-        // Update the local profile object so the cooldown works without refreshing
-        if (isNameField) {
-          profile.last_name_update = updates.last_name_update;
-          profile.full_name = updates.full_name;
-          profile.username = updates.username;
-        }
+        // Sync local object records instantly in-memory without refreshing the page
+        profile.full_name = updates.full_name;
+        profile.username = updates.username;
+        profile.phone = updates.phone;
+        profile.about = updates.about;
         
         Swal.fire({
           icon: "success",
@@ -199,6 +271,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     });
   });
+
 
 
   // ✅ Delete Account (set inactive)
