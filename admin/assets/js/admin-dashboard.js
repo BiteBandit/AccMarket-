@@ -2733,9 +2733,9 @@ window.sendAdminMessage = async function(disputeId, conversationId) {
                 if (notifError) console.error("❌ Notification table insert error:", notifError);
             }
 
-            // --- PART B: Multi-Channel Routing Engine (Telegram & OneSignal) ---
+            // --- PART B: Multi-Channel Routing Engine (Telegram & OneSignal Edge Relay) ---
             if (targetUserIds.length > 0) {
-                // 2. Query profiles for both Telegram chat IDs and OneSignal IDs
+                // Query profiles for both Telegram chat IDs and OneSignal IDs
                 const { data: userProfiles, error: profileError } = await supabase
                     .from('profiles')
                     .select('id, telegram_chat_id, onesignal_id')
@@ -2748,11 +2748,6 @@ window.sendAdminMessage = async function(disputeId, conversationId) {
                     const telegramApiUrl = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
                     const telegramMessageText = `*⚖️ Dispute Update: ${convInfo.product_name}*\n\nAdmin ${adminUsername} has joined the conversation session.\n\n🔗 [Click here to join the chat](https://www.accmarket.name.ng/chats?id=${conversationId})`;
 
-                    // 🔔 2️⃣ OneSignal Credentials Setup
-                    const ONESIGNAL_APP_ID = "e0c81302-9932-420b-885f-f553995f432e";
-                    // ⚠️ REPLACE THIS with your secure OneSignal REST API Key from your OneSignal Dashboard Settings
-                    const ONESIGNAL_REST_API_KEY = "os_v2_app_4debgauzgjbaxcc76vjzsx2dfyaiwdjwqkmui6ex4ogyrp3rigtzhvqtewcjn7vus2o3ptpabahb3mbkybycayx4umx6aur3kqi5gha"; 
-                    
                     const oneSignalDeviceIds = [];
 
                     // Loop over retrieved profiles to route messages
@@ -2780,26 +2775,32 @@ window.sendAdminMessage = async function(disputeId, conversationId) {
                         }
                     });
 
-                    // 💥 3️⃣ Fire OneSignal HTTP Push Notification Request
+                    // 💥 2️⃣ Fire OneSignal Push via Supabase Edge Function 'swift-handler'
                     if (oneSignalDeviceIds.length > 0) {
                         try {
-                            await fetch("https://onesignal.com/api/v1/notifications", {
-                                method: "POST",
-                                headers: {
-                                    "Content-Type": "application/json; charset=utf-8",
-                                    "Authorization": `Basic ${ONESIGNAL_REST_API_KEY}`
-                                },
-                                body: JSON.stringify({
-                                    app_id: ONESIGNAL_APP_ID,
-                                    include_subscription_ids: oneSignalDeviceIds, 
-                                    headings: { "en": notificationTitle },
-                                    contents: { "en": notificationBody },
+                            console.log(`Routing push payload via swift-handler edge function...`);
+                            
+                            // A. Fetch current session token manually to guarantee explicit authorization inclusion
+                            const { data: sessionData } = await supabase.auth.getSession();
+                            const token = sessionData?.session?.access_token;
+
+                            // Invokes your edge function to bypass browser-based CORS blocks securely
+                            await supabase.functions.invoke('swift-handler', {
+                                body: {
+                                    deviceIds: oneSignalDeviceIds,
+                                    title: notificationTitle,
+                                    body: notificationBody,
                                     url: `https://www.accmarket.name.ng/chats?id=${conversationId}`
-                                })
+                                },
+                                // B. Explicitly pass the active JWT as a Bearer Token if it exists
+                                headers: token ? {
+                                    "Authorization": `Bearer ${token}`
+                                } : {}
                             });
-                            console.log(`✅ OneSignal push notification payload dispatched to ${oneSignalDeviceIds.length} users.`);
+                            
+                            console.log(`✅ Push payload successfully routed to swift-handler for ${oneSignalDeviceIds.length} devices.`);
                         } catch (pushErr) {
-                            console.error("❌ OneSignal Push Delivery pipeline failure:", pushErr);
+                            console.error("❌ swift-handler Edge function invocation failure:", pushErr);
                         }
                     }
 
@@ -2812,6 +2813,7 @@ window.sendAdminMessage = async function(disputeId, conversationId) {
         console.error("❌ Unexpected notification system failure:", err);
     }
     // ====== END OF NOTIFICATION & TELEGRAM & ONESIGNAL INJECTION SNIPPET ======
+
 
     // 5. Update parent conversations lifecycle schema states
     const { error: updateError } = await supabase
@@ -2829,6 +2831,7 @@ window.sendAdminMessage = async function(disputeId, conversationId) {
         inputField.value = ""; 
     }
 };
+
 
 
 
