@@ -972,3 +972,158 @@ const handleProfilePicStats = async () => {
 };
 
 handleProfilePicStats();
+
+// ✅ Push Notifications Settings Toggle (OneSignal + Supabase Integration)
+document.addEventListener("DOMContentLoaded", async () => {
+  const pushToggle = document.getElementById("oneSignalSetupBtn");
+  if (!pushToggle) return;
+
+  // Get current logged-in user from Supabase
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
+    console.warn("⚠️ No authenticated user detected for Push Notifications setup.");
+    return;
+  }
+
+  const userId = user.id;
+
+  // 1️⃣ Load initial toggle status from the database on page load
+  try {
+    const { data: profile, error: fetchError } = await supabase
+      .from("profiles")
+      .select("onesignal_id")
+      .eq("id", userId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    // If an ID already exists, flip the switch to true
+    if (profile && profile.onesignal_id) {
+      pushToggle.checked = true;
+    }
+  } catch (err) {
+    console.error("❌ Failed to load initial push notification state:", err.message);
+  }
+
+  // Helper utility for cleanly pausing execution async-style
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  // 2️⃣ Listen for user interaction on the switch toggle
+  pushToggle.addEventListener("change", async () => {
+    const isTurningOn = pushToggle.checked;
+
+    // --- CASE A: USER IS TURNING NOTIFICATIONS ON ---
+    if (isTurningOn) {
+      // Temporarily lock switch interactions during authorization workflows
+      pushToggle.disabled = true;
+
+      try {
+        // Double check that OneSignal SDK is loaded on the page window object
+        if (!window.OneSignal) {
+          Swal.fire({
+            icon: "warning",
+            title: "System Lag",
+            text: "Notification engines are still initializing. Please wait a moment and try again."
+          });
+          pushToggle.checked = false;
+          pushToggle.disabled = false;
+          return;
+        }
+
+        console.log("Requesting explicit device push authorization via OneSignal...");
+        await window.OneSignal.Notifications.requestPermission();
+
+        // Pause briefly to give OneSignal background tasks time to register the platform token ID
+        await sleep(1200);
+
+        const subscriptionId = window.OneSignal.User.PushSubscription?.id;
+
+        if (subscriptionId) {
+          // Save registration token string right back to the user's Supabase profile row
+          const { error: patchError } = await supabase
+            .from("profiles")
+            .update({ 
+              onesignal_id: subscriptionId,
+              updated_at: new Date().toISOString()
+            })
+            .eq("id", userId);
+
+          if (!patchError) {
+            Swal.fire({
+              icon: "success",
+              title: "Alerts Activated!",
+              text: "Your device has been linked to your account. You will now receive real-time updates.",
+              timer: 2500,
+              showConfirmButton: false
+            });
+          } else {
+            throw new Error(patchError.message);
+          }
+        } else {
+          // Triggered if the user hits 'Block/Deny' or prematurely breaks the active native window prompt
+          Swal.fire({
+            icon: "info",
+            title: "Permission Needed",
+            text: "Notifications were not enabled. Please check your browser's site settings permission and allow alerts manually."
+          });
+          pushToggle.checked = false;
+        }
+      } catch (err) {
+        console.error("❌ Settings layout device registration transaction anomaly:", err);
+        Swal.fire({
+          icon: "error",
+          title: "Sync Error",
+          text: "We couldn't save your device key to your profile. Please try again later."
+        });
+        pushToggle.checked = false;
+      } finally {
+        pushToggle.disabled = false;
+      }
+
+    // --- CASE B: USER IS TURNING NOTIFICATIONS OFF ---
+    } else {
+      // Prompt user to confirm they want to turn off alerts
+      const confirmOptOut = await Swal.fire({
+        title: "Disable Alerts?",
+        text: "You will stop receiving updates regarding active disputes and transaction statuses on this device.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#3b82f6",
+        cancelButtonColor: "#6b7280",
+        confirmButtonText: "Yes, turn off"
+      });
+
+      if (confirmOptOut.isConfirmed) {
+        pushToggle.disabled = true;
+        try {
+          // Remove token field trace reference directly out of your Supabase records
+          const { error: clearError } = await supabase
+            .from("profiles")
+            .update({ 
+              onesignal_id: null,
+              updated_at: new Date().toISOString()
+            })
+            .eq("id", userId);
+
+          if (clearError) throw clearError;
+
+          Swal.fire({
+            icon: "success",
+            title: "Deactivated",
+            text: "Push alerts have been disabled.",
+            timer: 1500,
+            showConfirmButton: false
+          });
+        } catch (err) {
+          console.error("❌ Failed to clear notification parameters:", err.message);
+          pushToggle.checked = true; // Rollback switch toggle view back to true 
+        } finally {
+          pushToggle.disabled = false;
+        }
+      } else {
+        // If the cancel button was clicked, snap the visual toggle back to true
+        pushToggle.checked = true;
+      }
+    }
+  });
+});

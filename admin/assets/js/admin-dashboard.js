@@ -2611,6 +2611,9 @@ window.inspectDispute = async function(id) {
 };
 
 // ✅ Broadcast Text Entry & Perform Downstream Interlinked Relational State Machine Mutations
+
+
+
 window.sendAdminMessage = async function(disputeId, conversationId) {
     const inputField = document.getElementById('adminConsoleMessageInput');
     if (!inputField) return;
@@ -2628,13 +2631,37 @@ window.sendAdminMessage = async function(disputeId, conversationId) {
         .eq('id', conversationId)
         .maybeSingle();
 
+// 🌟 Fetch the current logged-in Admin's user profile data dynamically from the database
+let adminUsername = "An administrator";
+try {
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (authUser) {
+        // Query your custom 'profiles' table using the logged-in admin's ID
+        const { data: adminProfile } = await supabase
+            .from('profiles')
+            .select('username')
+            .eq('id', authUser.id)
+            .maybeSingle();
+
+        // Check our new database query first, then fall back to metadata or email
+        adminUsername = adminProfile?.username || 
+                        authUser.user_metadata?.username || 
+                        authUser.user_metadata?.full_name || 
+                        authUser.email?.split('@')[0] || 
+                        "An administrator";
+    }
+} catch (authErr) {
+    console.error("❌ Failed to parse admin user profile context:", authErr);
+}
+ 
+
     // 3. Inject system notification message if conversation status is currently disputed
     if (currentConv && currentConv.status === 'disputed') {
         await supabase
             .from('messages')
             .insert([{
                 conversation_id: conversationId,
-                content: `⚖️ An administrator has joined the conversation session.`,
+                content: `⚖️ Admin ${adminUsername} has joined the conversation session.`,
                 type: 'system',
                 is_read: false
             }]);
@@ -2656,103 +2683,100 @@ window.sendAdminMessage = async function(disputeId, conversationId) {
         return;
     }
 
-// ====== START OF NOTIFICATION & TELEGRAM INJECTION SNIPPET ======
-try {
-    // 1. Fetch the conversation data to grab the buyer and seller UUIDs
-    const { data: convInfo } = await supabase
-        .from('conversations')
-        .select('buyer_id, seller_id, product_name, status')
-        .eq('id', conversationId)
-        .maybeSingle();
+    // ====== START OF NOTIFICATION & TELEGRAM INJECTION SNIPPET ======
+    try {
+        // 1. Fetch the conversation data to grab the buyer and seller UUIDs
+        const { data: convInfo } = await supabase
+            .from('conversations')
+            .select('buyer_id, seller_id, product_name, status')
+            .eq('id', conversationId)
+            .maybeSingle();
 
-    // 💡 ONLY execute if the conversation status is currently marked as 'disputed'
-    if (convInfo && convInfo.status === 'disputed') {
-        const notificationTitle = `⚖️ Dispute Update: ${convInfo.product_name}`;
-        const notificationBody = `An administrator has joined the conversation session.`;
-        
-        const notificationInserts = [];
-        const targetUserIds = [];
+        // 💡 ONLY execute if the conversation status is currently marked as 'disputed'
+        if (convInfo && convInfo.status === 'disputed') {
+            const notificationTitle = `⚖️ Dispute Update: ${convInfo.product_name}`;
+            const notificationBody = `${adminUsername} has joined the conversation session.`;
+            
+            const notificationInserts = [];
+            const targetUserIds = [];
 
-        if (convInfo.buyer_id) targetUserIds.push(convInfo.buyer_id);
-        if (convInfo.seller_id) targetUserIds.push(convInfo.seller_id);
+            if (convInfo.buyer_id) targetUserIds.push(convInfo.buyer_id);
+            if (convInfo.seller_id) targetUserIds.push(convInfo.seller_id);
 
-        // --- PART A: In-App Database Notifications Setup ---
-        if (convInfo.buyer_id) {
-            notificationInserts.push({
-                user_id: convInfo.buyer_id,
-                title: notificationTitle,
-                message: notificationBody,
-                icon: "fas fa-scale-balanced",
-                is_read: false,
-                type: "dispute_alert"
-            });
-        }
-
-        if (convInfo.seller_id) {
-            notificationInserts.push({
-                user_id: convInfo.seller_id,
-                title: notificationTitle,
-                message: notificationBody,
-                icon: "fas fa-scale-balanced",
-                is_read: false,
-                type: "dispute_alert"
-            });
-        }
-
-        if (notificationInserts.length > 0) {
-            const { error: notifError } = await supabase
-                .from('notifications')
-                .insert(notificationInserts);
-
-            if (notifError) console.error("❌ Notification table insert error:", notifError);
-        }
-
-        // --- PART B: Telegram Routing Engine ---
-        if (targetUserIds.length > 0) {
-            // 2. Query the profiles table using the gathered IDs
-            const { data: userProfiles, error: profileError } = await supabase
-                .from('profiles')
-                .select('id, telegram_chat_id')
-                .in('id', targetUserIds);
-
-            if (!profileError && userProfiles && userProfiles.length > 0) {
-                // ⚠️ REPLACE THIS STRING WITH YOUR ACTUAL TELEGRAM BOT TOKEN CONFIGURATION VALUE
-                const TELEGRAM_BOT_TOKEN = "8436841265:AAHIh50C2bEamKqB649Dx_CRy7l8X6f2yqg"; 
-                const telegramApiUrl = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-                
-                const telegramMessageText = `*⚖️ Dispute Update: ${convInfo.product_name}*\n\nAn administrator has joined the conversation session.`;
-
-                // 3. Loop over retrieved profiles and fire async HTTP requests to Telegram API endpoints
-                userProfiles.forEach(async (profile) => {
-                    if (profile.telegram_chat_id) {
-                        try {
-                            await fetch(telegramApiUrl, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    chat_id: profile.telegram_chat_id,
-                                    text: telegramMessageText,
-                                    parse_mode: 'Markdown'
-                                })
-                            });
-                        } catch (telegramHttpErr) {
-                            console.error(`❌ Telegram transmission failed for user profile ${profile.id}:`, telegramHttpErr);
-                        }
-                    }
+            // --- PART A: In-App Database Notifications Setup ---
+            if (convInfo.buyer_id) {
+                notificationInserts.push({
+                    user_id: convInfo.buyer_id,
+                    title: notificationTitle,
+                    message: notificationBody,
+                    icon: "fas fa-scale-balanced",
+                    is_read: false,
+                    type: "dispute_alert"
                 });
-            } else if (profileError) {
-                console.error("❌ Error fetching profiles for Telegram distribution:", profileError);
+            }
+
+            if (convInfo.seller_id) {
+                notificationInserts.push({
+                    user_id: convInfo.seller_id,
+                    title: notificationTitle,
+                    message: notificationBody,
+                    icon: "fas fa-scale-balanced",
+                    is_read: false,
+                    type: "dispute_alert"
+                });
+            }
+
+            if (notificationInserts.length > 0) {
+                const { error: notifError } = await supabase
+                    .from('notifications')
+                    .insert(notificationInserts);
+
+                if (notifError) console.error("❌ Notification table insert error:", notifError);
+            }
+
+            // --- PART B: Telegram Routing Engine ---
+            if (targetUserIds.length > 0) {
+                // 2. Query the profiles table using the gathered IDs
+                const { data: userProfiles, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('id, telegram_chat_id')
+                    .in('id', targetUserIds);
+
+                if (!profileError && userProfiles && userProfiles.length > 0) {
+                    const TELEGRAM_BOT_TOKEN = "8436841265:AAHIh50C2bEamKqB649Dx_CRy7l8X6f2yqg"; 
+                    const telegramApiUrl = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+                    
+                    const telegramMessageText = `*⚖️ Dispute Update: ${convInfo.product_name}*\n\n${adminUsername} has joined the conversation session.\n\n🔗 [Click here to join the chat](https://www.accmarket.name.ng/chats?id=${conversationId})`;
+
+                    // 3. Loop over retrieved profiles and fire async HTTP requests to Telegram API endpoints
+                    userProfiles.forEach(async (profile) => {
+                        if (profile.telegram_chat_id) {
+                            try {
+                                await fetch(telegramApiUrl, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        chat_id: profile.telegram_chat_id,
+                                        text: telegramMessageText,
+                                        parse_mode: 'Markdown'
+                                    })
+                                });
+                            } catch (telegramHttpErr) {
+                                console.error(`❌ Telegram transmission failed for user profile ${profile.id}:`, telegramHttpErr);
+                            }
+                        }
+                    });
+                } else if (profileError) {
+                    console.error("❌ Error fetching profiles for Telegram distribution:", profileError);
+                }
             }
         }
+    } catch (err) {
+        console.error("❌ Unexpected notification system failure:", err);
     }
-} catch (err) {
-    console.error("❌ Unexpected notification system failure:", err);
-}
-// ====== END OF NOTIFICATION & TELEGRAM INJECTION SNIPPET ======
-
+    // ====== END OF NOTIFICATION & TELEGRAM INJECTION SNIPPET ======
 
     // 5. Update parent conversations lifecycle schema states
-    // Changes status flag to 'active' and updates last_message using the raw un-prefixed clean text
     const { error: updateError } = await supabase
         .from('conversations')
         .update({
@@ -2768,6 +2792,7 @@ try {
         inputField.value = ""; 
     }
 };
+
 
 // ✅ 3. Settle Dispute Database Records
 window.processDisputeResolution = async function(id, statusOutcome) {
