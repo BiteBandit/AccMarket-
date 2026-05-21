@@ -428,6 +428,7 @@ async function processTransaction(account, totalWithFee, originalPrice, buyerId)
     try {
         Swal.fire({ title: 'Processing Transaction...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
+        // Lock down verification record status
         const { data: lockCheck, error: lockError } = await supabase
             .from('verifications')
             .update({ status: 'in_progress' })
@@ -439,9 +440,10 @@ async function processTransaction(account, totalWithFee, originalPrice, buyerId)
             return Swal.fire("Unavailable", "This account was just taken or is no longer available.", "error");
         }
 
+        // Verify balance
         const { data: buyer, error: balanceError } = await supabase
             .from('profiles')
-            .select('balance')
+            .select('username, full_name, balance')
             .eq('id', buyerId)
             .single();
 
@@ -450,10 +452,19 @@ async function processTransaction(account, totalWithFee, originalPrice, buyerId)
             return Swal.fire("Insufficient Balance", "You do not have enough funds for this purchase.", "warning");
         }
 
+        // Fetch seller details specifically for Telegram integration parameters
+        const { data: sellerProfile } = await supabase
+            .from('profiles')
+            .select('telegram_chat_id, telegram_alerts')
+            .eq('id', account.user_id)
+            .single();
+
+        // Deduct balance from buyer profile snapshot
         await supabase.from('profiles')
             .update({ balance: buyer.balance - totalWithFee })
             .eq('id', buyerId);
 
+        // Record buyer wallet transaction ledger history
         await supabase.from('wallet').insert([{
             user_id: buyerId,
             type: 'Payment',
@@ -463,6 +474,7 @@ async function processTransaction(account, totalWithFee, originalPrice, buyerId)
             reference: `PUR_${account.id.slice(0, 8)}_${Date.now()}`
         }]);
 
+        // Create official conversation room channel tracking
         const { data: conv, error: convError } = await supabase.from('conversations').insert([{
             product_id: account.id,
             product_name: "Facebook",
@@ -475,6 +487,51 @@ async function processTransaction(account, totalWithFee, originalPrice, buyerId)
         }]).select().single();
 
         if (convError) throw convError;
+
+        // Formulate details and dynamic deep-linking URL strings
+        const currentBuyerName = buyer?.username || buyer?.full_name || "Someone";
+        const targetAccountName = account.data?.username || "Facebook Listing";
+        const chatRoomUrl = `https://accmarket.name.ng/chats?id=${conv.id}`;
+        
+        // 🟢 FIXED: Embeds the deep-linked chat room URL directly inside the notification text payloads
+        const purchaseAlertMsg = `@${currentBuyerName} purchased your account @${targetAccountName}! Access your chat workspace here to deliver logs: ${chatRoomUrl}`;
+
+        // 1. Dispatch inside your structural app notifications table
+        const { error: notifyError } = await supabase.from('notifications').insert([{
+            user_id: account.user_id, // Target Recipient: The Seller
+            title: "Account Sold! 🎉",
+            message: purchaseAlertMsg,
+            icon: "fas fa-shopping-bag",
+            type: "purchase",
+            is_read: false
+        }]);
+
+        if (notifyError) {
+            console.error("Purchase Notification Table Insert Failed:", notifyError.message);
+        }
+
+        // 2. Dispatch via Telegram Bot API if configured by the vendor using Markdown linking
+        if (sellerProfile?.telegram_alerts === true && sellerProfile?.telegram_chat_id) {
+            const TELEGRAM_BOT_TOKEN = "8436841265:AAHIh50C2bEamKqB649Dx_CRy7l8X6f2yqg"; 
+            const tgUrl = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+            
+            // Format link cleanly using Markdown for Telegram clickability
+            const tgMarkdownText = `💰 *New Sale Notification!*\n\n@${currentBuyerName} purchased your account *${targetAccountName}*!\n\n👉 [Click Here to Access Chat Workspace](${chatRoomUrl}) to deliver logs.`;
+
+            try {
+                await fetch(tgUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: sellerProfile.telegram_chat_id,
+                        text: tgMarkdownText,
+                        parse_mode: "Markdown"
+                    })
+                });
+            } catch (tgErr) {
+                console.error("Telegram purchase notification delivery failed:", tgErr);
+            }
+        }
 
         Swal.fire({ icon: 'success', title: 'Purchase Secured!', text: 'Redirecting to your escrow workspace...', timer: 2000, showConfirmButton: false });
         setTimeout(() => { window.location.href = `../chats?id=${conv.id}`; }, 2000);
@@ -519,6 +576,7 @@ window.copyMarketplaceUrl = (event, id) => {
     document.querySelectorAll('.dropdown-content').forEach(m => m.classList.remove('show'));
 };
 
+
 window.toggleFollowSeller = async (event, sellerId, sellerUsername) => {
     event.stopPropagation(); 
     
@@ -535,8 +593,10 @@ window.toggleFollowSeller = async (event, sellerId, sellerUsername) => {
 
         Swal.fire({ title: 'Updating follow status...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
-        const { data: buyerProfile } = await supabase.from('profiles').select('following').eq('id', buyerId).single();
-        const { data: sellerProfile } = await supabase.from('profiles').select('followers').eq('id', sellerId).single();
+        const { data: buyerProfile } = await supabase.from('profiles').select('username, full_name, following').eq('id', buyerId).single();
+        
+        // 🟢 FIXED: Select telegram_chat_id and telegram_alerts directly from the seller's profile
+        const { data: sellerProfile } = await supabase.from('profiles').select('followers, telegram_chat_id, telegram_alerts').eq('id', sellerId).single();
 
         let buyerFollowing = buyerProfile?.following?.uids || [];
         let sellerFollowers = sellerProfile?.followers?.uids || [];
@@ -544,6 +604,7 @@ window.toggleFollowSeller = async (event, sellerId, sellerUsername) => {
         const isCurrentlyFollowing = buyerFollowing.includes(sellerId);
         let alertTitle = "";
         let alertIcon = "success";
+        let shouldSendNotification = false;
 
         if (isCurrentlyFollowing) {
             buyerFollowing = buyerFollowing.filter(id => id !== sellerId);
@@ -555,6 +616,7 @@ window.toggleFollowSeller = async (event, sellerId, sellerUsername) => {
             sellerFollowers.push(buyerId);
             alertTitle = `Now following @${sellerUsername}`;
             alertIcon = "success";
+            shouldSendNotification = true; 
         }
 
         const updateBuyer = supabase.from('profiles').update({ following: { uids: buyerFollowing } }).eq('id', buyerId);
@@ -563,13 +625,50 @@ window.toggleFollowSeller = async (event, sellerId, sellerUsername) => {
         const [buyerRes, sellerRes] = await Promise.all([updateBuyer, updateSeller]);
         if (buyerRes.error || sellerRes.error) throw new Error("Database sync failed");
 
-        // Update global memory snapshot instantly to prevent race-rendering glitches
+        if (shouldSendNotification) {
+            const currentBuyerName = buyerProfile?.username || buyerProfile?.full_name || "Someone";
+            const messageText = `@${currentBuyerName} started following you!`;
+            
+            // 1. Send in-app table notification
+            const { error: notifyError } = await supabase.from('notifications').insert([{
+                user_id: sellerId, 
+                title: "New Follower",
+                message: messageText,
+                icon: "fas fa-user-plus",
+                type: "follow",
+                is_read: false
+            }]);
+
+            if (notifyError) {
+                console.error("Notification Insert Failed:", notifyError.message);
+            }
+
+            // 2. 🟢 NEW: Check if seller's telegram alerts switch is explicitly TRUE and chat ID is configured
+            if (sellerProfile?.telegram_alerts === true && sellerProfile?.telegram_chat_id) {
+                const TELEGRAM_BOT_TOKEN = "8436841265:AAHIh50C2bEamKqB649Dx_CRy7l8X6f2yqg"; // ⚠️ Replace this with your real Telegram Bot Token
+                const tgUrl = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+                
+                try {
+                    await fetch(tgUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            chat_id: sellerProfile.telegram_chat_id,
+                            text: `🔔 *New Follower Alert!*\n\n${messageText}`,
+                            parse_mode: "Markdown"
+                        })
+                    });
+                } catch (tgErr) {
+                    console.error("Telegram delivery system failed:", tgErr);
+                }
+            }
+        }
+
         if (window.currentGlobalProfiles) {
             const index = window.currentGlobalProfiles.findIndex(p => p.id === buyerId);
             if(index !== -1) window.currentGlobalProfiles[index].following = { uids: buyerFollowing };
         }
 
-        // 🟢 FIXED: Keep real-time inline filter cache perfectly synchronized
         if (typeof cachedMyFollowingList !== 'undefined') {
             cachedMyFollowingList = buyerFollowing;
         }
@@ -583,20 +682,22 @@ window.toggleFollowSeller = async (event, sellerId, sellerUsername) => {
             timer: 2000
         });
 
-        // 🟢 FIXED: Await the async filter execution pipeline so it finishes rendering completely
         await applyFilters(); 
 
     } catch (err) {
         console.error("Follow System Error:", err);
         Swal.fire("Error", "Could not complete follow update action.", "error");
     }
-
     document.querySelectorAll('.dropdown-content').forEach(m => m.classList.remove('show'));
 };
 
 
+
+
+
 window.onclick = () => document.querySelectorAll('.dropdown-content').forEach(m => m.classList.remove('show'));
 window.closeModal = () => document.getElementById('modalOverlay').style.display = 'none';
+
 
 // Start App with URL Deep-Linking and Real-time Subscription
 async function init() {
