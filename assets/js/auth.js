@@ -442,20 +442,39 @@ if (forgotForm) {
   forgotForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const email = document.getElementById("forgot-email").value.trim();
+    
     if (!email) {
       Swal.fire("Missing email", "Please enter your email.", "warning");
       return;
     }
 
+    // ✅ 1. Fetch the Turnstile token for the forgot form wrapper
+    const token = getTurnstileToken("#forgot-turnstile");
+    if (!token) {
+      Swal.fire("Security Check", "Please fulfill the security verification challenge.", "warning");
+      return;
+    }
+
     Swal.fire({ title: "Sending reset link...", allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: "https://accmarket.name.ng/reset.html" });
+    
+    // ✅ 2. Pass the captchaToken within the options object to Supabase
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { 
+      redirectTo: "https://accmarket.name.ng/reset.html",
+      options: {
+        captchaToken: token
+      }
+    });
     Swal.close();
 
     if (error) {
       Swal.fire("Error", error.message, "error");
+      // ✅ 3. Reset the widget challenge if the request fails so they can try again
+      if (typeof turnstile !== "undefined") turnstile.reset("#forgot-turnstile");
     } else {
       Swal.fire("Check your inbox", "Reset link sent.", "success");
       forgotForm.reset();
+      // ✅ 4. Reset the widget on success before hiding the modal
+      if (typeof turnstile !== "undefined") turnstile.reset("#forgot-turnstile");
       if (typeof window.closeForgotModal === "function") window.closeForgotModal();
     }
   });
