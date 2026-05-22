@@ -121,7 +121,7 @@ const iconMap = {
   info: { icon: "fa-award", color: "#FFD700" }, //  gold
   success: { icon: "fa-thumbs-up", color: "#22c55e" }, // green
   follow: { icon: "fas fa-user-plus", color: "#22c55e" }, // green
-    purchase: { icon: "fas fa-shopping-bag"/", color: "#22c55e" }, // green
+    purchase: { icon: "fas fa-shopping-bag", color: "#22c55e" }, // green
   warning: { icon: "fa-exclamation-circle", color: "#fbbf24" }, // orange
   default: { icon: "fa-bell", color: "#6b7280" }, // gray fallback
   blog: { icon: "fa-newspaper", color: "#0b1e5b" }, // dark blue

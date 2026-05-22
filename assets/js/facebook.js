@@ -452,10 +452,10 @@ async function processTransaction(account, totalWithFee, originalPrice, buyerId)
             return Swal.fire("Insufficient Balance", "You do not have enough funds for this purchase.", "warning");
         }
 
-        // Fetch seller details specifically for Telegram integration parameters
+        // Fetch seller details specifically for email, template matching names, and Telegram integrations
         const { data: sellerProfile } = await supabase
             .from('profiles')
-            .select('telegram_chat_id, telegram_alerts')
+            .select('email, username, full_name, telegram_chat_id, telegram_alerts')
             .eq('id', account.user_id)
             .single();
 
@@ -493,12 +493,11 @@ async function processTransaction(account, totalWithFee, originalPrice, buyerId)
         const targetAccountName = account.data?.username || "Facebook Listing";
         const chatRoomUrl = `https://accmarket.name.ng/chats?id=${conv.id}`;
         
-        // 🟢 FIXED: Embeds the deep-linked chat room URL directly inside the notification text payloads
         const purchaseAlertMsg = `@${currentBuyerName} purchased your account @${targetAccountName}! Access your chat workspace here to deliver logs: ${chatRoomUrl}`;
 
         // 1. Dispatch inside your structural app notifications table
         const { error: notifyError } = await supabase.from('notifications').insert([{
-            user_id: account.user_id, // Target Recipient: The Seller
+            user_id: account.user_id, 
             title: "Account Sold! 🎉",
             message: purchaseAlertMsg,
             icon: "fas fa-shopping-bag",
@@ -515,7 +514,6 @@ async function processTransaction(account, totalWithFee, originalPrice, buyerId)
             const TELEGRAM_BOT_TOKEN = "8436841265:AAHIh50C2bEamKqB649Dx_CRy7l8X6f2yqg"; 
             const tgUrl = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
             
-            // Format link cleanly using Markdown for Telegram clickability
             const tgMarkdownText = `💰 *New Sale Notification!*\n\n@${currentBuyerName} purchased your account *${targetAccountName}*!\n\n👉 [Click Here to Access Chat Workspace](${chatRoomUrl}) to deliver logs.`;
 
             try {
@@ -533,6 +531,32 @@ async function processTransaction(account, totalWithFee, originalPrice, buyerId)
             }
         }
 
+        // 3. 🟢 CALL THE DEPLOYED EDGE FUNCTION WITH AUTHORIZATION BEARER HEADERS
+        if (sellerProfile?.email) {
+            try {
+                // Get the user's current session JWT token via the supabase client wrapper
+                const { data: sessionData } = await supabase.auth.getSession();
+                const jwtToken = sessionData?.session?.access_token || supabase.supabaseKey; 
+
+                await fetch("https://qihzvglznpkytolxkuxz.supabase.co/functions/v1/sales-notification", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${jwtToken}`
+                    },
+                    body: JSON.stringify({
+                        seller_email: sellerProfile.email,
+                        seller_name: sellerProfile.full_name || sellerProfile.username || "Seller",
+                        buyer_name: currentBuyerName,
+                        account_name: targetAccountName,
+                        chat_url: chatRoomUrl
+                    })
+                });
+            } catch (funcErr) {
+                console.error("Failed to route email notification request to Edge Function:", funcErr);
+            }
+        }
+
         Swal.fire({ icon: 'success', title: 'Purchase Secured!', text: 'Redirecting to your escrow workspace...', timer: 2000, showConfirmButton: false });
         setTimeout(() => { window.location.href = `../chats?id=${conv.id}`; }, 2000);
 
@@ -542,6 +566,7 @@ async function processTransaction(account, totalWithFee, originalPrice, buyerId)
         Swal.fire("Error", "Transaction failed. Please contact support.", "error");
     }
 }
+
 
 window.closeEscrowModal = () => {
     document.getElementById('escrowModal').style.display = 'none';

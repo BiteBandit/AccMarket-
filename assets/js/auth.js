@@ -212,61 +212,100 @@ if (registerForm) {
     const termsCheckbox = document.getElementById("terms");
     const isTermsAccepted = termsCheckbox ? termsCheckbox.checked : false;
 
+    // Verify Turnstile Token Presence
+    const turnstileResponse = typeof turnstile !== "undefined" ? turnstile.getResponse("#register-turnstile") : null;
+    if (!turnstileResponse) {
+      Swal.fire({ title: 'Security Check', text: 'Please fulfill the security verification challenge.', icon: 'warning', confirmButtonColor: '#0b1e5b' });
+      return;
+    }
+
     if (!email || !password) {
-      Swal.fire({ title: 'Missing Details', text: 'Email and password are required.', icon: 'warning', confirmButtonColor: '#0b1e5b' });
+      Swal.fire({ title: 'Account Creation', text: 'Please fill in all mandatory fields.', icon: 'warning', confirmButtonColor: '#0b1e5b' });
+      if (typeof turnstile !== "undefined") turnstile.reset("#register-turnstile");
       return;
     }
 
     if (password !== confirmPassword) {
-      Swal.fire({ title: 'Check Passwords', text: 'Passwords do not match.', icon: 'error', confirmButtonColor: '#0b1e5b' });
+      Swal.fire({ title: 'Security Verification', text: 'The passwords entered do not match.', icon: 'error', confirmButtonColor: '#0b1e5b' });
+      if (typeof turnstile !== "undefined") turnstile.reset("#register-turnstile");
       return;
     }
 
     if (!isTermsAccepted) {
-      Swal.fire({ title: 'Terms & Policies', text: 'You must agree to the Terms & Policies.', icon: 'info', confirmButtonColor: '#0b1e5b' });
+      Swal.fire({ title: 'Policy Agreement', text: 'You must review and agree to the Terms & Policies to proceed.', icon: 'info', confirmButtonColor: '#0b1e5b' });
       termsCheckbox.parentElement.classList.add('vibrate');
       setTimeout(() => termsCheckbox.parentElement.classList.remove('vibrate'), 300);
+      if (typeof turnstile !== "undefined") turnstile.reset("#register-turnstile");
       return;
     }
 
-    Swal.fire({ title: 'Validating Profile', html: 'Please wait...', allowOutsideClick: false, showConfirmButton: false, didOpen: () => Swal.showLoading() });
+    // Initialize Processing State
+    Swal.fire({ 
+      title: 'Processing Request', 
+      html: 'Validating credentials and setting up your profile...', 
+      allowOutsideClick: false, 
+      showConfirmButton: false, 
+      didOpen: () => Swal.showLoading() 
+    });
 
     try {
-      // Check for existing profile
+      // Pre-registration internal profile check
       const { data: existingProfile } = await supabase.from("profiles").select("email").eq("email", email).maybeSingle();
 
       if (existingProfile) {
-        Swal.close();
         Swal.fire({
-          title: 'Account Found',
-          html: `<b>${email}</b> is already registered. Login instead?`,
+          title: 'Account Exists',
+          html: `An account associated with <b>${email}</b> is already registered. Would you like to log in instead?`,
           icon: 'info',
           showCancelButton: true,
-          confirmButtonText: 'Login Now',
+          confirmButtonText: 'Proceed to Login',
           confirmButtonColor: '#0b1e5b'
         }).then((res) => { if (res.isConfirmed) document.getElementById('go-to-login').click(); });
+        if (typeof turnstile !== "undefined") turnstile.reset("#register-turnstile");
         return;
       }
 
+      // Execute Supabase Auth Signup with Turnstile Verification Token
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo: "https://accmarket.name.ng/verify.html" }
+        options: { 
+          emailRedirectTo: "https://accmarket.name.ng/verify.html",
+          captchaToken: turnstileResponse 
+        }
       });
 
-      Swal.close();
+      // Handle server-side registration errors
       if (error) {
-        Swal.fire({ title: 'Registration Error', text: error.message, icon: 'error', confirmButtonColor: '#0b1e5b' });
+        Swal.fire({ title: 'Registration Failed', text: error.message, icon: 'error', confirmButtonColor: '#0b1e5b' });
+        if (typeof turnstile !== "undefined") turnstile.reset("#register-turnstile");
         return;
       }
 
+      // Final Success Notification
       if (data?.user) {
-        Swal.fire({ icon: 'success', title: 'Almost There!', html: `Verification email sent to <b>${email}</b>.`, confirmButtonColor: '#0b1e5b' });
         registerForm.reset();
+        if (typeof turnstile !== "undefined") turnstile.reset("#register-turnstile");
+        Swal.fire({ 
+          icon: 'success', 
+          title: 'Verification Link Sent', 
+          html: `A verification link has been successfully dispatched to <b>${email}</b>.<br><br><small style="color: #666;">If you do not see it in a few minutes, please check your <b>Spam</b> or <b>Junk</b> folders.</small>`, 
+          confirmButtonColor: '#0b1e5b' 
+        });
+      } else {
+        if (typeof turnstile !== "undefined") turnstile.reset("#register-turnstile");
+        Swal.fire({ 
+          icon: 'info', 
+          title: 'Check Your Inbox', 
+          html: `If this email address is new to our network, a verification link has been dispatched to <b>${email}</b>.<br><br><small style="color: #666;">Please check your <b>Spam</b> or <b>Junk</b> folders if the message does not arrive shortly.</small>`, 
+          confirmButtonColor: '#0b1e5b' 
+        });
       }
+
     } catch (err) {
       Swal.close();
-      Swal.fire('Error', 'An unexpected system error occurred.', 'error');
+      if (typeof turnstile !== "undefined") turnstile.reset("#register-turnstile");
+      Swal.fire({ title: 'System Error', text: 'An unexpected internal error occurred. Please try again later or contact support.', icon: 'error', confirmButtonColor: '#0b1e5b' });
     }
   });
 }
@@ -280,24 +319,41 @@ if (loginForm) {
     const password = document.getElementById("login-password").value;
     const remember = document.getElementById("rememberMe")?.checked ?? false;
 
+    // Verify Turnstile Token Presence
+    const turnstileResponse = typeof turnstile !== "undefined" ? turnstile.getResponse("#login-turnstile") : null;
+    if (!turnstileResponse) {
+      Swal.fire("Security Check", "Please fulfill the security verification challenge.", "warning");
+      return;
+    }
+
     if (!email || !password) {
       Swal.fire("Missing fields", "Please enter email and password.", "warning");
+      if (typeof turnstile !== "undefined") turnstile.reset("#login-turnstile");
       return;
     }
 
     Swal.fire({ title: "Logging in...", allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    // Execute Supabase Sign In with Turnstile Verification Token
+    const { data, error } = await supabase.auth.signInWithPassword({ 
+      email, 
+      password,
+      options: {
+        captchaToken: turnstileResponse
+      }
+    });
     Swal.close();
 
     if (error) {
       Swal.fire("Login failed", error.message, "error");
+      if (typeof turnstile !== "undefined") turnstile.reset("#login-turnstile");
       return;
     }
 
     const user = data.user;
     if (!user.confirmed_at) {
       Swal.fire({ icon: "warning", title: "Email not verified", text: "Please verify your email." });
+      if (typeof turnstile !== "undefined") turnstile.reset("#login-turnstile");
       return;
     }
 
@@ -306,6 +362,7 @@ if (loginForm) {
     if (profile && profile.is_active === false) {
       await supabase.auth.signOut();
       Swal.fire({ icon: "warning", title: "Account Deactivated", text: "Contact support to reactivate." });
+      if (typeof turnstile !== "undefined") turnstile.reset("#login-turnstile");
       return;
     }
 
@@ -332,6 +389,7 @@ if (loginForm) {
       sessionStorage.setItem("supabaseSession", JSON.stringify(data.session));
     }
 
+    if (typeof turnstile !== "undefined") turnstile.reset("#login-turnstile");
     Swal.fire({ icon: "success", title: "Login successful", showConfirmButton: false, timer: 1400 });
     setTimeout(() => { window.location.href = "dashboard.html"; }, 1200);
   });
@@ -361,3 +419,6 @@ if (forgotForm) {
     }
   });
 }
+
+
+

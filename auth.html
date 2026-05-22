@@ -78,7 +78,8 @@
 
     <!--JAVASCRIPT-->
    <script type="module" src="assets/js/auth.js"></script>
-
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+ 
 <!-- SweetAlert2 -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
@@ -182,11 +183,17 @@
 
   </div>
 </div>
+
+
 <!-- ✅ Remember Me -->
   <label class="remember-me">
     <input type="checkbox" id="rememberMe" />
     Remember me
   </label>
+<div class="form-group" style="margin-bottom: 15px;">
+  <div class="cf-turnstile" data-sitekey="0x4AAAAAADUWpq8-dxlXWp7t" id="login-turnstile"></div>
+</div>
+
             <button type="submit" class="auth-btn">Login</button>
             <!-- ✅ Forgot Password now under button -->
   <p class="forgot-link-container">
@@ -262,6 +269,11 @@
         <input type="checkbox" id="terms" required />
         <label for="terms">I agree to the <a href="terms.html">Terms & Policies</a></label>
       </div>
+
+<div class="form-group" style="margin-bottom: 15px;">
+  <div class="cf-turnstile" data-sitekey="0x4AAAAAADUWpq8-dxlXWp7t" id="register-turnstile"></div>
+</div>
+
 
       <button type="submit" class="auth-btn">Register</button>
       
