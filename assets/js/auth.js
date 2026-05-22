@@ -1,15 +1,39 @@
-// Select elements
+// ==========================================
+// 1. GLOBAL TURNSTILE CALLBACKS (MUST BE FIRST)
+// ==========================================
+window.turnstileTokens = {
+  register: null,
+  login: null
+};
+
+window.onRegisterSuccess = function(token) {
+  window.turnstileTokens.register = token;
+};
+
+window.onLoginSuccess = function(token) {
+  window.turnstileTokens.login = token;
+};
+
+// ==========================================
+// 2. MODULE IMPORTS
+// ==========================================
+import { supabase } from './supabase-config.js'
+
+// ==========================================
+// 3. SIDEBARS & NAVIGATION UI LOGIC
+// ==========================================
 const sidebarToggle = document.getElementById("sidebarToggle");
 const leftSidebar = document.getElementById("leftSidebar");
 const closeLeft = document.getElementById("closeLeft");
 
-// Left sidebar logic
-sidebarToggle.addEventListener("click", () => {
-  leftSidebar.classList.add("active");
-});
-closeLeft.addEventListener("click", () => {
-  leftSidebar.classList.remove("active");
-});
+if (sidebarToggle && leftSidebar && closeLeft) {
+  sidebarToggle.addEventListener("click", () => {
+    leftSidebar.classList.add("active");
+  });
+  closeLeft.addEventListener("click", () => {
+    leftSidebar.classList.remove("active");
+  });
+}
 
 // Sidebar Search Function (Live Search)
 document.addEventListener("DOMContentLoaded", () => {
@@ -30,7 +54,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-// Auth Section Switching Logic
+// ==========================================
+// 4. AUTH SECTION SWITCHING ANIMATIONS
+// ==========================================
 const registerSection = document.getElementById("register-section");
 const loginSection = document.getElementById("login-section");
 const goToLogin = document.getElementById("go-to-login");
@@ -39,10 +65,12 @@ const illustration = document.querySelector(".auth-illustration");
 const formSections = document.querySelectorAll(".auth-form");
 
 function fadeIllustration() {
-  illustration.classList.remove("show");
-  setTimeout(() => {
-    illustration.classList.add("show");
-  }, 100);
+  if (illustration) {
+    illustration.classList.remove("show");
+    setTimeout(() => {
+      illustration.classList.add("show");
+    }, 100);
+  }
 }
 
 function fadeForm() {
@@ -56,11 +84,11 @@ function fadeForm() {
 const switchAuthMode = (e, showLogin) => {
   e.preventDefault();
   if (showLogin) {
-    registerSection.classList.remove("active");
-    loginSection.classList.add("active");
+    if (registerSection) registerSection.classList.remove("active");
+    if (loginSection) loginSection.classList.add("active");
   } else {
-    loginSection.classList.remove("active");
-    registerSection.classList.add("active");
+    if (loginSection) loginSection.classList.remove("active");
+    if (registerSection) registerSection.classList.add("active");
   }
   fadeIllustration();
   fadeForm();
@@ -74,40 +102,51 @@ window.addEventListener("load", () => {
   fadeForm();
 });
 
-// Forgot Password Modal
+// ==========================================
+// 5. FORGOT PASSWORD MODAL UTILITIES
+// ==========================================
 const forgotLink = document.querySelector(".forgot-link");
 const forgotModal = document.getElementById("forgot-modal");
 
-if (forgotLink) {
+if (forgotLink && forgotModal) {
   forgotLink.addEventListener("click", (e) => {
     e.preventDefault();
     forgotModal.classList.add("show");
   });
 }
 
-function closeForgotModal() {
-  forgotModal.classList.remove("show");
+// Exposed globally to handle HTML inline onclick attributes safely
+window.closeForgotModal = function() {
+  if (forgotModal) forgotModal.classList.remove("show");
 }
 
 window.addEventListener("click", (e) => {
-  if (e.target === forgotModal) closeForgotModal();
+  if (e.target === forgotModal) window.closeForgotModal();
 });
 
-// Back to Top
+// ==========================================
+// 6. BACK TO TOP BUTTON LOGIC
+// ==========================================
 const backToTop = document.getElementById("backToTop");
-window.addEventListener("scroll", () => {
-  if (window.scrollY > 300) {
-    backToTop.style.display = "flex";
-  } else {
-    backToTop.style.display = "none";
-  }
-});
+if (backToTop) {
+  window.addEventListener("scroll", () => {
+    if (window.scrollY > 300) {
+      backToTop.style.display = "flex";
+    } else {
+      backToTop.style.display = "none";
+    }
+  });
 
-backToTop.addEventListener("click", () => {
-  window.scrollTo({ top: 0, behavior: "smooth" });
-});
+  backToTop.addEventListener("click", () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+}
 
-// === Password Strength Meter ===
+// ==========================================
+// 7. INTERACTIVE ENTRY FIELD HELPERS
+// ==========================================
+
+// Password Strength Meter
 document.addEventListener("DOMContentLoaded", () => {
   const passwordInput = document.getElementById("password"); 
   const strengthContainer = document.querySelector(".password-strength");
@@ -146,7 +185,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-// === Password Match Checker ===
+// Password Match Checker
 const passwordField = document.getElementById("password");
 const confirmPasswordField = document.getElementById("confirm-password");
 
@@ -182,7 +221,7 @@ if (passwordField && confirmPasswordField) {
   confirmPasswordField.addEventListener("input", checkPasswordMatch);
 }
 
-// === Password Visibility Toggle ===
+// Password Visibility Toggle
 document.addEventListener("click", (e) => {
   const toggleBtn = e.target.closest(".eye-icon");
   if (toggleBtn) {
@@ -197,21 +236,11 @@ document.addEventListener("click", (e) => {
   }
 });
 
-// === Supabase //
-import { supabase } from './supabase-config.js'
+// ==========================================
+// 8. SUPABASE & SECURE AUTENTICATION TRANSACTION HANDLERS
+// ==========================================
 
-// --- GLOBAL STORAGE FOR TOKEN ---
-// This ensures the token is ready before the user clicks submit
-const turnstileTokens = {
-  register: null,
-  login: null
-};
-
-// Global callbacks called by the Cloudflare Turnstile widget
-window.onRegisterSuccess = (token) => { turnstileTokens.register = token; };
-window.onLoginSuccess = (token) => { turnstileTokens.login = token; };
-
-// Register User
+// Register User Request
 const registerForm = document.getElementById("register-form");
 if (registerForm) {
   registerForm.addEventListener("submit", async (e) => {
@@ -223,8 +252,8 @@ if (registerForm) {
     const termsCheckbox = document.getElementById("terms");
     const isTermsAccepted = termsCheckbox ? termsCheckbox.checked : false;
 
-    // Use the stored token instead of getResponse()
-    const token = turnstileTokens.register;
+    // Direct look-up into fixed window scope storage
+    const token = window.turnstileTokens.register;
     if (!token) {
       Swal.fire({ title: 'Security Check', text: 'Please fulfill the security verification challenge.', icon: 'warning', confirmButtonColor: '#0b1e5b' });
       return;
@@ -250,13 +279,27 @@ if (registerForm) {
       return;
     }
 
-    Swal.fire({ title: 'Processing Request', html: 'Validating credentials and setting up your profile...', allowOutsideClick: false, showConfirmButton: false, didOpen: () => Swal.showLoading() });
+    Swal.fire({ 
+      title: 'Processing Request', 
+      html: 'Validating credentials and setting up your profile...', 
+      allowOutsideClick: false, 
+      showConfirmButton: false, 
+      didOpen: () => Swal.showLoading() 
+    });
 
     try {
       const { data: existingProfile } = await supabase.from("profiles").select("email").eq("email", email).maybeSingle();
+
       if (existingProfile) {
-        Swal.fire({ title: 'Account Exists', html: `An account associated with <b>${email}</b> is already registered.`, icon: 'info', showCancelButton: true, confirmButtonText: 'Proceed to Login', confirmButtonColor: '#0b1e5b' }).then((res) => { if (res.isConfirmed) document.getElementById('go-to-login').click(); });
-        turnstileTokens.register = null;
+        Swal.fire({
+          title: 'Account Exists',
+          html: `An account associated with <b>${email}</b> is already registered. Would you like to log in instead?`,
+          icon: 'info',
+          showCancelButton: true,
+          confirmButtonText: 'Proceed to Login',
+          confirmButtonColor: '#0b1e5b'
+        }).then((res) => { if (res.isConfirmed) document.getElementById('go-to-login').click(); });
+        window.turnstileTokens.register = null; 
         if (typeof turnstile !== "undefined") turnstile.reset("#register-turnstile");
         return;
       }
@@ -264,30 +307,50 @@ if (registerForm) {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo: "https://accmarket.name.ng/verify.html", captchaToken: token }
+        options: { 
+          emailRedirectTo: "https://accmarket.name.ng/verify.html",
+          captchaToken: token 
+        }
       });
 
       if (error) {
         Swal.fire({ title: 'Registration Failed', text: error.message, icon: 'error', confirmButtonColor: '#0b1e5b' });
-        turnstileTokens.register = null;
+        window.turnstileTokens.register = null;
         if (typeof turnstile !== "undefined") turnstile.reset("#register-turnstile");
         return;
       }
 
-      registerForm.reset();
-      turnstileTokens.register = null;
-      if (typeof turnstile !== "undefined") turnstile.reset("#register-turnstile");
-      Swal.fire({ icon: 'success', title: 'Verification Link Sent', html: `A verification link has been successfully dispatched to <b>${email}</b>.`, confirmButtonColor: '#0b1e5b' });
+      if (data?.user) {
+        registerForm.reset();
+        window.turnstileTokens.register = null;
+        if (typeof turnstile !== "undefined") turnstile.reset("#register-turnstile");
+        Swal.fire({ 
+          icon: 'success', 
+          title: 'Verification Link Sent', 
+          html: `A verification link has been successfully dispatched to <b>${email}</b>.<br><br><small style="color: #666;">If you do not see it in a few minutes, please check your <b>Spam</b> or <b>Junk</b> folders.</small>`, 
+          confirmButtonColor: '#0b1e5b' 
+        });
+      } else {
+        window.turnstileTokens.register = null;
+        if (typeof turnstile !== "undefined") turnstile.reset("#register-turnstile");
+        Swal.fire({ 
+          icon: 'info', 
+          title: 'Check Your Inbox', 
+          html: `If this email address is new to our network, a verification link has been dispatched to <b>${email}</b>.<br><br><small style="color: #666;">Please check your <b>Spam</b> or <b>Junk</b> folders if the message does not arrive shortly.</small>`, 
+          confirmButtonColor: '#0b1e5b' 
+        });
+      }
+
     } catch (err) {
       Swal.close();
-      turnstileTokens.register = null;
+      window.turnstileTokens.register = null;
       if (typeof turnstile !== "undefined") turnstile.reset("#register-turnstile");
-      Swal.fire({ title: 'System Error', text: 'An unexpected internal error occurred.', icon: 'error', confirmButtonColor: '#0b1e5b' });
+      Swal.fire({ title: 'System Error', text: 'An unexpected internal error occurred. Please try again later or contact support.', icon: 'error', confirmButtonColor: '#0b1e5b' });
     }
   });
 }
 
-// Login User
+// Login User Request
 const loginForm = document.getElementById("login-form");
 if (loginForm) {
   loginForm.addEventListener("submit", async (e) => {
@@ -296,8 +359,8 @@ if (loginForm) {
     const password = document.getElementById("login-password").value;
     const remember = document.getElementById("rememberMe")?.checked ?? false;
 
-    // Use stored token
-    const token = turnstileTokens.login;
+    // Direct look-up into fixed window scope storage
+    const token = window.turnstileTokens.login;
     if (!token) {
       Swal.fire("Security Check", "Please fulfill the security verification challenge.", "warning");
       return;
@@ -314,13 +377,15 @@ if (loginForm) {
     const { data, error } = await supabase.auth.signInWithPassword({ 
       email, 
       password,
-      options: { captchaToken: token }
+      options: {
+        captchaToken: token
+      }
     });
     Swal.close();
 
     if (error) {
       Swal.fire("Login failed", error.message, "error");
-      turnstileTokens.login = null;
+      window.turnstileTokens.login = null;
       if (typeof turnstile !== "undefined") turnstile.reset("#login-turnstile");
       return;
     }
@@ -328,7 +393,7 @@ if (loginForm) {
     const user = data.user;
     if (!user.confirmed_at) {
       Swal.fire({ icon: "warning", title: "Email not verified", text: "Please verify your email." });
-      turnstileTokens.login = null;
+      window.turnstileTokens.login = null;
       if (typeof turnstile !== "undefined") turnstile.reset("#login-turnstile");
       return;
     }
@@ -338,7 +403,7 @@ if (loginForm) {
     if (profile && profile.is_active === false) {
       await supabase.auth.signOut();
       Swal.fire({ icon: "warning", title: "Account Deactivated", text: "Contact support to reactivate." });
-      turnstileTokens.login = null;
+      window.turnstileTokens.login = null;
       if (typeof turnstile !== "undefined") turnstile.reset("#login-turnstile");
       return;
     }
@@ -349,35 +414,51 @@ if (loginForm) {
       const ipRes = await fetch("https://ipapi.co/json/");
       const ipData = await ipRes.json();
       const currentIP = ipData.ip || "0.0.0.0";
+
       if (profile?.telegram_alerts && profile.telegram_chat_id && (profile.last_ip !== currentIP || profile.last_device !== currentDevice)) {
         await fetch(`https://api.telegram.org/bot8436841265:AAHIh50C2bEamKqB649Dx_CRy7l8X6f2yqg/sendMessage`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ chat_id: profile.telegram_chat_id, text: `🔔 New login detected:\nDevice: ${currentDevice}\nIP: ${currentIP}` })
         });
       }
       await supabase.from("profiles").update({ last_ip: currentIP, last_device: currentDevice }).eq("id", user.id);
     } catch (err) { console.error("Tracking failed", err); }
 
-    if (remember) localStorage.setItem("supabaseSession", JSON.stringify(data.session));
-    else sessionStorage.setItem("supabaseSession", JSON.stringify(data.session));
+    if (remember) {
+      localStorage.setItem("supabaseSession", JSON.stringify(data.session));
+    } else {
+      sessionStorage.setItem("supabaseSession", JSON.stringify(data.session));
+    }
 
-    turnstileTokens.login = null;
+    window.turnstileTokens.login = null;
+    if (typeof turnstile !== "undefined") turnstile.reset("#login-turnstile");
     Swal.fire({ icon: "success", title: "Login successful", showConfirmButton: false, timer: 1400 });
     setTimeout(() => { window.location.href = "dashboard.html"; }, 1200);
   });
 }
 
-// Forgot Password
+// Forgot Password Transaction Handler
 const forgotForm = document.getElementById("forgot-password-form");
 if (forgotForm) {
   forgotForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const email = document.getElementById("forgot-email").value.trim();
-    if (!email) { Swal.fire("Missing email", "Please enter your email.", "warning"); return; }
+    if (!email) {
+      Swal.fire("Missing email", "Please enter your email.", "warning");
+      return;
+    }
+
     Swal.fire({ title: "Sending reset link...", allowOutsideClick: false, didOpen: () => Swal.showLoading() });
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: "https://accmarket.name.ng/reset.html" });
     Swal.close();
-    if (error) Swal.fire("Error", error.message, "error");
-    else { Swal.fire("Check your inbox", "Reset link sent.", "success"); forgotForm.reset(); }
+
+    if (error) {
+      Swal.fire("Error", error.message, "error");
+    } else {
+      Swal.fire("Check your inbox", "Reset link sent.", "success");
+      forgotForm.reset();
+      if (typeof window.closeForgotModal === "function") window.closeForgotModal();
+    }
   });
 }
