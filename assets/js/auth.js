@@ -1,18 +1,18 @@
 // ==========================================
-// 1. GLOBAL TURNSTILE CALLBACKS (MUST BE FIRST)
+// 1. TURNSTILE TOKEN UTILITIES
 // ==========================================
-window.turnstileTokens = {
-  register: null,
-  login: null
-};
+/**
+ * Safely fetches the current Turnstile token from a widget container.
+ * @param {string} selector - The CSS selector of the turnstile element (e.g., '#login-turnstile')
+ * @returns {string|null} The token string if validated, otherwise null.
+ */
+function getTurnstileToken(selector) {
+  if (typeof turnstile !== "undefined") {
+    return turnstile.getResponse(selector);
+  }
+  return null;
+}
 
-window.onRegisterSuccess = function(token) {
-  window.turnstileTokens.register = token;
-};
-
-window.onLoginSuccess = function(token) {
-  window.turnstileTokens.login = token;
-};
 
 // ==========================================
 // 2. MODULE IMPORTS
@@ -252,10 +252,14 @@ if (registerForm) {
     const termsCheckbox = document.getElementById("terms");
     const isTermsAccepted = termsCheckbox ? termsCheckbox.checked : false;
 
-    // Direct look-up into fixed window scope storage
-    const token = window.turnstileTokens.register;
+    const token = getTurnstileToken("#register-turnstile");
     if (!token) {
-      Swal.fire({ title: 'Security Check', text: 'Please fulfill the security verification challenge.', icon: 'warning', confirmButtonColor: '#0b1e5b' });
+      Swal.fire({ 
+        title: 'Security Check', 
+        text: 'Please fulfill the security verification challenge.', 
+        icon: 'warning', 
+        confirmButtonColor: '#0b1e5b' 
+      });
       return;
     }
 
@@ -299,7 +303,6 @@ if (registerForm) {
           confirmButtonText: 'Proceed to Login',
           confirmButtonColor: '#0b1e5b'
         }).then((res) => { if (res.isConfirmed) document.getElementById('go-to-login').click(); });
-        window.turnstileTokens.register = null; 
         if (typeof turnstile !== "undefined") turnstile.reset("#register-turnstile");
         return;
       }
@@ -315,14 +318,13 @@ if (registerForm) {
 
       if (error) {
         Swal.fire({ title: 'Registration Failed', text: error.message, icon: 'error', confirmButtonColor: '#0b1e5b' });
-        window.turnstileTokens.register = null;
+        // Fixed: Removed old window.turnstileTokens line that would cause execution to crash here
         if (typeof turnstile !== "undefined") turnstile.reset("#register-turnstile");
         return;
       }
 
       if (data?.user) {
         registerForm.reset();
-        window.turnstileTokens.register = null;
         if (typeof turnstile !== "undefined") turnstile.reset("#register-turnstile");
         Swal.fire({ 
           icon: 'success', 
@@ -331,7 +333,7 @@ if (registerForm) {
           confirmButtonColor: '#0b1e5b' 
         });
       } else {
-        window.turnstileTokens.register = null;
+        // Fixed: Removed old window.turnstileTokens line that would cause execution to crash here
         if (typeof turnstile !== "undefined") turnstile.reset("#register-turnstile");
         Swal.fire({ 
           icon: 'info', 
@@ -343,7 +345,6 @@ if (registerForm) {
 
     } catch (err) {
       Swal.close();
-      window.turnstileTokens.register = null;
       if (typeof turnstile !== "undefined") turnstile.reset("#register-turnstile");
       Swal.fire({ title: 'System Error', text: 'An unexpected internal error occurred. Please try again later or contact support.', icon: 'error', confirmButtonColor: '#0b1e5b' });
     }
@@ -359,8 +360,7 @@ if (loginForm) {
     const password = document.getElementById("login-password").value;
     const remember = document.getElementById("rememberMe")?.checked ?? false;
 
-    // Direct look-up into fixed window scope storage
-    const token = window.turnstileTokens.login;
+    const token = getTurnstileToken("#login-turnstile");
     if (!token) {
       Swal.fire("Security Check", "Please fulfill the security verification challenge.", "warning");
       return;
@@ -385,7 +385,6 @@ if (loginForm) {
 
     if (error) {
       Swal.fire("Login failed", error.message, "error");
-      window.turnstileTokens.login = null;
       if (typeof turnstile !== "undefined") turnstile.reset("#login-turnstile");
       return;
     }
@@ -393,7 +392,6 @@ if (loginForm) {
     const user = data.user;
     if (!user.confirmed_at) {
       Swal.fire({ icon: "warning", title: "Email not verified", text: "Please verify your email." });
-      window.turnstileTokens.login = null;
       if (typeof turnstile !== "undefined") turnstile.reset("#login-turnstile");
       return;
     }
@@ -403,7 +401,7 @@ if (loginForm) {
     if (profile && profile.is_active === false) {
       await supabase.auth.signOut();
       Swal.fire({ icon: "warning", title: "Account Deactivated", text: "Contact support to reactivate." });
-      window.turnstileTokens.login = null;
+      // Fixed: Removed old window.turnstileTokens line that would cause execution to crash here
       if (typeof turnstile !== "undefined") turnstile.reset("#login-turnstile");
       return;
     }
@@ -431,7 +429,7 @@ if (loginForm) {
       sessionStorage.setItem("supabaseSession", JSON.stringify(data.session));
     }
 
-    window.turnstileTokens.login = null;
+    // Fixed: Removed old window.turnstileTokens line that would cause execution to crash here
     if (typeof turnstile !== "undefined") turnstile.reset("#login-turnstile");
     Swal.fire({ icon: "success", title: "Login successful", showConfirmButton: false, timer: 1400 });
     setTimeout(() => { window.location.href = "dashboard.html"; }, 1200);
