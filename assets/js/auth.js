@@ -318,7 +318,6 @@ if (registerForm) {
 
       if (error) {
         Swal.fire({ title: 'Registration Failed', text: error.message, icon: 'error', confirmButtonColor: '#0b1e5b' });
-        // Fixed: Removed old window.turnstileTokens line that would cause execution to crash here
         if (typeof turnstile !== "undefined") turnstile.reset("#register-turnstile");
         return;
       }
@@ -333,7 +332,6 @@ if (registerForm) {
           confirmButtonColor: '#0b1e5b' 
         });
       } else {
-        // Fixed: Removed old window.turnstileTokens line that would cause execution to crash here
         if (typeof turnstile !== "undefined") turnstile.reset("#register-turnstile");
         Swal.fire({ 
           icon: 'info', 
@@ -401,7 +399,6 @@ if (loginForm) {
     if (profile && profile.is_active === false) {
       await supabase.auth.signOut();
       Swal.fire({ icon: "warning", title: "Account Deactivated", text: "Contact support to reactivate." });
-      // Fixed: Removed old window.turnstileTokens line that would cause execution to crash here
       if (typeof turnstile !== "undefined") turnstile.reset("#login-turnstile");
       return;
     }
@@ -429,7 +426,6 @@ if (loginForm) {
       sessionStorage.setItem("supabaseSession", JSON.stringify(data.session));
     }
 
-    // Fixed: Removed old window.turnstileTokens line that would cause execution to crash here
     if (typeof turnstile !== "undefined") turnstile.reset("#login-turnstile");
     Swal.fire({ icon: "success", title: "Login successful", showConfirmButton: false, timer: 1400 });
     setTimeout(() => { window.location.href = "dashboard.html"; }, 1200);
@@ -448,7 +444,7 @@ if (forgotForm) {
       return;
     }
 
-    // ✅ 1. Fetch the Turnstile token for the forgot form wrapper
+    // Fetch the Turnstile token for the forgot form wrapper
     const token = getTurnstileToken("#forgot-turnstile");
     if (!token) {
       Swal.fire("Security Check", "Please fulfill the security verification challenge.", "warning");
@@ -457,7 +453,7 @@ if (forgotForm) {
 
     Swal.fire({ title: "Sending reset link...", allowOutsideClick: false, didOpen: () => Swal.showLoading() });
     
-    // ✅ 2. Pass the captchaToken within the options object to Supabase
+    // Pass the captchaToken within the options object to Supabase
     const { error } = await supabase.auth.resetPasswordForEmail(email, { 
       redirectTo: "https://accmarket.name.ng/reset.html",
       options: {
@@ -468,12 +464,10 @@ if (forgotForm) {
 
     if (error) {
       Swal.fire("Error", error.message, "error");
-      // ✅ 3. Reset the widget challenge if the request fails so they can try again
       if (typeof turnstile !== "undefined") turnstile.reset("#forgot-turnstile");
     } else {
       Swal.fire("Check your inbox", "Reset link sent.", "success");
       forgotForm.reset();
-      // ✅ 4. Reset the widget on success before hiding the modal
       if (typeof turnstile !== "undefined") turnstile.reset("#forgot-turnstile");
       if (typeof window.closeForgotModal === "function") window.closeForgotModal();
     }
