@@ -237,7 +237,7 @@ document.addEventListener("click", (e) => {
 });
 
 // ==========================================
-// 8. SUPABASE & SECURE AUTENTICATION TRANSACTION HANDLERS
+// 8. SUPABASE & SECURE AUTHENTICATION TRANSACTION HANDLERS
 // ==========================================
 
 // Register User Request
@@ -444,34 +444,34 @@ if (forgotForm) {
       return;
     }
 
-    // ✅ 1. Fetch the Turnstile token for the forgot form wrapper
-    const token = getTurnstileToken("#forgot-turnstile");
+    // 1. Read from the SHARED login turnstile container
+    const token = getTurnstileToken("#login-turnstile");
     if (!token) {
-      Swal.fire("Security Check", "Please fulfill the security verification challenge.", "warning");
+      Swal.fire("Security Check", "Please fulfill the security verification challenge on the login card.", "warning");
       return;
     }
 
     Swal.fire({ title: "Sending reset link...", allowOutsideClick: false, didOpen: () => Swal.showLoading() });
     
-    // ✅ 2. Pass the captchaToken within the options object to Supabase
+    // 2. ✅ FIXED: captchaToken is now correctly flat beside redirectTo
     const { error } = await supabase.auth.resetPasswordForEmail(email, { 
       redirectTo: "https://accmarket.name.ng/reset.html",
-      options: {
-        captchaToken: token
-      }
+      captchaToken: token
     });
     Swal.close();
 
+    // 3. Instantly reset the widget because single-use tokens expire immediately upon use
+    if (typeof turnstile !== "undefined") turnstile.reset("#login-turnstile");
+
     if (error) {
       Swal.fire("Error", error.message, "error");
-      // ✅ 3. Reset the widget challenge if the request fails so they can try again
-      if (typeof turnstile !== "undefined") turnstile.reset("#forgot-turnstile");
     } else {
       Swal.fire("Check your inbox", "Reset link sent.", "success");
       forgotForm.reset();
-      // ✅ 4. Reset the widget on success before hiding the modal
-      if (typeof turnstile !== "undefined") turnstile.reset("#forgot-turnstile");
-      if (typeof window.closeForgotModal === "function") window.closeForgotModal();
+      
+      // Close modal dynamically
+      const modal = document.getElementById("forgot-modal");
+      if (modal) modal.classList.remove("active");
     }
   });
 }
