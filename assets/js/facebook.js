@@ -454,7 +454,7 @@ window.initiatePurchase = async (id) => {
             return Swal.fire("Insufficient Balance", "You do not have enough funds for this purchase.", "warning");
         }
 
-        // 🟢 UPDATED: Selecting onesignal_id and push_notifications_enabled from the database
+        // Fetch seller details specifically for email, username, Telegram, and OneSignal integrations
         const { data: sellerProfile } = await supabase
             .from('profiles')
             .select('email, username, full_name, telegram_chat_id, telegram_alerts, onesignal_id, push_notifications_enabled')
@@ -554,7 +554,8 @@ window.initiatePurchase = async (id) => {
                         buyer_name: currentBuyerName,
                         account_name: targetAccountName,
                         chat_url: chatRoomUrl,
-                        // 🟢 ADDED: Safely forward push payload metrics down to the backend edge function
+                        
+                        // 🟢 FIXED: Explicitly passes the selected parameters to the payload object body
                         onesignal_id: sellerProfile.onesignal_id,
                         push_enabled: sellerProfile.push_notifications_enabled
                     })
@@ -573,7 +574,6 @@ window.initiatePurchase = async (id) => {
         Swal.fire("Error", "Transaction failed. Please contact support.", "error");
     }
 }
-
 
 
 window.closeEscrowModal = () => {
