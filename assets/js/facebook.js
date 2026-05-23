@@ -488,24 +488,38 @@ async function processTransaction(account, totalWithFee, originalPrice, buyerId)
 
         if (sellerProfile?.email) {
             try {
+                // 1. Fetch the absolute freshest session details safely
                 const { data: sessionData } = await supabase.auth.getSession();
-                const jwtToken = sessionData?.session?.access_token || supabase.supabaseKey; 
-                const sellerDisplayName = sellerProfile.username || "Seller";
+                const jwtToken = sessionData?.session?.access_token; 
 
+                const sellerDisplayName = sellerProfile.username || sellerProfile.full_name || "Seller";
+
+                // 2. Build a strictly scrubbed data payload object
+                const notificationPayload = {
+                    seller_email: sellerProfile.email.trim(),
+                    seller_name: sellerDisplayName,
+                    buyer_name: currentBuyerName,
+                    account_name: targetAccountName,
+                    chat_url: chatRoomUrl,
+                    // Force variable to format cleanly as an explicit string or strict null
+                    onesignal_id: sellerProfile.onesignal_id ? String(sellerProfile.onesignal_id) : null,
+                    push_enabled: Boolean(sellerProfile.push_notifications_enabled)
+                };
+
+                // 3. Dispatch out to the Supabase Edge Function securely
                 await fetch("https://qihzvglznpkytolxkuxz.supabase.co/functions/v1/sales-notification", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${jwtToken}` },
-                    body: JSON.stringify({
-                        seller_email: sellerProfile.email,
-                        seller_name: sellerDisplayName,
-                        buyer_name: currentBuyerName,
-                        account_name: targetAccountName,
-                        chat_url: chatRoomUrl,
-                        onesignal_id: sellerProfile.onesignal_id,
-                        push_enabled: sellerProfile.push_notifications_enabled
-                    })
+                    headers: { 
+                        "Content-Type": "application/json",
+                        // Pass API context signatures correctly to avoid 401 JWT Validation Failures
+                        "apikey": supabase.supabaseKey,
+                        "Authorization": `Bearer ${jwtToken || supabase.supabaseKey}` 
+                    },
+                    body: JSON.stringify(notificationPayload)
                 });
-            } catch (funcErr) { console.error(funcErr); }
+            } catch (funcErr) { 
+                console.error("Edge Function Network Route Failed:", funcErr); 
+            }
         }
 
         Swal.fire({ icon: 'success', title: 'Purchase Secured!', text: 'Redirecting to your escrow workspace...', timer: 2000, showConfirmButton: false });
@@ -517,6 +531,7 @@ async function processTransaction(account, totalWithFee, originalPrice, buyerId)
         Swal.fire("Error", "Transaction failed. Please contact support.", "error");
     }
 }
+
 
 window.closeEscrowModal = () => {
     document.getElementById('escrowModal').style.display = 'none';
