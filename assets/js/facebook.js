@@ -424,7 +424,9 @@ window.initiatePurchase = async (id) => {
     }
 };
 
-async function processTransaction(account, totalWithFee, originalPrice, buyerId) {
+
+
+       async function processTransaction(account, totalWithFee, originalPrice, buyerId) {
     try {
         Swal.fire({ title: 'Processing Transaction...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
@@ -452,10 +454,10 @@ async function processTransaction(account, totalWithFee, originalPrice, buyerId)
             return Swal.fire("Insufficient Balance", "You do not have enough funds for this purchase.", "warning");
         }
 
-        // Fetch seller details specifically for email, template matching names, and Telegram integrations
+        // 🟢 UPDATED: Selecting onesignal_id and push_notifications_enabled from the database
         const { data: sellerProfile } = await supabase
             .from('profiles')
-            .select('email, username, full_name, telegram_chat_id, telegram_alerts')
+            .select('email, username, full_name, telegram_chat_id, telegram_alerts, onesignal_id, push_notifications_enabled')
             .eq('id', account.user_id)
             .single();
 
@@ -531,12 +533,14 @@ async function processTransaction(account, totalWithFee, originalPrice, buyerId)
             }
         }
 
-        // 3. 🟢 CALL THE DEPLOYED EDGE FUNCTION WITH AUTHORIZATION BEARER HEADERS
+        // 3. CALL THE DEPLOYED EDGE FUNCTION WITH AUTHORIZATION BEARER HEADERS
         if (sellerProfile?.email) {
             try {
                 // Get the user's current session JWT token via the supabase client wrapper
                 const { data: sessionData } = await supabase.auth.getSession();
                 const jwtToken = sessionData?.session?.access_token || supabase.supabaseKey; 
+
+                const sellerDisplayName = sellerProfile.username || "Seller";
 
                 await fetch("https://qihzvglznpkytolxkuxz.supabase.co/functions/v1/sales-notification", {
                     method: "POST",
@@ -546,10 +550,13 @@ async function processTransaction(account, totalWithFee, originalPrice, buyerId)
                     },
                     body: JSON.stringify({
                         seller_email: sellerProfile.email,
-                        seller_name: sellerProfile.full_name || sellerProfile.username || "Seller",
+                        seller_name: sellerDisplayName,
                         buyer_name: currentBuyerName,
                         account_name: targetAccountName,
-                        chat_url: chatRoomUrl
+                        chat_url: chatRoomUrl,
+                        // 🟢 ADDED: Safely forward push payload metrics down to the backend edge function
+                        onesignal_id: sellerProfile.onesignal_id,
+                        push_enabled: sellerProfile.push_notifications_enabled
                     })
                 });
             } catch (funcErr) {
@@ -566,6 +573,7 @@ async function processTransaction(account, totalWithFee, originalPrice, buyerId)
         Swal.fire("Error", "Transaction failed. Please contact support.", "error");
     }
 }
+
 
 
 window.closeEscrowModal = () => {
