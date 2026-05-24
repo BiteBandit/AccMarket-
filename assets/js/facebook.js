@@ -183,9 +183,9 @@ async function fetchFacebookInventory() {
 
         // Fetch profile structural lookups ahead of time
         const { data: profileList } = await supabase
-            .from('profiles')
-            .select('id, username, full_name, following, followers')
-            .in('id', userIds);
+    .from('profiles')
+    .select('id, username, full_name, following, followers, trust_score') // 👈 Added trust_score here
+    .in('id', userIds);
 
         window.currentGlobalProfiles = profileList || [];
 
@@ -250,6 +250,32 @@ function renderGrid(accounts) {
         const sellerUsername = row.profiles?.username || row.profiles?.full_name || `User_${String(row.user_id).slice(0, 5)}`;
         const isFollowing = cachedMyFollowingList.includes(row.user_id);
 
+// 🟡 Gold Verified Badge Logic (Increased size to 19px)
+const trustScore = row.profiles?.trust_score || 0;
+const isGoldVerified = trustScore >= 85 && trustScore <= 100;
+
+const goldBadgeSvg = isGoldVerified ? `
+    <svg class="meta-badge" viewBox="0 0 24 24" fill="none" style="width: 19px; height: 19px; margin-left: 5px; flex-shrink: 0; vertical-align: middle;">
+        <defs>
+            <linearGradient id="goldGradient-${row.id}" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#FFF3B0"/>
+                <stop offset="40%" stop-color="#FFD700"/>
+                <stop offset="100%" stop-color="#D4AF37"/>
+            </linearGradient>
+        </defs>
+        <path
+        d="M12 2L14.2 4.1L17 3.5L18.1 6.1L20.8 6.8L20.5 9.7L22.5 12L20.5 14.3L20.8 17.2L18.1 17.9L17 20.5L14.2 19.9L12 22L9.8 19.9L7 20.5L5.9 17.9L3.2 17.2L3.5 14.3L1.5 12L3.5 9.7L3.2 6.8L5.9 6.1L7 3.5L9.8 4.1L12 2Z"
+        fill="url(#goldGradient-${row.id})"/>
+        <path
+        d="M9.5 12.5L11 14L15 10"
+        stroke="white"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+    </svg>
+` : '';
+
+
         return `
             <div class="card">
                 <div class="options-menu">
@@ -271,9 +297,9 @@ function renderGrid(accounts) {
                     </div>
                 </div>
 
-                <div class="card-tag seller-username-tag">
-                    <i class="fa-regular fa-user" style="font-size: 0.7rem;"></i> @${sellerUsername}
-                </div>
+                 <div class="card-tag seller-username-tag" style="display: inline-flex; align-items: center; gap: 1px;"> <i class="fa-regular fa-user" style="font-size: 0.7rem;"></i> <span>@${sellerUsername}</span> ${goldBadgeSvg}
+</div>
+
                 
                 <div class="card-img">
                     <img src="https://accmarket.name.ng/images/facebook.png" alt="FB">
