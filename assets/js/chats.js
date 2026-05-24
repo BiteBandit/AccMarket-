@@ -9,8 +9,6 @@ let conversationSub = null;        // Handles Deal Status (Cancel/Complete/Escro
 let heartbeatInterval = null;
 let replyingTo = null; 
 
-
-
 // --- 1. INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', async () => {
     console.log("[INIT] App Starting...");
@@ -49,39 +47,32 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Navigation Logic
     const backBtn = document.getElementById('backToList');
-if (backBtn) {
-    backBtn.onclick = async () => {
-        document.querySelector('.app-container').classList.remove('chat-open');
-        
-        // 1. Mark messages as read before closing
-        if (activeChatId) await markMessagesAsRead(activeChatId);
-        
-        // 2. Clear the active ID
-        activeChatId = null;
+    if (backBtn) {
+        backBtn.onclick = async () => {
+            document.querySelector('.app-container').classList.remove('chat-open');
+            
+            if (activeChatId) await markMessagesAsRead(activeChatId);
+            activeChatId = null;
 
-        // 3. 🎯 NEW: CLEANUP ALL SEPARATE CHANNELS
-        // This stops the app from listening to the old chat in the background
-        if (messageSubscription) {
-            supabase.removeChannel(messageSubscription);
-            messageSubscription = null;
-        }
-        if (partnerStatusSub) {
-            supabase.removeChannel(partnerStatusSub);
-            partnerStatusSub = null;
-        }
-        if (conversationSub) {
-            supabase.removeChannel(conversationSub);
-            conversationSub = null;
-        }
-        
-        // 4. Update URL and Refresh Sidebar
-        const newUrl = new URL(window.location);
-        newUrl.searchParams.delete('id');
-        window.history.pushState({}, '', newUrl);
-        await loadSidebar();
-    };
-}
-
+            if (messageSubscription) {
+                supabase.removeChannel(messageSubscription);
+                messageSubscription = null;
+            }
+            if (partnerStatusSub) {
+                supabase.removeChannel(partnerStatusSub);
+                partnerStatusSub = null;
+            }
+            if (conversationSub) {
+                supabase.removeChannel(conversationSub);
+                conversationSub = null;
+            }
+            
+            const newUrl = new URL(window.location);
+            newUrl.searchParams.delete('id');
+            window.history.pushState({}, '', newUrl);
+            await loadSidebar();
+        };
+    }
 
     // Input Listeners
     const sendBtn = document.getElementById('sendMessageBtn'); 
@@ -98,21 +89,37 @@ if (backBtn) {
 
     const searchBar = document.getElementById('chatSearch');
     if(searchBar) searchBar.oninput = (e) => loadSidebar(e.target.value);
-
-
 });
+
+// --- Helper Function for Badges ---
+function generateGoldBadge(trustScore, uniqueId) {
+    const isGoldVerified = trustScore >= 85 && trustScore <= 100;
+    if (!isGoldVerified) return '';
+    return `
+        <svg class="meta-badge" viewBox="0 0 24 24" fill="none" style="width: 15px; height: 15px; margin-left: 2px; flex-shrink: 0; display: inline-block; vertical-align: middle;">
+            <defs>
+                <linearGradient id="goldGradient-${uniqueId}" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#FFF3B0"/>
+                    <stop offset="40%" stop-color="#FFD700"/>
+                    <stop offset="100%" stop-color="#D4AF37"/>
+                </linearGradient>
+            </defs>
+            <path d="M12 2L14.2 4.1L17 3.5L18.1 6.1L20.8 6.8L20.5 9.7L22.5 12L20.5 14.3L20.8 17.2L18.1 17.9L17 20.5L14.2 19.9L12 22L9.8 19.9L7 20.5L5.9 17.9L3.2 17.2L3.5 14.3L1.5 12L3.5 9.7L3.2 6.8L5.9 6.1L7 3.5L9.8 4.1L12 2Z" fill="url(#goldGradient-${uniqueId})"/>
+            <path d="M9.5 12.5L11 14L15 10" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+    `;
+}
 
 // --- 2. UPLOAD LOGIC ---
 async function handleFileUpload(file) {
     if (!activeChatId || !currentUser) return;
 
-    // 1. Generate a temporary ID to show an "Uploading" state in the UI
     const tempId = 'uploading-' + Date.now();
     const container = document.querySelector('.message-container');
     
     const tempDiv = document.createElement('div');
     tempDiv.id = tempId;
-    tempDiv.className = 'message outgoing'; // Align to your side
+    tempDiv.className = 'message outgoing'; 
     tempDiv.innerHTML = `
         <div class="msg-bubble" style="opacity: 0.7;">
             <p class="content">
@@ -128,7 +135,6 @@ async function handleFileUpload(file) {
         const fileName = `${Date.now()}.${fileExt}`;
         const filePath = `${activeChatId}/${fileName}`;
 
-        // 2. Upload to your 'chat-attachments' bucket
         const { error: uploadError } = await supabase.storage
             .from('chat-attachments')
             .upload(filePath, file);
@@ -139,12 +145,10 @@ async function handleFileUpload(file) {
             .from('chat-attachments')
             .getPublicUrl(filePath);
 
-        // 3. Determine if it's an image or a general file
         const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExt);
         const msgType = isImage ? 'image' : 'file';
         const replyId = replyingTo ? replyingTo.id : null;
 
-        // 4. Insert into database with the file_name for non-image types
         const { error: msgError } = await supabase
             .from('messages')
             .insert([{
@@ -154,12 +158,11 @@ async function handleFileUpload(file) {
                 type: msgType, 
                 is_read: false,
                 reply_to_id: replyId,
-                file_name: file.name // We save this so we can show "document.pdf" in the chat
+                file_name: file.name
             }]);
 
         if (msgError) throw msgError;
 
-        // 5. Cleanup
         document.getElementById(tempId)?.remove();
         cancelReplyUI();
         
@@ -177,10 +180,9 @@ async function handleFileUpload(file) {
     }
 }
 
-
 // --- 3. HEARTBEAT / PRESENCE ---
 async function initUserPresence() {
-    if (heartbeatInterval) clearInterval();
+    if (heartbeatInterval) clearInterval(heartbeatInterval);
 
     const updateStatus = async () => {
         const { data: profile } = await supabase.from('profiles').select('show_online').eq('id', currentUser.id).single();
@@ -202,8 +204,8 @@ async function loadSidebar(filter = "") {
         .from('conversations')
         .select(`
             id, last_message, updated_at, buyer_id, seller_id,
-            seller:profiles!conversations_seller_id_fkey(id, username, avatar_url, last_seen, show_online),
-            buyer:profiles!conversations_buyer_id_fkey(id, username, avatar_url, last_seen, show_online),
+            seller:profiles!conversations_seller_id_fkey(id, username, avatar_url, last_seen, show_online, trust_score),
+            buyer:profiles!conversations_buyer_id_fkey(id, username, avatar_url, last_seen, show_online, trust_score),
             messages(is_read, sender_id)
         `)
         .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id}`)
@@ -217,7 +219,6 @@ async function loadSidebar(filter = "") {
         const otherUser = isMeBuyer ? chat.seller : chat.buyer;
         if (filter && !otherUser.username.toLowerCase().includes(filter.toLowerCase())) return;
 
-        // 🎯 UPDATED READ/UNREAD CALCULATOR
         const hasUnread = chat.messages.some(m => 
             m && 
             m.is_read === false && 
@@ -226,14 +227,40 @@ async function loadSidebar(filter = "") {
             chat.id !== activeChatId
         );
         const isActive = chat.id === activeChatId ? 'active' : '';
-        const timeDisplay = new Date(chat.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        // 🟢 Dynamic Day + Time Logic for Sidebar
+        const msgDate = new Date(chat.updated_at);
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+
+        let timeDisplay = "";
+
+        if (msgDate.toDateString() === today.toDateString()) {
+            // If sent today: e.g., "10:30 AM"
+            timeDisplay = msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        } else if (msgDate.toDateString() === yesterday.toDateString()) {
+            // If sent yesterday: "Yesterday"
+            timeDisplay = "Yesterday";
+        } else {
+            // If older than yesterday: e.g., "Nov 12"
+            timeDisplay = msgDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
+        }
+
+        const goldBadgeSvg = generateGoldBadge(otherUser?.trust_score || 0, `sidebar-${chat.id}`);
 
         const item = document.createElement('div');
         item.className = `chat-item ${isActive} ${hasUnread ? 'unread-item' : ''}`;
+        
         item.innerHTML = `
             <img src="${otherUser.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUser.username}`}">
             <div class="chat-info">
-                <div class="chat-top"><span class="user-name">${otherUser.username}</span><span class="time">${timeDisplay}</span></div>
+                <div class="chat-top">
+                    <span class="user-name" style="display: inline-flex; align-items: center; gap: 1px;">
+                        ${otherUser.username} ${goldBadgeSvg}
+                    </span>
+                    <span class="time">${timeDisplay}</span>
+                </div>
                 <div class="chat-bottom">
                     <p class="last-msg">${chat.last_message || 'New Deal Started'}</p>
                     ${hasUnread ? '<span class="unread-dot"></span>' : ''}
@@ -249,6 +276,7 @@ async function loadSidebar(filter = "") {
             await loadSidebar(filter); 
             initChatWindow(); 
         };
+
         chatList.appendChild(item);
     });
 }
@@ -263,29 +291,33 @@ async function initChatWindow() {
 
     console.log("[CHAT] Refreshing view for:", activeChatId);
     subscribeToMessages();
-subscribeToConversationChanges();
-
+    subscribeToConversationChanges();
 
     const { data: chat } = await supabase
-    .from('conversations')
-    .select(`*, 
-        product_id,
-        product_name, 
-        product_price,
-        seller:profiles!conversations_seller_id_fkey(id, username, avatar_url, last_seen, show_online), 
-        buyer:profiles!conversations_buyer_id_fkey(id, username, avatar_url, last_seen, show_online)`)
-    .eq('id', activeChatId)
-    .single();
-
+        .from('conversations')
+        .select(`*, 
+            product_id,
+            product_name, 
+            product_price,
+            seller:profiles!conversations_seller_id_fkey(id, username, avatar_url, last_seen, show_online, trust_score), 
+            buyer:profiles!conversations_buyer_id_fkey(id, username, avatar_url, last_seen, show_online, trust_score)`)
+        .eq('id', activeChatId)
+        .single();
 
     if (chat) {
-window.activeChatData = chat; 
+        window.activeChatData = chat; 
 
         const otherUser = chat.buyer_id === currentUser.id ? chat.seller : chat.buyer;
-        headerName.innerText = otherUser.username;
+        
+        const goldBadgeSvg = generateGoldBadge(otherUser?.trust_score || 0, `header-${chat.id}`);
+
+        headerName.style.display = "inline-flex";
+        headerName.style.alignItems = "center";
+        headerName.style.gap = "1px";
+        headerName.innerHTML = `${otherUser.username} ${goldBadgeSvg}`;
+
         headerAvatar.src = otherUser.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUser.username}`;
 
-        // 🎯 THE AUTO-START TRIGGER
         if (chat.escrow_step === 0) {
             console.log("[ESCROW] Initializing Step 1...");
             await upgradeToStepOne(); 
@@ -293,91 +325,69 @@ window.activeChatData = chat;
             updateEscrowUI(chat.escrow_step);
         }
 
-syncLockdownUI(chat.status);
+        syncLockdownUI(chat.status);
 
+        // --- 🎯 PRODUCT CONTEXT BAR & LOGO LOGIC ---
+        const pTitle = document.getElementById('productTitle');
+        const pPrice = document.getElementById('productPrice');
+        const pImg = document.getElementById('productImg');
+        const viewBtn = document.querySelector('.view-listing-btn');
 
-
-// --- 🎯 PRODUCT CONTEXT BAR & LOGO LOGIC ---
-const pTitle = document.getElementById('productTitle');
-const pPrice = document.getElementById('productPrice');
-const pImg = document.getElementById('productImg');
-const viewBtn = document.querySelector('.view-listing-btn');
-
-const logos = {
-    instagram: "../images/instagram.png",
-    twitter: "../images/twitter.png",
-    tiktok: "../images/tiktok.png",
-    facebook: "../images/facebook.png",
-    snapchat: "../images/snapchat.png",
-    reddit: "../images/reddit.png",
-    twitch: "../images/twitch.png",
-    discord: "../images/discord.png",
-    linkedin: "../images/linkedin.png",
-    pinterest: "../images/pinterest.png"
-};
-
-if (chat) {
-    if (pTitle) pTitle.innerText = chat.product_name || "Unknown Item";
-    if (pPrice) pPrice.innerText = `₦${chat.product_price || '0.00'}`;
-
-    // Get the correct logo based on the product name
-    if (pImg && chat.product_name) {
-        // Normalize name (e.g., "FACEBOOK " -> "facebook")
-        const platform = chat.product_name.toLowerCase().trim();
-        pImg.src = logos[platform] || "../images/default-platform.png"; 
-    }
-
-    // Redirection Logic
-        // --- 🎯 UPDATED REDIRECTION LOGIC ---
-    if (viewBtn && chat) {
-        viewBtn.onclick = () => {
-            // 1. Clean the platform name (e.g., "FACEBOOK " -> "facebook")
-            const platform = chat.product_name ? chat.product_name.toLowerCase().trim() : "";
-            
-            // 2. Get the product UUID from the conversation table
-            const productId = chat.product_id;
-
-            if (platform && productId) {
-                // Redirects to: ../pages/facebook.html?id=18821243-2792...
-                window.location.href = `../platforms/${platform}.html?id=${productId}`;
-            } 
-            else if (platform) {
-                // Fallback if the product_id column is empty
-                window.location.href = `../platforms/${platform}.html`;
-            } 
-            else {
-                console.error("Missing platform name to redirect.");
-            }
+        const logos = {
+            instagram: "../images/instagram.png",
+            twitter: "../images/twitter.png",
+            tiktok: "../images/tiktok.png",
+            facebook: "../images/facebook.png",
+            snapchat: "../images/snapchat.png",
+            reddit: "../images/reddit.png",
+            twitch: "../images/twitch.png",
+            discord: "../images/discord.png",
+            linkedin: "../images/linkedin.png",
+            pinterest: "../images/pinterest.png"
         };
-    }
-}
 
-await refreshMenuVisibility();
+        if (pTitle) pTitle.innerText = chat.product_name || "Unknown Item";
+        if (pPrice) pPrice.innerText = `₦${chat.product_price || '0.00'}`;
 
+        if (pImg && chat.product_name) {
+            const platform = chat.product_name.toLowerCase().trim();
+            pImg.src = logos[platform] || "../images/default-platform.png"; 
+        }
 
+        if (viewBtn) {
+            viewBtn.onclick = () => {
+                const platform = chat.product_name ? chat.product_name.toLowerCase().trim() : "";
+                const productId = chat.product_id;
+
+                if (platform && productId) {
+                    window.location.href = `../platforms/${platform}.html?id=${productId}`;
+                } else if (platform) {
+                    window.location.href = `../platforms/${platform}.html`;
+                } else {
+                    console.error("Missing platform name to redirect.");
+                }
+            };
+        }
+
+        await refreshMenuVisibility();
         watchPartnerPresence(otherUser);
     }
 
-    // 🎯 Use 'reply_link' constraint hint to solve ambiguity
-      // ✅ Corrected Query
-const { data: messages, error } = await supabase
-    .from('messages')
-    .select(`
-        *, 
-        sender:profiles(username, avatar_url, role), 
-        reply_to:messages!reply_to_id(
-            id, 
-            content, 
-            type, 
-            sender_id,
-            sender:profiles(username)
-        )
-    `)
-    .eq('conversation_id', activeChatId)
-    .order('created_at', { ascending: true });
-
-
-
+    const { data: messages, error } = await supabase
+        .from('messages')
+        .select(`
+            *, 
+            sender:profiles(username, avatar_url, role, trust_score), 
+            reply_to:messages!reply_to_id(
+                id, 
+                content, 
+                type, 
+                sender_id,
+                sender:profiles(username)
+            )
+        `)
+        .eq('conversation_id', activeChatId)
+        .order('created_at', { ascending: true });
 
     if (error) {
         console.error("[CHAT] Fetch messages error:", error);
@@ -385,11 +395,9 @@ const { data: messages, error } = await supabase
 
     container.innerHTML = ''; 
 
-    // 🛡️ 2. ADD SAFETY WARNING (New Step)
-    // We check if it's Level 1 (Step 1) or any active deal
     if (chat && chat.status === 'active') {
         const warningDiv = document.createElement('div');
-        warningDiv.className = 'system-pill-container'; // Keeps it centered
+        warningDiv.className = 'system-pill-container'; 
         warningDiv.innerHTML = `
             <div class="safety-warning-box">
                 <div class="warning-header">
@@ -436,7 +444,6 @@ function watchPartnerPresence(partner) {
 
     calculateStatus(partner.last_seen, partner.show_online);
 
-    // 🎯 FIX: Use partnerStatusSub instead of the shared statusSubscription
     if (partnerStatusSub) supabase.removeChannel(partnerStatusSub);
     
     partnerStatusSub = supabase.channel(`status-${partner.id}`)
@@ -452,7 +459,6 @@ function watchPartnerPresence(partner) {
 }
  
 // --- 7. MESSAGING HELPERS ---
- // --- 7. MESSAGING HELPERS (UPDATED WITH DELETE SYNC) ---
 function subscribeToMessages() {
     if (messageSubscription) supabase.removeChannel(messageSubscription);
 
@@ -465,16 +471,14 @@ function subscribeToMessages() {
         }, async (payload) => {
             console.log("[REALTIME] New message incoming...");
             
-            // 🎯 Handle System messages immediately
             if (payload.new.type === 'system') {
                 appendMessageUI(payload.new);
             } else {
-                // 🎯 UPDATED: Fetch the sender's 'role' and 'avatar_url' live
                 const { data: fullMsg } = await supabase
                     .from('messages')
                     .select(`
                         *,
-                        sender:profiles(username, avatar_url, role), 
+                        sender:profiles(username, avatar_url, role, trust_score), 
                         reply_to:messages!reply_to_id (
                             id, content, type, sender_id,
                             sender:profiles (username)
@@ -496,14 +500,12 @@ function subscribeToMessages() {
             table: 'messages', 
             filter: `conversation_id=eq.${activeChatId}` 
         }, (payload) => {
-            // Handle Read Status
             const icon = document.getElementById(`icon-${payload.new.id}`);
             if (icon && payload.new.is_read) {
                 icon.className = 'ph ph-checks';
                 icon.style.color = '#10b981';
             }
 
-            // Handle Real-time Deletion
             if (payload.new.type === 'deleted') {
                 const msgDiv = document.getElementById(`msg-${payload.new.id}`);
                 if (msgDiv) {
@@ -527,9 +529,7 @@ function subscribeToMessages() {
 }
 
 
-// --- NEW REALTIME: Listen for Deal Status & Escrow Changes ---
 function subscribeToConversationChanges() {
-    // 🎯 FIX: Use conversationSub instead of the shared statusSubscription
     if (conversationSub) supabase.removeChannel(conversationSub);
 
     conversationSub = supabase.channel(`conv-status-${activeChatId}`)
@@ -540,31 +540,21 @@ function subscribeToConversationChanges() {
             filter: `id=eq.${activeChatId}` 
         }, (payload) => {
             console.log("[REALTIME] Deal Update:", payload.new.status);
-            
-            // Update global data object so other functions know the status changed
             window.activeChatData = payload.new;
 
-            // 1. Instantly update progress bar for the partner (Step 1 -> 2 -> 3)
             if (typeof updateEscrowUI === 'function') {
                 updateEscrowUI(payload.new.escrow_step);
             }
-            
-            // 2. Instantly lock/unlock the chat for the partner
             syncLockdownUI(payload.new.status);
-            
-            // 3. Refresh the sidebar list to show "Cancelled" or "Completed" status
             loadSidebar();
         })
         .subscribe();
 }
 
-
 // --- 9. DELETE LOGIC WITH SWEETALERT ---
 async function deleteMessage(msgId, senderId) {
-    // 🛑 Safety check: ensures currentUser is loaded and owns the message
     if (!currentUser || senderId !== currentUser.id) return;
 
-    // 🛑 1. DISPUTE LOCK: Block deletion if status is disputed, cancelled, or completed
     const currentStatus = window.activeChatData?.status;
     if (['disputed', 'cancelled', 'completed'].includes(currentStatus)) {
         Swal.fire({
@@ -574,7 +564,6 @@ async function deleteMessage(msgId, senderId) {
             confirmButtonColor: '#0b1e5b'
         });
         
-        // Reset the swipe UI visuals
         const msgDiv = document.getElementById(`msg-${msgId}`);
         if (msgDiv) {
             const bubble = msgDiv.querySelector('.msg-bubble');
@@ -604,7 +593,6 @@ async function deleteMessage(msgId, senderId) {
     }
 
     try {
-        // 2. Fetch info to check if this is the last message
         const { data: msgToDelete } = await supabase
             .from('messages')
             .select('id, conversation_id, created_at')
@@ -613,7 +601,6 @@ async function deleteMessage(msgId, senderId) {
 
         if (!msgToDelete) return;
 
-        // 3. Update the message record (Soft Delete)
         const { error: msgError } = await supabase
             .from('messages')
             .update({ 
@@ -625,7 +612,6 @@ async function deleteMessage(msgId, senderId) {
 
         if (msgError) throw msgError;
 
-        // 4. Update Sidebar if this was the most recent message
         const { count } = await supabase
             .from('messages')
             .select('*', { count: 'exact', head: true })
@@ -639,7 +625,6 @@ async function deleteMessage(msgId, senderId) {
                 .eq('id', msgToDelete.conversation_id);
         }
 
-        // 5. Success UI
         Swal.fire({ 
             toast: true, 
             position: 'top-end', 
@@ -654,16 +639,8 @@ async function deleteMessage(msgId, senderId) {
         Swal.fire('Error', 'Could not delete message.', 'error');
     }
 }
-
-// 🎯 CRITICAL: Export to global scope so HTML onclick can find it
 window.deleteMessage = deleteMessage;
 
-
-
-
-
-
-// 🎯 UPDATED REPLY LOGIC WITH DYNAMIC NAMES & ERROR PROTECTION
 function setReplyUI(msg) {
     if (!msg) return;
     replyingTo = msg;
@@ -674,7 +651,6 @@ function setReplyUI(msg) {
         return;
     }
 
-    // Add Styles if they don't exist yet
     if (!document.getElementById('reply-style-tag')) {
         const style = document.createElement('style');
         style.id = 'reply-style-tag';
@@ -739,14 +715,12 @@ function setReplyUI(msg) {
 
     const text = msg.type === 'image' ? '📷 Image' : (msg.content || '');
     
-    // 🎯 FIX: Correct logic for "You" vs "Username"
     let displayName = "User";
     if (msg.sender_id === currentUser.id) {
         displayName = "You";
     } else if (msg.sender && msg.sender.username) {
         displayName = msg.sender.username;
     } else {
-        // Fallback: Try to find the username from the chat header if the sender object is missing
         displayName = document.getElementById('headerName')?.innerText || "User";
     }
 
@@ -768,13 +742,10 @@ function cancelReplyUI() {
 }
 window.cancelReplyUI = cancelReplyUI;
 
-   
-
-  function appendMessageUI(msg) {
+function appendMessageUI(msg) {
     const container = document.querySelector('.message-container');
     if (!container || document.getElementById(`msg-${msg.id}`)) return;
 
-    // 🎯 1. Handle System Messages
     if (msg.type === 'system') {
         const systemDiv = document.createElement('div');
         systemDiv.id = `msg-${msg.id}`;
@@ -796,19 +767,33 @@ window.cancelReplyUI = cancelReplyUI;
         return; 
     }
 
-    // 🎯 2. Setup Identities & Positioning
-    const isMe = msg.sender_id === currentUser.id;
-    const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    
-    // Standard User Positioning: My messages on the right, others on the left
+        const isMe = msg.sender_id === currentUser.id;
+
+    // 🟢 Dynamic Day + Time Format for Chat Bubbles (e.g., "Today, 10:30 AM" or "Nov 12, 10:30 AM")
+    const msgDate = new Date(msg.created_at);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    let dateLabel = "";
+    if (msgDate.toDateString() === today.toDateString()) {
+        dateLabel = "Today";
+    } else if (msgDate.toDateString() === yesterday.toDateString()) {
+        dateLabel = "Yesterday";
+    } else {
+        // Shows clean short date format like "Nov 12"
+        dateLabel = msgDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    }
+
+    const timeLabel = msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const time = `${dateLabel}, ${timeLabel}`; // 🎯 Combines them into "Today, 02:15 PM"
+
     const messageClass = isMe ? 'outgoing' : 'incoming';
 
-    // 🎯 3. Create the Base Element
     const div = document.createElement('div');
     div.id = `msg-${msg.id}`;
     div.className = `message ${messageClass}`;
 
-    // 🎯 4. Handle Replies
     let replyHTML = '';
     if (msg.reply_to_id) {
         const otherName = document.getElementById('headerName')?.innerText || 'User';
@@ -821,7 +806,6 @@ window.cancelReplyUI = cancelReplyUI;
             </div>`;
     }
 
-    // 🎯 5. Content Logic
     let contentHTML = '';
     if (msg.type === 'deleted') {
         contentHTML = `<p class="content deleted-text">${msg.content}</p>`;
@@ -841,13 +825,21 @@ window.cancelReplyUI = cancelReplyUI;
         contentHTML = `<p class="content">${msg.content}</p>`;
     }
 
-    // 🎯 6. Assemble Final Structure
     const isLocked = window.activeChatData?.status === 'disputed' || 
                      window.activeChatData?.status === 'cancelled' || 
                      window.activeChatData?.status === 'completed';
 
+    // 🟡 Gold Verified Badge Logic for Message Stream Bubbles
+    const goldBadgeSvg = generateGoldBadge(msg.sender?.trust_score || 0, `msg-${msg.id}`);
+
     div.innerHTML = `
         ${(isMe && !isLocked) ? `<div class="swipe-delete-btn" onclick="deleteMessage('${msg.id}', '${msg.sender_id}')"><i class="ph ph-trash"></i></div>` : ''}
+        
+        ${(!isMe && msg.sender?.username) ? `
+            <span class="sender-name" style="display: inline-flex; align-items: center; gap: 1px; font-size: 0.75rem; margin-bottom: 2px; color: #475569; font-weight: 500;">
+                ${msg.sender.username} ${goldBadgeSvg}
+            </span>
+        ` : ''}
         
         <div class="msg-bubble">
             ${replyHTML}
@@ -859,8 +851,6 @@ window.cancelReplyUI = cancelReplyUI;
             </div>
         </div>`;
 
-
-    // 🎯 7. Mobile Interactions & Rendering
     const bubble = div.querySelector('.msg-bubble');
     let pressTimer, startX = 0, currentX = 0, isSwiping = false;
 
@@ -889,9 +879,6 @@ window.cancelReplyUI = cancelReplyUI;
     container.scrollTop = container.scrollHeight;
 }
 
-
-
-// 🎯 COOL ADDITION: Function to jump to the message
 function scrollToMessage(id) {
     const target = document.getElementById(`msg-${id}`);
     if (target) {
@@ -901,9 +888,6 @@ function scrollToMessage(id) {
     }
 }
 window.scrollToMessage = scrollToMessage;
-
-
-  
 
 async function handleSendMessage() {
     const input = document.getElementById('messageInput');
@@ -927,8 +911,6 @@ async function handleSendMessage() {
         await supabase.from('conversations')
             .update({ last_message: content, updated_at: new Date().toISOString() })
             .eq('id', activeChatId);
-
- 
     }
 }
 
@@ -953,13 +935,11 @@ async function initSettingsToggle() {
     };
 }
 
-// 🎯 AUTO-UPGRADE TO STEP 1
 async function upgradeToStepOne() {
     if (!activeChatId || !currentUser) return;
 
     const systemText= "💰 Payment confirmed. Funds are now held in Escrow. Seller, please send the login details here so the buyer can verify the account.";
 
-    // 1. Update the Conversation Table
     await supabase.from('conversations')
         .update({ 
             escrow_step: 1, 
@@ -968,7 +948,6 @@ async function upgradeToStepOne() {
         })
         .eq('id', activeChatId);
 
-    // 2. Insert Message (FIXED: Using real currentUser.id to pass Foreign Key check)
     const { error } = await supabase.from('messages').insert([{
         conversation_id: activeChatId,
         sender_id: currentUser.id, 
@@ -978,16 +957,10 @@ async function upgradeToStepOne() {
 
     if (error) console.error("[DATABASE ERROR] Message not saved:", error.message);
 
-    // 3. Update the visual bar
     updateEscrowUI(1);
-    
-    // 4. Refresh the sidebar
     await loadSidebar();
 }
  
-
-
-// 🎯 DYNAMIC UI UPDATE
 function updateEscrowUI(step) {
     const stepPaid = document.querySelector('.status-step:nth-child(1)');
     const lineDelivery = document.querySelector('.status-line:nth-child(2)');
@@ -995,33 +968,25 @@ function updateEscrowUI(step) {
     const lineRelease = document.getElementById('lineRelease');
     const stepRelease = document.getElementById('stepRelease');
 
-    // Reset everything
     [stepPaid, stepDelivery, stepRelease].forEach(el => el?.classList.remove('active', 'completed'));
     [lineDelivery, lineRelease].forEach(el => el?.classList.remove('completed'));
 
     if (step === 0) return;
     
-    // --- STEP 1: PAID ---
     if (step >= 1) {
-        // Force 'completed' to ensure it uses the green background style
         stepPaid?.classList.add('completed'); 
         lineDelivery?.classList.add('completed');
     }
-
-    // --- STEP 2: DELIVERY ---
     if (step >= 2) {
         stepDelivery?.classList.add('completed');
         lineRelease?.classList.add('completed');
     }
-
-    // --- STEP 3: RELEASE ---
     if (step >= 3) {
         stepRelease?.classList.add('completed');
     }
 }
 window.updateEscrowUI = updateEscrowUI;
 
-// --- NEW UTILITY: Sync UI Lockdown ---
 function syncLockdownUI(status) {
     const footer = document.querySelector('.chat-footer');
     const messageInput = document.getElementById('messageInput');
@@ -1047,36 +1012,20 @@ function syncLockdownUI(status) {
     }
 }
 
-
-/**
- * 🎯 1. THE TOGGLE 
- * This fixes the 'not defined' error by attaching to window.
- */
 window.toggleStatusMenu = async function(e) {
     if (e) e.stopPropagation();
-    
     const menu = document.getElementById("statusMenu");
     if (!menu) return;
 
-    // Toggle the 'show' class to open/close the box
     menu.classList.toggle("show");
-    
-    console.log("--- [MENU CLICKED] ---");
-
-    // If the menu is now open, run the logic to show/hide the buttons
     if (menu.classList.contains("show")) {
         await refreshMenuVisibility();
     }
 };
 
-/**
- * 🎯 2. THE VISIBILITY LOGIC
- * Only handles showing/hiding. No functions yet.
- */
 async function refreshMenuVisibility() {
     if (!activeChatId || !currentUser) return;
 
-    // 1. Fetch the data - CRITICAL: Added 'status' to the select
     const { data: chat, error } = await supabase
         .from("conversations")
         .select("seller_id, buyer_id, escrow_step, status")
@@ -1088,68 +1037,36 @@ async function refreshMenuVisibility() {
         return;
     }
 
-    // 2. Identify the buttons in your HTML
     const btnConfirm = document.getElementById("btnConfirmDelivery");
     const btnRelease = document.getElementById("btnReleaseFunds");
     const btnCancel = document.getElementById("btnCancel");
     const btnDispute = document.getElementById("btnDispute");
 
-    // 3. Define the roles and current step
     const isSeller = currentUser.id === chat.seller_id;
     const isBuyer = currentUser.id === chat.buyer_id;
     const step = chat.escrow_step || 1;
 
-    // 🛑 LOCKDOWN CHECK: If the deal is cancelled or completed, hide everything and EXIT
     if (chat.status === 'cancelled' || chat.status === 'completed') {
         if (btnConfirm) btnConfirm.style.display = "none";
         if (btnRelease) btnRelease.style.display = "none";
         if (btnCancel) btnCancel.style.display = "none";
         if (btnDispute) btnDispute.style.display = "none";
-        
-        console.log("Result: Chat is closed (Status: " + chat.status + "). Hiding all buttons.");
-        return; // This stops the function here
+        return; 
     }
 
-// 🕵️ SHOW LOGIC (Only runs if status is active)
-
-// 🎯 DISPUTE BUTTON: Show in BOTH Step 1 and Step 2
-if (btnDispute) {
-    // This will show the dispute button as long as the deal isn't finished
-    btnDispute.style.display = "flex"; 
+    if (btnDispute) btnDispute.style.display = "flex"; 
+    if (btnCancel) btnCancel.style.display = (step === 1) ? "flex" : "none";
+    if (btnConfirm) btnConfirm.style.display = (isSeller && step === 1) ? "flex" : "none";
+    if (btnRelease) btnRelease.style.display = (isBuyer && step === 2) ? "flex" : "none";
 }
 
-// 🎯 CANCEL BUTTON: Show ONLY in Step 1
-if (btnCancel) {
-    btnCancel.style.display = (step === 1) ? "flex" : "none";
-}
-
-// 🎯 SELLER BUTTON: Confirm Delivery (Only Step 1)
-if (btnConfirm) {
-    btnConfirm.style.display = (isSeller && step === 1) ? "flex" : "none";
-}
-
-// 🎯 BUYER BUTTON: Release Funds (Only Step 2)
-if (btnRelease) {
-    btnRelease.style.display = (isBuyer && step === 2) ? "flex" : "none";
-}
-}
-
-
-
-// Global empty functions so you don't get errors when clicking
 window.upgradeToStepTwo = () => console.log("Button clicked: Confirm Delivery");
 window.upgradeToStepThree = () => console.log("Button clicked: Release Funds");
 window.handleDispute = () => console.log("Button clicked: Dispute");
 
-// Close menu if clicking anywhere else
 document.addEventListener("click", () => {
     document.getElementById("statusMenu")?.classList.remove("show");
 });
-
-/**
- * 🎯 CANCEL DEAL LOGIC
- * Only works in Step 1 (Before delivery)
- */
 
 window.handleCancelDeal = async function() {
     if (!activeChatId || !currentUser) return;
@@ -1183,32 +1100,25 @@ window.handleCancelDeal = async function() {
         });
         
         const systemText = `❌ Deal Cancelled. ₦${chat.product_price} was refunded to the buyer.`;
+        const basePrice = parseFloat(chat.product_price);
 
-                // Inside handleCancelDeal in chats.js
-const basePrice = parseFloat(chat.product_price);
+        const feeRate = (basePrice === 1500) ? 0.05 : 0.03;
+        const totalRefund = basePrice + (basePrice * feeRate);
 
-// Recalculate fee to ensure buyer gets a 100% refund
-const feeRate = (basePrice === 1500) ? 0.05 : 0.03;
-const totalRefund = basePrice + (basePrice * feeRate);
+        const { error: rpcError } = await supabase.rpc('handle_cancel_refund', {
+            target_buyer_id: chat.buyer_id,
+            refund_amount: totalRefund, 
+            target_conv_id: activeChatId,
+            product_name: chat.product_name 
+        });
 
-const { error: rpcError } = await supabase.rpc('handle_cancel_refund', {
-    target_buyer_id: chat.buyer_id,
-    refund_amount: totalRefund, // Sends the full price + fee back to the buyer
-    target_conv_id: activeChatId,
-    product_name: chat.product_name 
-});
+        if (rpcError) throw rpcError;
 
-if (rpcError) throw rpcError;
-
-  // Proceed with updating the conversation UI
-await supabase.from('conversations').update({ 
-    status: 'cancelled',           // 👈 CRITICAL: This triggers the real-time lockdown
-    last_message: systemText,
-    updated_at: now.toISOString()
-}).eq('id', activeChatId);
-
-
-
+        await supabase.from('conversations').update({ 
+            status: 'cancelled',           
+            last_message: systemText,
+            updated_at: now.toISOString()
+        }).eq('id', activeChatId);
 
         await supabase.from('messages').insert([{
             conversation_id: activeChatId,
@@ -1230,15 +1140,12 @@ await supabase.from('conversations').update({
             created_at: now.toISOString()
         }]);
 
-        // 4. 🎯 UPDATED TELEGRAM LOGIC WITH PREFERENCE CHECK
         const { data: profile } = await supabase
             .from('profiles')
-            // Ensure you select your boolean setting column (e.g., telegram_alerts)
             .select('telegram_chat_id, telegram_alerts') 
             .eq('id', notifyTargetId)
             .single();
 
-        // Only proceed if chat ID exists AND alerts are enabled (true)
         if (profile?.telegram_chat_id && profile?.telegram_alerts === true) {
             const botToken = "8436841265:AAHIh50C2bEamKqB649Dx_CRy7l8X6f2yqg";
             const telegramMsg = `🔔 *AccMarket Alert*\n\n❌ *Deal Cancelled*\nProduct: ${chat.product_name}\nInitiator: ${initiator}\nTime: ${localTime}\nStatus: Refunded to Buyer\nAmount: ₦${chat.product_price}`;
@@ -1266,7 +1173,6 @@ await supabase.from('conversations').update({
     }
 };
 
-
 window.upgradeToStepTwo = async function() {
     if (!activeChatId || !currentUser) return;
 
@@ -1281,7 +1187,6 @@ window.upgradeToStepTwo = async function() {
     if (!confirm.isConfirmed) return;
 
     try {
-        // 1. Fetch deal details to get Product Name and Buyer ID
         const { data: chat, error: fetchError } = await supabase
             .from('conversations')
             .select('product_name, buyer_id')
@@ -1291,7 +1196,6 @@ window.upgradeToStepTwo = async function() {
         if (fetchError || !chat) throw new Error("Deal details not found.");
 
         const now = new Date();
-        // Format time for local display (e.g., 6:00 PM)
         const localTime = now.toLocaleTimeString([], { 
             hour: '2-digit', 
             minute: '2-digit',
@@ -1300,7 +1204,6 @@ window.upgradeToStepTwo = async function() {
 
         const systemText = "📦 Seller has marked the logs as delivered. Buyer, please verify and release funds.";
 
-        // 2. Update Conversation Step
         const { error: updateError } = await supabase.from('conversations')
             .update({ 
                 escrow_step: 2, 
@@ -1311,7 +1214,6 @@ window.upgradeToStepTwo = async function() {
 
         if (updateError) throw updateError;
 
-        // 3. Insert System Message
         await supabase.from('messages').insert([{
             conversation_id: activeChatId,
             sender_id: currentUser.id, 
@@ -1319,7 +1221,6 @@ window.upgradeToStepTwo = async function() {
             type: 'system' 
         }]);
 
-        // 4. 🎯 IN-APP NOTIFICATION FOR BUYER
         await supabase.from('notifications').insert([{
             user_id: chat.buyer_id, 
             title: "Logs Delivered",
@@ -1330,14 +1231,12 @@ window.upgradeToStepTwo = async function() {
             created_at: now.toISOString() 
         }]);
 
-        // 5. 🚀 TELEGRAM NOTIFICATION (Check preference first)
         const { data: profile } = await supabase
             .from('profiles')
             .select('telegram_chat_id, telegram_alerts') 
             .eq('id', chat.buyer_id)
             .single();
 
-        // Only send if linked AND telegram_alerts is true
         if (profile?.telegram_chat_id && profile?.telegram_alerts === true) {
             const botToken = "8436841265:AAHIh50C2bEamKqB649Dx_CRy7l8X6f2yqg"; 
             const telegramMsg = `🔔 *AccMarket Alert*\n\n📦 *Logs Delivered*\nProduct: ${chat.product_name}\nTime: ${localTime}\n\n*Action Required:* Please login to the app, verify the account details, and release the funds.`;
@@ -1355,7 +1254,6 @@ window.upgradeToStepTwo = async function() {
             } catch (tgErr) { console.error("Telegram error:", tgErr); }
         }
 
-        // 6. Refresh UI
         updateEscrowUI(2); 
         document.getElementById('statusMenu')?.classList.remove('show');
         if (typeof loadSidebar === 'function') await loadSidebar();
@@ -1367,7 +1265,6 @@ window.upgradeToStepTwo = async function() {
         Swal.fire('Error', 'Could not confirm delivery.', 'error');
     }
 };
-
 
 window.upgradeToStepThree = async function() {
     if (!activeChatId || !currentUser) return;
@@ -1384,7 +1281,6 @@ window.upgradeToStepThree = async function() {
     if (!confirm.isConfirmed) return;
 
     try {
-        // 1. Fetch deal details
         const { data: chat, error: fetchError } = await supabase
             .from('conversations')
             .select('product_name, seller_id, product_price, buyer_id')
@@ -1397,10 +1293,6 @@ window.upgradeToStepThree = async function() {
         const localTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
         const systemText = "✅ Funds released! Transaction completed successfully.";
 
-        // 2. 💰 EXECUTE WALLET TRANSACTION (RPC)
-        // This function must: 
-        // a) Update seller's balance 
-        // b) Insert into 'wallets' or 'transactions' history table
         const { error: rpcError } = await supabase.rpc('handle_release_funds', {
             target_seller_id: chat.seller_id,
             amount_to_release: parseFloat(chat.product_price),
@@ -1410,7 +1302,6 @@ window.upgradeToStepThree = async function() {
 
         if (rpcError) throw rpcError;
 
-        // 3. Update Conversation Status
         await supabase.from('conversations').update({ 
             escrow_step: 3, 
             status: 'completed',
@@ -1418,7 +1309,6 @@ window.upgradeToStepThree = async function() {
             updated_at: now.toISOString() 
         }).eq('id', activeChatId);
 
-        // 4. Insert System Message
         await supabase.from('messages').insert([{
             conversation_id: activeChatId,
             sender_id: currentUser.id, 
@@ -1426,7 +1316,6 @@ window.upgradeToStepThree = async function() {
             type: 'system' 
         }]);
 
-        // 5. In-App Notification (Seller)
         await supabase.from('notifications').insert([{
             user_id: chat.seller_id, 
             title: "Payment Received",
@@ -1437,7 +1326,6 @@ window.upgradeToStepThree = async function() {
             created_at: now.toISOString() 
         }]);
 
-        // 6. Telegram Alert (Check Preference)
         const { data: profile } = await supabase
             .from('profiles')
             .select('telegram_chat_id, telegram_alerts') 
@@ -1457,7 +1345,6 @@ window.upgradeToStepThree = async function() {
             } catch (tgErr) { console.error(tgErr); }
         }
 
-        // 7. Finalize UI
         updateEscrowUI(3);
         if (typeof loadSidebar === 'function') await loadSidebar();
         document.getElementById('ratingModal').classList.add('active'); 
@@ -1468,21 +1355,14 @@ window.upgradeToStepThree = async function() {
     }
 };
 
-
-
-/**
- * 🎯 DISPUTE MODAL CONTROLLER
- */
 window.handleDispute = function() {
     const modal = document.getElementById('disputeModal');
     if (modal) {
-        // Clear previous inputs
         document.getElementById('disputeDetails').value = '';
         modal.classList.add('active');
     }
 };
 
-// Close logic for the (X) and Cancel buttons
 document.getElementById('closeDispute')?.addEventListener('click', () => {
     document.getElementById('disputeModal').classList.remove('active');
 });
@@ -1491,9 +1371,6 @@ document.getElementById('cancelDispute')?.addEventListener('click', () => {
     document.getElementById('disputeModal').classList.remove('active');
 });
 
-/**
- * 🎯 SUBMIT DISPUTE (Updated for disputes table integration)
- */
 document.getElementById('submitDispute')?.addEventListener('click', async () => {
     const reason = document.getElementById('disputeReason').value;
     const details = document.getElementById('disputeDetails').value;
@@ -1506,12 +1383,10 @@ document.getElementById('submitDispute')?.addEventListener('click', async () => 
 
     if (!activeChatId || !currentUser) return;
 
-    // Disable button to prevent double-clicks
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<i class="ph ph-circle-notch animate-spin"></i> Raising dispute...';
 
     try {
-        // 1. Fetch current deal details to get IDs for the disputes table
         const { data: chat, error: fetchError } = await supabase
             .from('conversations')
             .select('buyer_id, seller_id')
@@ -1523,7 +1398,6 @@ document.getElementById('submitDispute')?.addEventListener('click', async () => 
         const reasonLabel = document.querySelector(`#disputeReason option[value="${reason}"]`).text;
         const systemMsg = `⚠️ DISPUTE OPENED\nReason: ${reasonLabel}\nDetails: ${details}`;
 
-        // 2. Insert record into the public.disputes table
         const { error: disputeError } = await supabase
             .from('disputes')
             .insert([{
@@ -1537,7 +1411,6 @@ document.getElementById('submitDispute')?.addEventListener('click', async () => 
 
         if (disputeError) throw disputeError;
 
-        // 3. Update Conversation Status to 'disputed'
         const { error: convoError } = await supabase
             .from('conversations')
             .update({ 
@@ -1549,7 +1422,6 @@ document.getElementById('submitDispute')?.addEventListener('click', async () => 
 
         if (convoError) throw convoError;
 
-        // 4. Insert System Message into Chat History
         const { error: msgError } = await supabase
             .from('messages')
             .insert([{
@@ -1561,7 +1433,6 @@ document.getElementById('submitDispute')?.addEventListener('click', async () => 
 
         if (msgError) throw msgError;
 
-        // 5. Success UI and Cleanup
         document.getElementById('disputeModal').classList.remove('active');
         Swal.fire({
             title: 'Dispute is open',
@@ -1570,9 +1441,8 @@ document.getElementById('submitDispute')?.addEventListener('click', async () => 
             confirmButtonColor: '#0b1e5b'
         });
 
-        // 6. Refresh Sidebar and Chat View
         if (typeof loadSidebar === 'function') await loadSidebar();
-        initChatWindow(); // Refresh UI to trigger lockdown/notice states
+        initChatWindow();
 
     } catch (error) {
         console.error("Dispute failed:", error);
@@ -1583,8 +1453,6 @@ document.getElementById('submitDispute')?.addEventListener('click', async () => 
     }
 });
 
-
-// --- Handle Slider Movement ---
 const ratingSlider = document.getElementById('ratingSlider');
 if (ratingSlider) {
     ratingSlider.addEventListener('input', (e) => {
@@ -1607,7 +1475,6 @@ if (ratingSlider) {
     });
 }
 
-// --- Handle Rating Submission (Using RPC to bypass RLS) ---
 document.getElementById('submitRating')?.addEventListener('click', async () => {
     const slider = document.getElementById('ratingSlider');
     const commentArea = document.getElementById('ratingComment');
@@ -1618,7 +1485,6 @@ document.getElementById('submitRating')?.addEventListener('click', async () => {
     const ratingValue = parseInt(slider.value);
     const comment = commentArea.value.trim();
 
-    // 1. Get Seller ID
     const { data: chat } = await supabase
         .from('conversations')
         .select(`seller_id`)
@@ -1628,7 +1494,6 @@ document.getElementById('submitRating')?.addEventListener('click', async () => {
     if (!chat?.seller_id) return;
     const sellerId = chat.seller_id;
 
-    // 🎯 2. CALCULATE BOOST
     let boost = 0;
     if (ratingValue >= 90) boost = 1.5;
     else if (ratingValue >= 50) boost = 0.5;
@@ -1638,7 +1503,6 @@ document.getElementById('submitRating')?.addEventListener('click', async () => {
     btn.innerText = "Updating...";
 
     try {
-        // 3. Save the Review
         const { error: revError } = await supabase.from('reviews').insert([{
             conversation_id: activeChatId,
             reviewer_id: currentUser.id,
@@ -1648,7 +1512,6 @@ document.getElementById('submitRating')?.addEventListener('click', async () => {
         }]);
         if (revError) throw revError;
 
-        // 🎯 4. CALL THE DATABASE FUNCTION (Bypasses RLS)
         const { error: rpcError } = await supabase.rpc('update_seller_trust', {
             target_seller_id: sellerId,
             target_buyer_id: currentUser.id,
@@ -1657,23 +1520,18 @@ document.getElementById('submitRating')?.addEventListener('click', async () => {
 
         if (rpcError) throw rpcError;
 
-        // 5. Success & Reset
         document.getElementById('ratingModal').classList.remove('active');
         
-        // UI Reset
         slider.value = 100;
         commentArea.value = "";
         document.getElementById('percentValue').innerText = "100";
         document.getElementById('percentLabel').innerText = "Excellent";
         document.getElementById('percentLabel').style.color = "#10b981";
 
-        // 🎯 6. REFRESH CHAT TO ACTIVATE LOCKDOWN
-        // This ensures the footer disappears and the "Transaction Closed" notice appears immediately.
         await initChatWindow(); 
 
         Swal.fire('Success', 'Rating submitted! The transaction is now officially closed.', 'success');
 
-        // Optional: Refresh sidebar to show new score
         if (typeof loadSidebar === 'function') await loadSidebar();
 
     } catch (err) {
@@ -1685,8 +1543,6 @@ document.getElementById('submitRating')?.addEventListener('click', async () => {
     }
 });
 
-
-// Close the rating modal when the (X) is clicked
 document.getElementById('closeRating')?.addEventListener('click', () => {
     document.getElementById('ratingModal').classList.remove('active');
 });
