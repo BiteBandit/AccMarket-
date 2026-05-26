@@ -63,26 +63,31 @@
     <button class="icon-btn" id="menuBtn" onclick="toggleStatusMenu(event)">
         <i class="ph ph-dots-three-vertical"></i>
     </button>
-    
-    <div id="statusMenu" class="dropdown-menu">
-        
 
-        <div id="btnConfirmDelivery" class="menu-item" style="display: none;" onclick="upgradeToStepTwo()">
-            <i class="ph ph-package"></i> Confirm Delivery
-        </div>
-
-        <div id="btnReleaseFunds" class="menu-item" style="display: none;" onclick="upgradeToStepThree()">
-            <i class="ph ph-hand-coins"></i> Release Funds
-        </div>
-
-        <div id="btnDispute" class="menu-item item-danger" onclick="handleDispute()">
-            <i class="ph ph-warning-circle"></i> Dispute
-        </div>
-
-<div id="btnCancel" class="menu-item item-danger" onclick="handleCancelDeal()">
-            <i class="ph ph-x-circle"></i> Cancel Deal
-        </div>
+<div id="statusMenu" class="dropdown-menu">
+    <div id="btnConfirmDelivery" class="menu-item" style="display: none;" onclick="upgradeToStepTwo()">
+        <i class="ph ph-package"></i> Confirm Delivery
     </div>
+
+    <div id="btnReleaseFunds" class="menu-item" style="display: none;" onclick="upgradeToStepThree()">
+        <i class="ph ph-hand-coins"></i> Release Funds
+    </div>
+
+    <div id="btnDispute" class="menu-item item-danger" onclick="handleDispute()">
+        <i class="ph ph-warning-circle"></i> Dispute
+    </div>
+
+    <div id="btnCancel" class="menu-item item-danger" onclick="handleCancelDeal()">
+        <i class="ph ph-x-circle"></i> Cancel Deal
+    </div>
+
+<div id="btnAdminRefund" class="menu-item item-danger" style="display: none;" onclick="handleAdminAction('refund')">
+    <i class="ph ph-arrow-counter-clockwise"></i> Refund Buyer
+</div>
+<div id="btnAdminRelease" class="menu-item" style="display: none; color: #10b981;" onclick="handleAdminAction('release')">
+    <i class="ph ph-check-circle"></i> Release to Seller
+</div>
+</div>
 </div>
 
 

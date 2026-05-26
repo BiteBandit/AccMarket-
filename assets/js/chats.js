@@ -200,23 +200,36 @@ async function loadSidebar(filter = "") {
     const chatList = document.querySelector('.chat-list');
     if (!chatList || !currentUser) return;
 
+    // 1. Added admin_id to the select query
     let { data: conversations, error } = await supabase
         .from('conversations')
         .select(`
-            id, last_message, updated_at, buyer_id, seller_id, escrow_step, status, product_name, product_price, product_id,
+            id, last_message, updated_at, buyer_id, seller_id, admin_id, escrow_step, status, product_name, product_price, product_id,
             seller:profiles!conversations_seller_id_fkey(id, username, avatar_url, last_seen, show_online, trust_score),
             buyer:profiles!conversations_buyer_id_fkey(id, username, avatar_url, last_seen, show_online, trust_score),
             messages(is_read, sender_id)
         `)
-        .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id}`)
+        // 2. Added admin_id to the filter
+        .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id},admin_id.eq.${currentUser.id}`)
         .order('updated_at', { ascending: false });
 
     if (error) return;
 
     chatList.innerHTML = '';
     conversations.forEach(chat => {
+        // 3. Logic to determine who the "other" person is for display
         const isMeBuyer = chat.buyer_id === currentUser.id;
-        const otherUser = isMeBuyer ? chat.seller : chat.buyer;
+        const isMeSeller = chat.seller_id === currentUser.id;
+        const isMeAdmin = chat.admin_id === currentUser.id;
+
+        // If admin, prioritize showing the buyer or seller name
+        let otherUser;
+        if (isMeAdmin) {
+            otherUser = chat.buyer; // Or logic to show both parties
+        } else {
+            otherUser = isMeBuyer ? chat.seller : chat.buyer;
+        }
+
         if (filter && !otherUser.username.toLowerCase().includes(filter.toLowerCase())) return;
 
         const hasUnread = chat.messages.some(m => 
@@ -228,33 +241,30 @@ async function loadSidebar(filter = "") {
         );
         const isActive = chat.id === activeChatId ? 'active' : '';
 
-        // 🟢 Dynamic Day + Time Logic for Sidebar
+        // --- Date Logic ---
         const msgDate = new Date(chat.updated_at);
         const today = new Date();
         const yesterday = new Date(today);
         yesterday.setDate(yesterday.getDate() - 1);
 
-        let timeDisplay = "";
-
-        if (msgDate.toDateString() === today.toDateString()) {
-            timeDisplay = msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        } else if (msgDate.toDateString() === yesterday.toDateString()) {
-            timeDisplay = "Yesterday";
-        } else {
-            timeDisplay = msgDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
-        }
+        let timeDisplay = (msgDate.toDateString() === today.toDateString()) 
+            ? msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : (msgDate.toDateString() === yesterday.toDateString()) ? "Yesterday" : msgDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
 
         const goldBadgeSvg = generateGoldBadge(otherUser?.trust_score || 0, `sidebar-${chat.id}`);
 
         const item = document.createElement('div');
         item.className = `chat-item ${isActive} ${hasUnread ? 'unread-item' : ''}`;
         
+        // 4. Added an Admin Label if the user is the admin
+        const adminBadge = isMeAdmin ? `<span style="font-size:10px; background:#e0e7ff; color:#4338ca; padding:2px 5px; border-radius:4px; margin-left:5px;">Admin</span>` : '';
+
         item.innerHTML = `
             <img src="${otherUser.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUser.username}`}">
             <div class="chat-info">
                 <div class="chat-top">
                     <span class="user-name" style="display: inline-flex; align-items: center; gap: 1px;">
-                        ${otherUser.username} ${goldBadgeSvg}
+                        ${otherUser.username} ${goldBadgeSvg} ${adminBadge}
                     </span>
                     <span class="time">${timeDisplay}</span>
                 </div>
@@ -277,6 +287,7 @@ async function loadSidebar(filter = "") {
     });
 }
 
+
 // --- 5. CHAT WINDOW (WITH EXPLICIT JOIN) ---
 async function initChatWindow() {
     const container = document.querySelector('.message-container');
@@ -285,7 +296,7 @@ async function initChatWindow() {
 
     if (!container || !activeChatId) return;
 
-    // 🟢 1. PRE-LOAD ALL ADMIN PROFILES FROM DATABASE INTO MEMORY CACHE FIRST
+    // 🟢 1. PRE-LOAD ALL ADMIN PROFILES
     if (!window.adminProfilesCache) {
         window.adminProfilesCache = {};
         try {
@@ -308,12 +319,14 @@ async function initChatWindow() {
     subscribeToMessages();
     subscribeToConversationChanges();
 
+    // 🟢 2. UPDATED QUERY: Fetch admin_id
     const { data: chat } = await supabase
         .from('conversations')
         .select(`*, 
             product_id,
             product_name, 
             product_price,
+            admin_id,
             seller:profiles!conversations_seller_id_fkey(id, username, avatar_url, last_seen, show_online, trust_score), 
             buyer:profiles!conversations_buyer_id_fkey(id, username, avatar_url, last_seen, show_online, trust_score)`)
         .eq('id', activeChatId)
@@ -321,6 +334,9 @@ async function initChatWindow() {
 
     if (chat) {
         window.activeChatData = chat; 
+
+        // 🟢 3. Trigger Unified Menu Logic
+        await refreshMenuVisibility(chat);
 
         const otherUser = chat.buyer_id === currentUser.id ? chat.seller : chat.buyer;
         
@@ -342,7 +358,7 @@ async function initChatWindow() {
 
         syncLockdownUI(chat.status);
     
-        // --- 🎯 PRODUCT CONTEXT BAR & LOGO LOGIC ---
+        // --- PRODUCT CONTEXT BAR & LOGO LOGIC ---
         const pTitle = document.getElementById('productTitle');
         const pPrice = document.getElementById('productPrice');
         const pImg = document.getElementById('productImg');
@@ -373,40 +389,23 @@ async function initChatWindow() {
             viewBtn.onclick = () => {
                 const platform = chat.product_name ? chat.product_name.toLowerCase().trim() : "";
                 const productId = chat.product_id;
-
                 if (platform && productId) {
                     window.location.href = `../platforms/${platform}.html?id=${productId}`;
                 } else if (platform) {
                     window.location.href = `../platforms/${platform}.html`;
-                } else {
-                    console.error("Missing platform name to redirect.");
                 }
             };
         }
 
-        await refreshMenuVisibility();
         watchPartnerPresence(otherUser);
     }
 
+    // --- MESSAGE LOADING ---
     const { data: messages, error } = await supabase
         .from('messages')
-        .select(`
-            *, 
-            sender:profiles(username, avatar_url, role, trust_score), 
-            reply_to:messages!reply_to_id(
-                id, 
-                content, 
-                type, 
-                sender_id,
-                sender:profiles(username)
-            )
-        `)
+        .select(`*, sender:profiles(username, avatar_url, role, trust_score), reply_to:messages!reply_to_id(id, content, type, sender_id, sender:profiles(username))`)
         .eq('conversation_id', activeChatId)
         .order('created_at', { ascending: true });
-
-    if (error) {
-        console.error("[CHAT] Fetch messages error:", error);
-    }
 
     container.innerHTML = ''; 
 
@@ -432,6 +431,7 @@ async function initChatWindow() {
 
     if (messages) messages.forEach(msg => appendMessageUI(msg));
 }
+
 
 // --- 6. PARTNER STATUS WATCHER ---
 function watchPartnerPresence(partner) {
@@ -763,59 +763,39 @@ function appendMessageUI(msg) {
     const container = document.querySelector('.message-container');
     if (!container || document.getElementById(`msg-${msg.id}`)) return;
 
-    // Check our pre-loaded database cache to see if this sender is an admin
     const cachedAdmin = window.adminProfilesCache ? window.adminProfilesCache[msg.sender_id] : null;
     const isAdminUser = cachedAdmin || msg.sender?.role === 'admin';
-
-    // 🟢 HANDLE SYSTEM NOTICES VS ADMIN CHAT MESSAGES
-    if (msg.type === 'system') {
-        const text = msg.content || "";
-        
-        // If it's a structural system notice text, render it as a standard gray notice pill
-        const isNoticeAlert = text.includes('joined') || 
-                              text.includes('started') || 
-                              text.includes('Created') || 
-                              text.includes('status changed');
-
-        if (isNoticeAlert && !isAdminUser) {
-            const systemDiv = document.createElement('div');
-            systemDiv.id = `msg-${msg.id}`;
-            systemDiv.className = 'msg-system';
-            
-            const isAlert = text.includes('DISPUTE') || text.includes('CANCELLED') || text.includes('⚠️') || text.includes('❌');
-            
-            systemDiv.innerHTML = `<div class="system-pill ${isAlert ? 'dispute-alert' : ''}">${text}</div>`;
-            container.appendChild(systemDiv);
-            container.scrollTop = container.scrollHeight;
-            return; 
-        } else {
-            // It's a regular message stored under a system type by the admin space; treat it as a chat bubble
-            msg.isAdminChatBubble = true;
-        }
-    }
-
     const isMe = msg.sender_id === currentUser.id;
 
-    // Dynamic Day + Time Format for Chat Bubbles
+    // --- 🟢 DYNAMIC NOTIFICATION FILTER: All 'system' types become pills ---
+    if (msg.type === 'system') {
+        const text = msg.content || "";
+        const isDisputeOrCancel = text.includes('DISPUTE') || text.includes('CANCELLED') || text.includes('⚠️') || text.includes('❌');
+        
+        const systemDiv = document.createElement('div');
+        systemDiv.id = `msg-${msg.id}`;
+        systemDiv.className = 'msg-system';
+        systemDiv.innerHTML = `<div class="system-pill ${isDisputeOrCancel ? 'dispute-alert' : 'action-success-pill'}">${text}</div>`;
+        
+        container.appendChild(systemDiv);
+        container.scrollTop = container.scrollHeight;
+        return; // Exit here, do not proceed to bubble rendering
+    }
+
+    // --- 🟢 BUBBLE RENDERING LOGIC ---
     const msgDate = new Date(msg.created_at);
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
 
-    let dateLabel = "";
-    if (msgDate.toDateString() === today.toDateString()) {
-        dateLabel = "Today";
-    } else if (msgDate.toDateString() === yesterday.toDateString()) {
-        dateLabel = "Yesterday";
-    } else {
-        dateLabel = msgDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
-    }
+    let dateLabel = (msgDate.toDateString() === today.toDateString()) ? "Today" : 
+                    (msgDate.toDateString() === yesterday.toDateString()) ? "Yesterday" : 
+                    msgDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
 
-    const timeLabel = msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const time = `${dateLabel}, ${timeLabel}`; 
-
-    // Admin chat bubbles get incoming class formatting so they stay readable for buyers/sellers
-    const messageClass = (msg.isAdminChatBubble || isAdminUser) ? 'incoming admin-custom-bubble' : (isMe ? 'outgoing' : 'incoming');
+    const time = `${dateLabel}, ${msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`; 
+    
+    // Assign class: outgoing if me, incoming if them or staff
+    const messageClass = (isMe ? 'outgoing' : (msg.isAdminChatBubble || isAdminUser ? 'incoming admin-custom-bubble' : 'incoming'));
 
     const div = document.createElement('div');
     div.id = `msg-${msg.id}`;
@@ -825,100 +805,57 @@ function appendMessageUI(msg) {
     if (msg.reply_to_id) {
         const otherName = document.getElementById('headerName')?.innerText || 'User';
         const replyName = (msg.reply_to?.sender_id === currentUser.id) ? 'You' : (msg.reply_to?.sender?.username || otherName);
-        
-        replyHTML = `
-            <div class="reply-badge" onclick="scrollToMessage('${msg.reply_to_id}')">
-                <i class="ph ph-arrow-bend-up-left"></i>
-                <span>Replying to <b>${replyName}</b></span>
-            </div>`;
+        replyHTML = `<div class="reply-badge" onclick="scrollToMessage('${msg.reply_to_id}')"><i class="ph ph-arrow-bend-up-left"></i><span>Replying to <b>${replyName}</b></span></div>`;
     }
 
     let contentHTML = '';
-    if (msg.type === 'deleted') {
-        contentHTML = `<p class="content deleted-text">${msg.content}</p>`;
-    } else if (msg.type === 'image') {
-        contentHTML = `<img src="${msg.content}" class="chat-img" loading="lazy" onclick="window.open('${msg.content}', '_blank')">`;
-    } else if (msg.type === 'file') {
-        const displayFileName = msg.file_name || 'Attachment';
-        contentHTML = `
-            <div class="file-attachment-box" onclick="window.open('${msg.content}', '_blank')">
-                <i class="ph-fill ph-file-text"></i>
-                <div class="file-info">
-                    <span>${displayFileName}</span>
-                    <small>Click to view/download</small>
-                </div>
-            </div>`;
+    if (msg.type === 'deleted') contentHTML = `<p class="content deleted-text">${msg.content}</p>`;
+    else if (msg.type === 'image') contentHTML = `<img src="${msg.content}" class="chat-img" loading="lazy" onclick="window.open('${msg.content}', '_blank')">`;
+    else if (msg.type === 'file') {
+        contentHTML = `<div class="file-attachment-box" onclick="window.open('${msg.content}', '_blank')"><i class="ph-fill ph-file-text"></i><div class="file-info"><span>${msg.file_name || 'Attachment'}</span><small>Click to view</small></div></div>`;
     } else {
         contentHTML = `<p class="content">${msg.content}</p>`;
     }
 
-    const isLocked = window.activeChatData?.status === 'disputed' || 
-                     window.activeChatData?.status === 'cancelled' || 
-                     window.activeChatData?.status === 'completed';
+    const isLocked = ['disputed', 'cancelled', 'completed'].includes(window.activeChatData?.status);
 
-    // 🟢 SENDER HEADER DISPLAY (Instant pre-loaded checks)
+    // --- 🟢 SENDER HEADER ---
     let senderHeaderNameHTML = '';
-    
     if (msg.isAdminChatBubble || isAdminUser) {
         const adminName = cachedAdmin?.username || msg.sender?.username || "System Admin";
-        const adminTrust = cachedAdmin?.trust_score || msg.sender?.trust_score || 0;
-        const goldBadgeSvg = generateGoldBadge(adminTrust, `msg-${msg.id}`);
-        
-        senderHeaderNameHTML = `
-            <span class="sender-name" style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.75rem; margin-bottom: 4px; color: #1e3a8a; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; width: 100%; justify-content: flex-start; padding-left: 2px;">
-                <i class="ph-fill ph-shield-check" style="font-size: 0.85rem; color: #1e3a8a;"></i> 
-                ${adminName} (Staff) ${goldBadgeSvg}
-            </span>`;
+        const goldBadgeSvg = generateGoldBadge(cachedAdmin?.trust_score || msg.sender?.trust_score || 0, `msg-${msg.id}`);
+        senderHeaderNameHTML = `<span class="sender-name" style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.75rem; margin-bottom: 4px; color: #1e3a8a; font-weight: bold; width: 100%; justify-content: ${isMe ? 'flex-end' : 'flex-start'}; padding-${isMe ? 'right' : 'left'}: 4px;">${isMe ? '' : '<i class="ph-fill ph-shield-check"></i>'} ${adminName} (Staff) ${goldBadgeSvg} ${isMe ? '<i class="ph-fill ph-shield-check"></i>' : ''}</span>`;
     } else if (!isMe && msg.sender?.username) {
-        const goldBadgeSvg = generateGoldBadge(msg.sender?.trust_score || 0, `msg-${msg.id}`);
-        senderHeaderNameHTML = `
-            <span class="sender-name" style="display: inline-flex; align-items: center; gap: 1px; font-size: 0.75rem; margin-bottom: 2px; color: #475569; font-weight: 500;">
-                ${msg.sender.username} ${goldBadgeSvg}
-            </span>`;
+        senderHeaderNameHTML = `<span class="sender-name" style="display: inline-flex; align-items: center; gap: 1px; font-size: 0.75rem; margin-bottom: 2px; color: #475569; font-weight: 500;">${msg.sender.username} ${generateGoldBadge(msg.sender?.trust_score || 0, `msg-${msg.id}`)}</span>`;
     }
 
     div.innerHTML = `
-        ${(isMe && !isLocked && !msg.isAdminChatBubble && !isAdminUser) ? `<div class="swipe-delete-btn" onclick="deleteMessage('${msg.id}', '${msg.sender_id}')"><i class="ph ph-trash"></i></div>` : ''}
-        
+        ${(isMe && !isLocked) ? `<div class="swipe-delete-btn" onclick="deleteMessage('${msg.id}', '${msg.sender_id}')"><i class="ph ph-trash"></i></div>` : ''}
         ${senderHeaderNameHTML}
-        
         <div class="msg-bubble">
             ${replyHTML}
             ${contentHTML}
-            
-            <div class="msg-status">
-                <span class="time">${time}</span>
-                ${(isMe && !msg.isAdminChatBubble && !isAdminUser) ? `<i class="ph ${msg.is_read ? 'ph-checks' : 'ph-check'}" id="icon-${msg.id}"></i>` : ''}
-            </div>
+            <div class="msg-status"><span class="time">${time}</span>${isMe ? `<i class="ph ${msg.is_read ? 'ph-checks' : 'ph-check'}" id="icon-${msg.id}"></i>` : ''}</div>
         </div>`;
 
+    // --- 🟢 SWIPE LOGIC ---
     const bubble = div.querySelector('.msg-bubble');
-    let pressTimer, startX = 0, currentX = 0, isSwiping = false;
-
-    bubble.addEventListener('touchstart', (e) => {
-        startX = e.touches[0].clientX;
-        currentX = 0; isSwiping = false;
-        bubble.style.transition = 'none';
-        pressTimer = setTimeout(() => { if (!isSwiping) { if (navigator.vibrate) navigator.vibrate(40); setReplyUI(msg); } }, 600);
-    }, { passive: true });
-
+    let startX = 0, currentX = 0;
+    bubble.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }, { passive: true });
     bubble.addEventListener('touchmove', (e) => {
-        currentX = e.touches[0].clientX - startX;
-        if (Math.abs(currentX) > 10) { clearTimeout(pressTimer); isSwiping = true; }
-        if (isMe && currentX < 0 && !msg.isAdminChatBubble && !isAdminUser) { const move = Math.max(currentX, -80); bubble.style.transform = `translateX(${move}px)`; }
+        if (isMe && !isLocked) {
+            currentX = e.touches[0].clientX - startX;
+            if (currentX < 0) bubble.style.transform = `translateX(${Math.max(currentX, -80)}px)`;
+        }
     }, { passive: true });
-
     bubble.addEventListener('touchend', () => {
-        clearTimeout(pressTimer);
-        bubble.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-        if (isMe && !msg.isAdminChatBubble && !isAdminUser) bubble.style.transform = currentX < -40 ? 'translateX(-70px)' : 'translateX(0)';
+        if (isMe && !isLocked) bubble.style.transition = 'transform 0.3s', bubble.style.transform = currentX < -40 ? 'translateX(-70px)' : 'translateX(0)';
     });
-
-    bubble.addEventListener('dblclick', () => setReplyUI(msg));
 
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
 }
+
 
 function scrollToMessage(id) {
     const target = document.getElementById(`msg-${id}`);
@@ -1067,9 +1004,10 @@ window.toggleStatusMenu = async function(e) {
 async function refreshMenuVisibility() {
     if (!activeChatId || !currentUser) return;
 
+    // 1. Fetch full data including admin_id and status
     const { data: chat, error } = await supabase
         .from("conversations")
-        .select("seller_id, buyer_id, escrow_step, status")
+        .select("seller_id, buyer_id, admin_id, escrow_step, status")
         .eq("id", activeChatId)
         .single();
 
@@ -1078,23 +1016,50 @@ async function refreshMenuVisibility() {
         return;
     }
 
+    // 2. Define Roles and States
+    const isSeller = currentUser.id === chat.seller_id;
+    const isBuyer = currentUser.id === chat.buyer_id;
+    const isAssignedAdmin = (currentUser.id === chat.admin_id);
+    const isDisputed = (chat.status === 'disputed');
+    const step = chat.escrow_step || 1;
+
+    // 3. Get all button references
     const btnConfirm = document.getElementById("btnConfirmDelivery");
     const btnRelease = document.getElementById("btnReleaseFunds");
     const btnCancel = document.getElementById("btnCancel");
     const btnDispute = document.getElementById("btnDispute");
+    const btnAdminRefund = document.getElementById("btnAdminRefund");
+    const btnAdminRelease = document.getElementById("btnAdminRelease");
 
-    const isSeller = currentUser.id === chat.seller_id;
-    const isBuyer = currentUser.id === chat.buyer_id;
-    const step = chat.escrow_step || 1;
+    // 4. Logic: If I am the Admin
+    if (isAssignedAdmin) {
+        // Hide all user buttons
+        if (btnConfirm) btnConfirm.style.display = "none";
+        if (btnRelease) btnRelease.style.display = "none";
+        if (btnCancel) btnCancel.style.display = "none";
+        if (btnDispute) btnDispute.style.display = "none";
 
+        // Show Admin buttons ONLY if disputed
+        if (btnAdminRefund) btnAdminRefund.style.display = isDisputed ? "flex" : "none";
+        if (btnAdminRelease) btnAdminRelease.style.display = isDisputed ? "flex" : "none";
+        return;
+    }
+
+    // 5. Logic: If I am a standard user (Buyer/Seller)
+    // Always hide Admin buttons for non-admins
+    if (btnAdminRefund) btnAdminRefund.style.display = "none";
+    if (btnAdminRelease) btnAdminRelease.style.display = "none";
+
+    // Handle Completed/Cancelled state for users
     if (chat.status === 'cancelled' || chat.status === 'completed') {
         if (btnConfirm) btnConfirm.style.display = "none";
         if (btnRelease) btnRelease.style.display = "none";
         if (btnCancel) btnCancel.style.display = "none";
         if (btnDispute) btnDispute.style.display = "none";
-        return; 
+        return;
     }
 
+    // Show User buttons based on flow
     if (btnDispute) btnDispute.style.display = "flex"; 
     if (btnCancel) btnCancel.style.display = (step === 1) ? "flex" : "none";
     if (btnConfirm) btnConfirm.style.display = (isSeller && step === 1) ? "flex" : "none";
@@ -1401,6 +1366,87 @@ window.handleDispute = function() {
     if (modal) {
         document.getElementById('disputeDetails').value = '';
         modal.classList.add('active');
+    }
+};
+
+/**
+ * Unified Admin Action Handler
+ * Uses existing RPCs to resolve disputes.
+ */
+window.handleAdminAction = async function(actionType) {
+    if (!activeChatId || !currentUser) return;
+
+    // 1. Confirm the action
+    const confirm = await Swal.fire({
+        title: actionType === 'refund' ? 'Refund Buyer?' : 'Release Funds to Seller?',
+        text: "This action is final and will resolve the dispute.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: actionType === 'refund' ? '#ef4444' : '#22c55e',
+        confirmButtonText: 'Yes, Proceed'
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    try {
+        // 2. Fetch conversation data for the RPC
+        const { data: chat } = await supabase
+            .from('conversations')
+            .select('product_price, buyer_id, seller_id, product_name')
+            .eq('id', activeChatId)
+            .single();
+
+        if (!chat) throw new Error("Conversation not found.");
+
+        let rpcError;
+        let systemText;
+
+        // 3. Trigger the appropriate RPC based on the actionType
+        if (actionType === 'refund') {
+            // Reusing your existing Refund/Cancel RPC
+            const { error } = await supabase.rpc('handle_cancel_refund', {
+                target_buyer_id: chat.buyer_id,
+                refund_amount: parseFloat(chat.product_price),
+                target_conv_id: activeChatId,
+                product_name: chat.product_name
+            });
+            rpcError = error;
+            systemText = "⚖️ Admin resolved: Refunded to Buyer.";
+        } else {
+            // Reusing your existing Release Funds RPC
+            const { error } = await supabase.rpc('handle_release_funds', {
+                target_seller_id: chat.seller_id,
+                amount_to_release: parseFloat(chat.product_price),
+                target_conv_id: activeChatId,
+                product_name: chat.product_name
+            });
+            rpcError = error;
+            systemText = "⚖️ Admin resolved: Released to Seller.";
+        }
+
+        if (rpcError) throw rpcError;
+
+        // 4. Update status and notify
+        await supabase.from('conversations').update({ 
+            status: 'completed', 
+            last_message: systemText 
+        }).eq('id', activeChatId);
+
+        await supabase.from('messages').insert([{
+            conversation_id: activeChatId,
+            sender_id: currentUser.id,
+            content: systemText,
+            type: 'system'
+        }]);
+
+        Swal.fire('Success', 'Dispute resolved successfully.', 'success');
+        
+        // Refresh UI
+        await initChatWindow(); 
+
+    } catch (error) {
+        console.error("Admin Action Failed:", error);
+        Swal.fire('Error', error.message || 'Action failed.', 'error');
     }
 };
 
