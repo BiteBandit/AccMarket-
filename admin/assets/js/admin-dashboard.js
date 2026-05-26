@@ -2241,7 +2241,6 @@ window.closeTicketModal = function() {
             border-radius: 6px;
         }
         
-        /* Interactive Chat Utility Layout Styles */
         .admin-chat-input-container {
             display: flex;
             flex-direction: column;
@@ -2300,6 +2299,27 @@ window.closeTicketModal = function() {
 
 window.activeDisputeChannel = null;
 
+// 🔊 Centralized Audio Notification System
+window.playIncomingMessageSound = function() {
+    try {
+        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-84.wav');
+        audio.volume = 0.4;
+        audio.play().catch(e => console.log("Audio playback blocked or interrupted:", e));
+    } catch (err) {
+        console.error("Failed to initialize audio engine:", err);
+    }
+};
+
+window.playNotificationSound = function() {
+    try {
+        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/911/911-84.wav');
+        audio.volume = 0.5;
+        audio.play().catch(e => console.log("Audio playback blocked or interrupted:", e));
+    } catch (err) {
+        console.error("Failed to initialize notification audio:", err);
+    }
+};
+
 // ✅ 1. Load Main Workspace Table Rows
 window.loadActiveDisputes = async function() {
     const tbody = document.getElementById('disputesTableBody');
@@ -2346,8 +2366,6 @@ window.loadActiveDisputes = async function() {
         row.style.borderBottom = "1px solid #f1f5f9";
         
         const matchedConv = conversationsMap[dispute.conversation_id];
-        
-        // Dynamic Fallback Mapping to resolve "Unknown Product" and "N/A"
         const productName = matchedConv?.product_name || dispute.product_name || 'General Escrow Contract';
         const rawPrice = matchedConv?.product_price || dispute.amount;
         const productPrice = rawPrice ? `₦${Number(rawPrice).toLocaleString()}` : '₦0.00';
@@ -2370,14 +2388,19 @@ window.loadActiveDisputes = async function() {
             <td style="padding:15px;"><span class="badge bg-warning" style="padding:5px 10px; border-radius:5px; text-transform: uppercase;">${dispute.status}</span></td>
             <td style="padding:15px; text-align: right;">
                 <div class="dispute-btn-group">
+                    <!-- Action A: Inspect Chat Logs & History -->
                     <button onclick="window.inspectDispute('${dispute.id}')" class="dispute-action-btn dispute-btn-inspect" title="Arbitrate & View Chats">
                         <i class="fa-solid fa-magnifying-glass"></i>
                     </button>
-                    <button onclick="window.processDisputeResolution('${dispute.id}', 'resolved')" class="dispute-action-btn dispute-btn-settle" title="Settle Case">
-                        <i class="fa-solid fa-check"></i>
+                    
+                    <!-- Action B: Settle Case by Executing Refund Back to Buyer -->
+                    <button onclick="window.processDisputeResolution('${dispute.id}', 'refunded')" class="dispute-action-btn" style="color: #0284c7; background: #f0f9ff;" title="Refund to Buyer">
+                        <i class="fa-solid fa-reply-all"></i>
                     </button>
-                    <button onclick="window.processDisputeResolution('${dispute.id}', 'dismissed')" class="dispute-action-btn dispute-btn-cancel" title="Dismiss Dispute">
-                        <i class="fa-solid fa-trash-can"></i>
+                    
+                    <!-- Action C: Settle Case by Releasing Funds Forward to Seller -->
+                    <button onclick="window.processDisputeResolution('${dispute.id}', 'released')" class="dispute-action-btn dispute-btn-settle" title="Release to Seller">
+                        <i class="fa-solid fa-money-bill-transfer"></i>
                     </button>
                 </div>
             </td>
@@ -2397,19 +2420,18 @@ window.appendSingleBubble = function(msg, dispute, conversation) {
     let partyLabel = 'PARTICIPANT';
     let displayedContent = (msg.content || '').trim();
 
+    // Contextual rendering checks
     if (msg.type === 'system') {
-        if (displayedContent.startsWith('⚠️ [ADMIN RESOLUTION]:')) {
-            bubbleBg = '#f3e8ff'; 
-            textAlignment = 'center';
-            borderShape = 'border-radius:8px; border: 1px solid #d8b4fe;';
-            partyLabel = '⚖️ SYSTEM ARBITRATOR (ADMIN)';
-            displayedContent = displayedContent.replace('⚠️ [ADMIN RESOLUTION]:', '').trim();
-        } else {
-            bubbleBg = '#fffbeb';
-            textAlignment = 'center';
-            borderShape = 'border-radius:8px;';
-            partyLabel = '🤖 SYSTEM ACTION ALERT';
-        }
+        bubbleBg = '#fffbeb';
+        textAlignment = 'center';
+        borderShape = 'border-radius:8px;';
+        partyLabel = '🤖 SYSTEM ACTION ALERT';
+    } else if (msg.type === 'text' && !msg.sender_id) {
+        // Explicit layout formatting for Administrator text messages
+        bubbleBg = '#f3e8ff'; 
+        textAlignment = 'center';
+        borderShape = 'border-radius:8px; border: 1px solid #d8b4fe;';
+        partyLabel = '⚖️ SYSTEM ARBITRATOR (ADMIN)';
     } else if (msg.sender_id === conversation?.buyer_id || msg.sender_id === dispute.buyer_id) {
         bubbleBg = '#eff6ff';
         textAlignment = 'flex-start';
@@ -2512,7 +2534,7 @@ window.inspectDispute = async function(id) {
         });
     }
 
-    // --- STEP E: Open Live Postgres Realtime Broadcast Stream Channels ---
+    // --- STEP E: Open Live Realtime Feed & Fire Audio Alerts on New Payload ---
     window.activeDisputeChannel = supabase
         .channel(`realtime-dispute-feed-${linkedConversationId}`)
         .on('postgres_changes', { 
@@ -2525,6 +2547,7 @@ window.inspectDispute = async function(id) {
             if (fallbackAlert) fallbackAlert.remove();
             
             window.appendSingleBubble(payload.new, dispute, conversation);
+            window.playIncomingMessageSound(); // Trigger Audio Feedback
         })
         .subscribe();
 
@@ -2588,12 +2611,12 @@ window.inspectDispute = async function(id) {
             <div style="padding:8px 10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; font-size:11px; font-family:monospace; color:#334155; word-break:break-all;">${finalSellerId}</div>
         </div>
         
-        <div style="margin-bottom:14px;">
+           <div style="margin-bottom:14px;">
             <label style="display:block; font-size:10px; font-weight:800; color:#64748b; margin-bottom:3px; text-transform:uppercase;">Dispute Trigger Subject</label>
             <div style="padding:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; font-size:13px; color:#1e293b; font-weight:600;">${dispute.reason || 'General Claim File'}</div>
         </div>
         
-      <div style="margin-bottom:14px;">
+        <div style="margin-bottom:14px;">
             <label style="display:block; font-size:10px; font-weight:800; color:#64748b; margin-bottom:3px; text-transform:uppercase;">Claimant Narrative Accusation</label>
             <div style="padding:12px; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:8px; font-size:13px; color:#334155; line-height:1.4; max-height:100px; overflow-y:auto; white-space:pre-wrap;">"${dispute.description || 'No written declaration evidence uploaded.'}"</div>
         </div>
@@ -2610,232 +2633,106 @@ window.inspectDispute = async function(id) {
     };
 };
 
-// ✅ Broadcast Text Entry & Perform Downstream Interlinked Relational State Machine Mutations
 
-
-
-window.sendAdminMessage = async function(disputeId, conversationId) {
-    const inputField = document.getElementById('adminConsoleMessageInput');
-    if (!inputField) return;
-    
-    const textRaw = inputField.value.trim();
-    if (!textRaw) return; 
-
-    // 1. Establish structural prefixing properties
-    const formattedAdminMessageText = `⚠️ [ADMIN RESOLUTION]: ${textRaw}`;
-
-    // 2. Fetch the target conversational record to analyze current workflow state
-    const { data: currentConv } = await supabase
-        .from('conversations')
-        .select('status')
-        .eq('id', conversationId)
-        .maybeSingle();
-
-    // 🌟 Fetch the current logged-in Admin's user profile data dynamically from the database
-    let adminUsername = "An administrator";
+// ✅ Helper Isolation Layer: Multi-Channel Push & Telegram Routing Relay Engine
+window.dispatchDisputeNotifications = async function(conversationId, adminUsername) {
     try {
-        const { data: { user: authUser } } = await supabase.auth.getUser();
-        if (authUser) {
-            // Query your custom 'profiles' table using the logged-in admin's ID
-            const { data: adminProfile } = await supabase
-                .from('profiles')
-                .select('username')
-                .eq('id', authUser.id)
-                .maybeSingle();
-
-            // Check our new database query first, then fall back to metadata or email
-            adminUsername = adminProfile?.username || 
-                            authUser.user_metadata?.username || 
-                            authUser.user_metadata?.full_name || 
-                            authUser.email?.split('@')[0] || 
-                            "An administrator";
-        }
-    } catch (authErr) {
-        console.error("❌ Failed to parse admin user profile context:", authErr);
-    }
-
-    // 3. Inject system notification message if conversation status is currently disputed
-    if (currentConv && currentConv.status === 'disputed') {
-        await supabase
-            .from('messages')
-            .insert([{
-                conversation_id: conversationId,
-                content: `⚖️ Admin ${adminUsername} has joined the conversation session.`,
-                type: 'system',
-                is_read: false
-            }]);
-    }
-
-    // 4. Save the administrator's operational entry message parameters
-    const { error: insertError } = await supabase
-        .from('messages')
-        .insert([{
-            conversation_id: conversationId,
-            content: formattedAdminMessageText,
-            type: 'system', 
-            is_read: false
-        }]);
-
-    if (insertError) {
-        console.error("❌ Failed to save admin text message:", insertError);
-        Swal.fire("Transmission Error", insertError.message, "error");
-        return;
-    }
-
-    // ====== START OF NOTIFICATION & TELEGRAM & ONESIGNAL INJECTION SNIPPET ======
-    try {
-        // 1. Fetch the conversation data to grab the buyer and seller UUIDs
         const { data: convInfo } = await supabase
             .from('conversations')
             .select('buyer_id, seller_id, product_name, status')
             .eq('id', conversationId)
             .maybeSingle();
 
-        // 💡 ONLY execute if the conversation status is currently marked as 'disputed'
-        if (convInfo && convInfo.status === 'disputed') {
-            const notificationTitle = `⚖️ Dispute Update: ${convInfo.product_name}`;
-            const notificationBody = `Admin ${adminUsername} has joined the conversation session.`;
-            
-            const notificationInserts = [];
-            const targetUserIds = [];
+        if (!convInfo || convInfo.status !== 'disputed') return;
 
-            if (convInfo.buyer_id) targetUserIds.push(convInfo.buyer_id);
-            if (convInfo.seller_id) targetUserIds.push(convInfo.seller_id);
+        const notificationTitle = `⚖️ Dispute Update: ${convInfo.product_name}`;
+        const notificationBody = `Admin ${adminUsername} has joined the conversation session.`;
+        const notificationInserts = [];
+        const targetUserIds = [];
 
-            // --- PART A: In-App Database Notifications Setup ---
-            if (convInfo.buyer_id) {
-                notificationInserts.push({
-                    user_id: convInfo.buyer_id,
-                    title: notificationTitle,
-                    message: notificationBody,
-                    icon: "fas fa-scale-balanced",
-                    is_read: false,
-                    type: "dispute_alert"
-                });
-            }
+        if (convInfo.buyer_id) targetUserIds.push(convInfo.buyer_id);
+        if (convInfo.seller_id) targetUserIds.push(convInfo.seller_id);
 
-            if (convInfo.seller_id) {
-                notificationInserts.push({
-                    user_id: convInfo.seller_id,
-                    title: notificationTitle,
-                    message: notificationBody,
-                    icon: "fas fa-scale-balanced",
-                    is_read: false,
-                    type: "dispute_alert"
-                });
-            }
+        // --- PART A: In-App Structural Notification Database Generation ---
+        targetUserIds.forEach(uid => {
+            notificationInserts.push({
+                user_id: uid,
+                title: notificationTitle,
+                message: notificationBody,
+                icon: "fas fa-scale-balanced",
+                is_read: false,
+                type: "dispute_alert"
+            });
+        });
 
-            if (notificationInserts.length > 0) {
-                const { error: notifError } = await supabase
-                    .from('notifications')
-                    .insert(notificationInserts);
+        if (notificationInserts.length > 0) {
+            const { error: notifError } = await supabase.from('notifications').insert(notificationInserts);
+            if (notifError) console.error("❌ Notification table insert error:", notifError);
+            window.playNotificationSound(); // Play alert chime instantly when generating notification payload
+        }
 
-                if (notifError) console.error("❌ Notification table insert error:", notifError);
-            }
+        // --- PART B: Remote Telegram API Bot Endpoints & Push Edge Invocation Channels ---
+        if (targetUserIds.length > 0) {
+            const { data: userProfiles, error: profileError } = await supabase
+                .from('profiles')
+                .select('id, telegram_chat_id, onesignal_id')
+                .in('id', targetUserIds);
 
-            // --- PART B: Multi-Channel Routing Engine (Telegram & OneSignal Edge Relay) ---
-            if (targetUserIds.length > 0) {
-                // Query profiles for both Telegram chat IDs and OneSignal IDs
-                const { data: userProfiles, error: profileError } = await supabase
-                    .from('profiles')
-                    .select('id, telegram_chat_id, onesignal_id')
-                    .in('id', targetUserIds);
+            if (!profileError && userProfiles && userProfiles.length > 0) {
+                const TELEGRAM_BOT_TOKEN = "8436841265:AAHIh50C2bEamKqB649Dx_CRy7l8X6f2yqg"; 
+                const telegramApiUrl = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+                const telegramMessageText = `*⚖️ Dispute Update: ${convInfo.product_name}*\n\nAdmin ${adminUsername} has joined the conversation session.\n\n🔗 [Click here to join the chat](https://www.accmarket.name.ng/chats?id=${conversationId})`;
+                const oneSignalDeviceIds = [];
 
-                if (!profileError && userProfiles && userProfiles.length > 0) {
-                    
-                    // 📲 1️⃣ Telegram Dispatches
-                    const TELEGRAM_BOT_TOKEN = "8436841265:AAHIh50C2bEamKqB649Dx_CRy7l8X6f2yqg"; 
-                    const telegramApiUrl = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-                    const telegramMessageText = `*⚖️ Dispute Update: ${convInfo.product_name}*\n\nAdmin ${adminUsername} has joined the conversation session.\n\n🔗 [Click here to join the chat](https://www.accmarket.name.ng/chats?id=${conversationId})`;
-
-                    const oneSignalDeviceIds = [];
-
-                    // Loop over retrieved profiles to route messages
-                    userProfiles.forEach(async (profile) => {
-                        // Gather valid OneSignal user tokens
-                        if (profile.onesignal_id) {
-                            oneSignalDeviceIds.push(profile.onesignal_id);
-                        }
-
-                        // Fire Async HTTP requests to Telegram API endpoints
-                        if (profile.telegram_chat_id) {
-                            try {
-                                await fetch(telegramApiUrl, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                        chat_id: profile.telegram_chat_id,
-                                        text: telegramMessageText,
-                                        parse_mode: 'Markdown'
-                                    })
-                                });
-                            } catch (telegramHttpErr) {
-                                console.error(`❌ Telegram transmission failed for user profile ${profile.id}:`, telegramHttpErr);
-                            }
-                        }
-                    });
-
-                    // 💥 2️⃣ Fire OneSignal Push via Supabase Edge Function 'swift-handler'
-                    if (oneSignalDeviceIds.length > 0) {
-                        try {
-                            console.log(`Routing push payload via swift-handler edge function...`);
-                            
-                            // A. Fetch current session token manually to guarantee explicit authorization inclusion
-                            const { data: sessionData } = await supabase.auth.getSession();
-                            const token = sessionData?.session?.access_token;
-
-                            // Invokes your edge function to bypass browser-based CORS blocks securely
-                            await supabase.functions.invoke('swift-handler', {
-                                body: {
-                                    deviceIds: oneSignalDeviceIds,
-                                    title: notificationTitle,
-                                    body: notificationBody,
-                                    url: `https://www.accmarket.name.ng/chats?id=${conversationId}`
-                                },
-                                // B. Explicitly pass the active JWT as a Bearer Token if it exists
-                                headers: token ? {
-                                    "Authorization": `Bearer ${token}`
-                                } : {}
-                            });
-                            
-                            console.log(`✅ Push payload successfully routed to swift-handler for ${oneSignalDeviceIds.length} devices.`);
-                        } catch (pushErr) {
-                            console.error("❌ swift-handler Edge function invocation failure:", pushErr);
-                        }
+                userProfiles.forEach(async (profile) => {
+                    if (profile.onesignal_id) {
+                        oneSignalDeviceIds.push(profile.onesignal_id);
                     }
 
-                } else if (profileError) {
-                    console.error("❌ Error fetching profiles for distribution:", profileError);
+                    if (profile.telegram_chat_id) {
+                        try {
+                            await fetch(telegramApiUrl, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    chat_id: profile.telegram_chat_id,
+                                    text: telegramMessageText,
+                                    parse_mode: 'Markdown'
+                                })
+                            });
+                        } catch (tErr) {
+                            console.error(`❌ Telegram transmission failure for user: ${profile.id}`, tErr);
+                        }
+                    }
+                });
+
+                // Invoke Supabase 'swift-handler' Edge Architecture Functions securely
+                if (oneSignalDeviceIds.length > 0) {
+                    try {
+                        const { data: sessionData } = await supabase.auth.getSession();
+                        const token = sessionData?.session?.access_token;
+
+                        await supabase.functions.invoke('swift-handler', {
+                            body: {
+                                deviceIds: oneSignalDeviceIds,
+                                title: notificationTitle,
+                                body: notificationBody,
+                                url: `https://www.accmarket.name.ng/chats?id=${conversationId}`
+                            },
+                            headers: token ? { "Authorization": `Bearer ${token}` } : {}
+                        });
+                    } catch (pushErr) {
+                        console.error("❌ swift-handler Edge function invocation failure:", pushErr);
+                    }
                 }
             }
         }
     } catch (err) {
         console.error("❌ Unexpected notification system failure:", err);
     }
-    // ====== END OF NOTIFICATION & TELEGRAM & ONESIGNAL INJECTION SNIPPET ======
-
-
-    // 5. Update parent conversations lifecycle schema states
-    const { error: updateError } = await supabase
-        .from('conversations')
-        .update({
-            status: 'active',
-            last_message: textRaw,
-            updated_at: new Date().toISOString()
-        })
-        .eq('id', conversationId);
-
-    if (updateError) {
-        console.error("❌ Failed to mutate parent conversation record:", updateError);
-    } else {
-        inputField.value = ""; 
-    }
 };
 
-
-
-
-// ✅ 3. Settle Dispute Database Records
+// ✅ 4. Settle Dispute Database Records
 window.processDisputeResolution = async function(id, statusOutcome) {
     const { error } = await supabase
         .from('disputes')
@@ -2860,7 +2757,7 @@ window.closeDisputeModal = async function() {
         window.activeDisputeChannel = null;
     }
 };
-
+    
 
 
 // --- Session Termination ---

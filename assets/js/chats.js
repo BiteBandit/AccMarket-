@@ -203,7 +203,7 @@ async function loadSidebar(filter = "") {
     let { data: conversations, error } = await supabase
         .from('conversations')
         .select(`
-            id, last_message, updated_at, buyer_id, seller_id,
+            id, last_message, updated_at, buyer_id, seller_id, escrow_step, status, product_name, product_price, product_id,
             seller:profiles!conversations_seller_id_fkey(id, username, avatar_url, last_seen, show_online, trust_score),
             buyer:profiles!conversations_buyer_id_fkey(id, username, avatar_url, last_seen, show_online, trust_score),
             messages(is_read, sender_id)
@@ -213,7 +213,7 @@ async function loadSidebar(filter = "") {
 
     if (error) return;
 
-        chatList.innerHTML = '';
+    chatList.innerHTML = '';
     conversations.forEach(chat => {
         const isMeBuyer = chat.buyer_id === currentUser.id;
         const otherUser = isMeBuyer ? chat.seller : chat.buyer;
@@ -237,13 +237,10 @@ async function loadSidebar(filter = "") {
         let timeDisplay = "";
 
         if (msgDate.toDateString() === today.toDateString()) {
-            // If sent today: e.g., "10:30 AM"
             timeDisplay = msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         } else if (msgDate.toDateString() === yesterday.toDateString()) {
-            // If sent yesterday: "Yesterday"
             timeDisplay = "Yesterday";
         } else {
-            // If older than yesterday: e.g., "Nov 12"
             timeDisplay = msgDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
         }
 
@@ -267,7 +264,6 @@ async function loadSidebar(filter = "") {
                 </div>
             </div>`;
 
-
         item.onclick = async () => {
             activeChatId = chat.id;
             window.history.pushState({}, '', `?id=${chat.id}`);
@@ -288,6 +284,25 @@ async function initChatWindow() {
     const headerAvatar = document.getElementById('headerAvatar');
 
     if (!container || !activeChatId) return;
+
+    // 🟢 1. PRE-LOAD ALL ADMIN PROFILES FROM DATABASE INTO MEMORY CACHE FIRST
+    if (!window.adminProfilesCache) {
+        window.adminProfilesCache = {};
+        try {
+            const { data: admins } = await supabase
+                .from('profiles')
+                .select('id, username, role, trust_score')
+                .eq('role', 'admin');
+                
+            if (admins) {
+                admins.forEach(admin => {
+                    window.adminProfilesCache[admin.id] = admin;
+                });
+            }
+        } catch (err) {
+            console.error("Failed to pre-load admin profiles:", err);
+        }
+    }
 
     console.log("[CHAT] Refreshing view for:", activeChatId);
     subscribeToMessages();
@@ -326,7 +341,7 @@ async function initChatWindow() {
         }
 
         syncLockdownUI(chat.status);
-
+    
         // --- 🎯 PRODUCT CONTEXT BAR & LOGO LOGIC ---
         const pTitle = document.getElementById('productTitle');
         const pPrice = document.getElementById('productPrice');
@@ -471,7 +486,10 @@ function subscribeToMessages() {
         }, async (payload) => {
             console.log("[REALTIME] New message incoming...");
             
-            if (payload.new.type === 'system') {
+            // Re-route check to read admin parameters dynamically during insertion stream loops
+            const cachedAdmin = window.adminProfilesCache ? window.adminProfilesCache[payload.new.sender_id] : null;
+
+            if (payload.new.type === 'system' && !cachedAdmin) {
                 appendMessageUI(payload.new);
             } else {
                 const { data: fullMsg } = await supabase
@@ -491,7 +509,7 @@ function subscribeToMessages() {
                 else appendMessageUI(payload.new);
             }
             
-            if (payload.new.sender_id !== currentUser.id) await markMessagesAsRead(activeChatId);
+  if (payload.new.sender_id !== currentUser.id) await markMessagesAsRead(activeChatId);
             await loadSidebar();
         })
         .on('postgres_changes', { 
@@ -527,7 +545,6 @@ function subscribeToMessages() {
         })
         .subscribe();
 }
-
 
 function subscribeToConversationChanges() {
     if (conversationSub) supabase.removeChannel(conversationSub);
@@ -746,30 +763,40 @@ function appendMessageUI(msg) {
     const container = document.querySelector('.message-container');
     if (!container || document.getElementById(`msg-${msg.id}`)) return;
 
+    // Check our pre-loaded database cache to see if this sender is an admin
+    const cachedAdmin = window.adminProfilesCache ? window.adminProfilesCache[msg.sender_id] : null;
+    const isAdminUser = cachedAdmin || msg.sender?.role === 'admin';
+
+    // 🟢 HANDLE SYSTEM NOTICES VS ADMIN CHAT MESSAGES
     if (msg.type === 'system') {
-        const systemDiv = document.createElement('div');
-        systemDiv.id = `msg-${msg.id}`;
-        systemDiv.className = 'msg-system';
+        const text = msg.content || "";
         
-        const isAlert = msg.content.includes('DISPUTE') || 
-                        msg.content.includes('CANCELLED') || 
-                        msg.content.includes('⚠️') || 
-                        msg.content.includes('❌');
-        
-        systemDiv.innerHTML = `
-            <div class="system-pill ${isAlert ? 'dispute-alert' : ''}">
-                ${msg.content}
-            </div>
-        `;
-        
-        container.appendChild(systemDiv);
-        container.scrollTop = container.scrollHeight;
-        return; 
+        // If it's a structural system notice text, render it as a standard gray notice pill
+        const isNoticeAlert = text.includes('joined') || 
+                              text.includes('started') || 
+                              text.includes('Created') || 
+                              text.includes('status changed');
+
+        if (isNoticeAlert && !isAdminUser) {
+            const systemDiv = document.createElement('div');
+            systemDiv.id = `msg-${msg.id}`;
+            systemDiv.className = 'msg-system';
+            
+            const isAlert = text.includes('DISPUTE') || text.includes('CANCELLED') || text.includes('⚠️') || text.includes('❌');
+            
+            systemDiv.innerHTML = `<div class="system-pill ${isAlert ? 'dispute-alert' : ''}">${text}</div>`;
+            container.appendChild(systemDiv);
+            container.scrollTop = container.scrollHeight;
+            return; 
+        } else {
+            // It's a regular message stored under a system type by the admin space; treat it as a chat bubble
+            msg.isAdminChatBubble = true;
+        }
     }
 
-        const isMe = msg.sender_id === currentUser.id;
+    const isMe = msg.sender_id === currentUser.id;
 
-    // 🟢 Dynamic Day + Time Format for Chat Bubbles (e.g., "Today, 10:30 AM" or "Nov 12, 10:30 AM")
+    // Dynamic Day + Time Format for Chat Bubbles
     const msgDate = new Date(msg.created_at);
     const today = new Date();
     const yesterday = new Date(today);
@@ -781,14 +808,14 @@ function appendMessageUI(msg) {
     } else if (msgDate.toDateString() === yesterday.toDateString()) {
         dateLabel = "Yesterday";
     } else {
-        // Shows clean short date format like "Nov 12"
         dateLabel = msgDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
     }
 
     const timeLabel = msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const time = `${dateLabel}, ${timeLabel}`; // 🎯 Combines them into "Today, 02:15 PM"
+    const time = `${dateLabel}, ${timeLabel}`; 
 
-    const messageClass = isMe ? 'outgoing' : 'incoming';
+    // Admin chat bubbles get incoming class formatting so they stay readable for buyers/sellers
+    const messageClass = (msg.isAdminChatBubble || isAdminUser) ? 'incoming admin-custom-bubble' : (isMe ? 'outgoing' : 'incoming');
 
     const div = document.createElement('div');
     div.id = `msg-${msg.id}`;
@@ -829,17 +856,31 @@ function appendMessageUI(msg) {
                      window.activeChatData?.status === 'cancelled' || 
                      window.activeChatData?.status === 'completed';
 
-    // 🟡 Gold Verified Badge Logic for Message Stream Bubbles
-    const goldBadgeSvg = generateGoldBadge(msg.sender?.trust_score || 0, `msg-${msg.id}`);
-
-    div.innerHTML = `
-        ${(isMe && !isLocked) ? `<div class="swipe-delete-btn" onclick="deleteMessage('${msg.id}', '${msg.sender_id}')"><i class="ph ph-trash"></i></div>` : ''}
+    // 🟢 SENDER HEADER DISPLAY (Instant pre-loaded checks)
+    let senderHeaderNameHTML = '';
+    
+    if (msg.isAdminChatBubble || isAdminUser) {
+        const adminName = cachedAdmin?.username || msg.sender?.username || "System Admin";
+        const adminTrust = cachedAdmin?.trust_score || msg.sender?.trust_score || 0;
+        const goldBadgeSvg = generateGoldBadge(adminTrust, `msg-${msg.id}`);
         
-        ${(!isMe && msg.sender?.username) ? `
+        senderHeaderNameHTML = `
+            <span class="sender-name" style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.75rem; margin-bottom: 4px; color: #1e3a8a; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; width: 100%; justify-content: flex-start; padding-left: 2px;">
+                <i class="ph-fill ph-shield-check" style="font-size: 0.85rem; color: #1e3a8a;"></i> 
+                ${adminName} (Staff) ${goldBadgeSvg}
+            </span>`;
+    } else if (!isMe && msg.sender?.username) {
+        const goldBadgeSvg = generateGoldBadge(msg.sender?.trust_score || 0, `msg-${msg.id}`);
+        senderHeaderNameHTML = `
             <span class="sender-name" style="display: inline-flex; align-items: center; gap: 1px; font-size: 0.75rem; margin-bottom: 2px; color: #475569; font-weight: 500;">
                 ${msg.sender.username} ${goldBadgeSvg}
-            </span>
-        ` : ''}
+            </span>`;
+    }
+
+    div.innerHTML = `
+        ${(isMe && !isLocked && !msg.isAdminChatBubble && !isAdminUser) ? `<div class="swipe-delete-btn" onclick="deleteMessage('${msg.id}', '${msg.sender_id}')"><i class="ph ph-trash"></i></div>` : ''}
+        
+        ${senderHeaderNameHTML}
         
         <div class="msg-bubble">
             ${replyHTML}
@@ -847,7 +888,7 @@ function appendMessageUI(msg) {
             
             <div class="msg-status">
                 <span class="time">${time}</span>
-                ${isMe ? `<i class="ph ${msg.is_read ? 'ph-checks' : 'ph-check'}" id="icon-${msg.id}"></i>` : ''}
+                ${(isMe && !msg.isAdminChatBubble && !isAdminUser) ? `<i class="ph ${msg.is_read ? 'ph-checks' : 'ph-check'}" id="icon-${msg.id}"></i>` : ''}
             </div>
         </div>`;
 
@@ -864,13 +905,13 @@ function appendMessageUI(msg) {
     bubble.addEventListener('touchmove', (e) => {
         currentX = e.touches[0].clientX - startX;
         if (Math.abs(currentX) > 10) { clearTimeout(pressTimer); isSwiping = true; }
-        if (isMe && currentX < 0) { const move = Math.max(currentX, -80); bubble.style.transform = `translateX(${move}px)`; }
+        if (isMe && currentX < 0 && !msg.isAdminChatBubble && !isAdminUser) { const move = Math.max(currentX, -80); bubble.style.transform = `translateX(${move}px)`; }
     }, { passive: true });
 
     bubble.addEventListener('touchend', () => {
         clearTimeout(pressTimer);
         bubble.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-        if (isMe) bubble.style.transform = currentX < -40 ? 'translateX(-70px)' : 'translateX(0)';
+        if (isMe && !msg.isAdminChatBubble && !isAdminUser) bubble.style.transform = currentX < -40 ? 'translateX(-70px)' : 'translateX(0)';
     });
 
     bubble.addEventListener('dblclick', () => setReplyUI(msg));

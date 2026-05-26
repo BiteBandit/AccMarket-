@@ -11,42 +11,16 @@ if (loginForm) {
     const email = document.getElementById("email").value.trim();
     const password = document.getElementById("password").value;
 
-    // ✅ 1. Read and validate the Turnstile token
-    let token = null;
-    if (typeof turnstile !== "undefined") {
-      token = turnstile.getResponse("#admin-turnstile");
-    }
-
-    if (!token) {
-      Swal.fire({
-        icon: 'warning',
-        title: 'Security Check',
-        text: 'Please fulfill the security verification challenge before logging in.',
-        confirmButtonColor: "#0b1e5b"
-      });
-      return;
-    }
-
     try {
-      // Show loading state while validating
-      Swal.fire({
-        title: 'Verifying...',
-        allowOutsideClick: false,
-        didOpen: () => Swal.showLoading()
-      });
-
-      // ✅ 2. Authenticate user with Supabase, passing the captchaToken inside options
+      // 1. Authenticate user with Supabase
       const { data: { user }, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
-        options: {
-          captchaToken: token
-        }
       });
 
       if (authError) throw authError;
 
-      // 3. Fetch user profile to verify "admin" role
+      // 2. Fetch user profile to verify "admin" role
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("role")
@@ -57,19 +31,14 @@ if (loginForm) {
         throw new Error("Could not verify administrative privileges.");
       }
 
-      // 4. Strict Security Check: Only "admin" allowed
+      // 3. Strict Security Check: Only "admin" allowed
       if (profile.role !== "admin") {
         // Log them out immediately if they aren't an admin
         await supabase.auth.signOut();
         throw new Error("Access Denied: Administrative role required.");
       }
 
-      // ✅ 5. Reset Turnstile token on successful login processing
-      if (typeof turnstile !== "undefined") turnstile.reset("#admin-turnstile");
-
-      Swal.close();
-
-      // 6. Success popup using your brand color
+      // 4. Success popup using your brand color
       Swal.fire({
         icon: 'success',
         title: 'Welcome, Admin',
@@ -83,17 +52,12 @@ if (loginForm) {
       });
 
     } catch (err) {
-      Swal.close();
-
-      // ✅ 7. Force clear and reset Turnstile so they can solve a new challenge on error
-      if (typeof turnstile !== "undefined") turnstile.reset("#admin-turnstile");
-
       // Error popup using the dark blue theme color
       Swal.fire({
         icon: 'error',
         title: 'Authentication Failed',
         text: err.message,
-        confirmButtonColor: "#0b1e5b"
+        confirmButtonColor: "#0b1e5b" 
       });
     }
   });

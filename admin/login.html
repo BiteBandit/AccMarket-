@@ -1,15 +1,13 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Login | AccMarket</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-
-  <script type="module" src="assets/js/login.js"></script>
+<script type="module" src="assets/js/login.js"></script>
 
   <style>
     :root {
@@ -97,13 +95,6 @@
       box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
     }
 
-    /* ✅ ALIGNS AND PACES CAPTCHA INSIDE CARD CONTAINER */
-    .captcha-container {
-      display: flex;
-      justify-content: center;
-      margin-bottom: 24px;
-    }
-
     .login-btn {
       width: 100%;
       padding: 16px;
@@ -151,11 +142,6 @@
         <label>Password</label>
         <input type="password" id="password" placeholder="••••••••" required>
       </div>
-
-      <div class="captcha-container">
-        <div class="cf-turnstile" data-sitekey="0x4AAAAAADUWpq8-dxlXWp7t" id="admin-turnstile"></div>
-      </div>
-
       <button type="submit" class="login-btn">Sign In to Dashboard</button>
     </form>
 
