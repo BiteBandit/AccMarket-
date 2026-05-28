@@ -349,14 +349,16 @@ async function initChatWindow() {
 
         headerAvatar.src = otherUser.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUser.username}`;
 
-        if (chat.escrow_step === 0) {
+             if (chat.escrow_step === 0) {
             console.log("[ESCROW] Initializing Step 1...");
             await upgradeToStepOne(); 
         } else {
             updateEscrowUI(chat.escrow_step);
         }
 
-        syncLockdownUI(chat.status);
+        // Updated to pass chat.admin_id
+        syncLockdownUI(chat.status, chat.admin_id);
+
     
         // --- PRODUCT CONTEXT BAR & LOGO LOGIC ---
         const pTitle = document.getElementById('productTitle');
@@ -557,16 +559,26 @@ function subscribeToConversationChanges() {
             filter: `id=eq.${activeChatId}` 
         }, (payload) => {
             console.log("[REALTIME] Deal Update:", payload.new.status);
-            window.activeChatData = payload.new;
+            const updatedChat = payload.new;
+            window.activeChatData = updatedChat;
 
+            // 1. Update Escrow UI
             if (typeof updateEscrowUI === 'function') {
-                updateEscrowUI(payload.new.escrow_step);
+                updateEscrowUI(updatedChat.escrow_step);
             }
-            syncLockdownUI(payload.new.status);
+
+            // 2. Refresh Menu (Pass updated chat object for role-based check)
+            refreshMenuVisibility(updatedChat);
+
+            // 3. Update Lockdown UI (Pass admin_id to enable admin chat during disputes)
+            syncLockdownUI(updatedChat.status, updatedChat.admin_id);
+
+            // 4. Update Sidebar
             loadSidebar();
         })
         .subscribe();
 }
+
 
 // --- 9. DELETE LOGIC WITH SWEETALERT ---
 async function deleteMessage(msgId, senderId) {
@@ -965,12 +977,15 @@ function updateEscrowUI(step) {
 }
 window.updateEscrowUI = updateEscrowUI;
 
-function syncLockdownUI(status) {
+function syncLockdownUI(status, admin_id) {
     const footer = document.querySelector('.chat-footer');
     const messageInput = document.getElementById('messageInput');
     const attachBtn = document.getElementById('attachBtn');
 
-    if (status === 'cancelled' || status === 'completed' || status === 'disputed') {
+    // 1. Logic for CLOSED chats (only block if status is specifically cancelled or completed)
+    const isPermanentlyLocked = (status === 'cancelled' || status === 'completed');
+
+    if (isPermanentlyLocked) {
         if (footer) {
             footer.style.display = 'none';
             if (messageInput) messageInput.disabled = true;
@@ -984,8 +999,22 @@ function syncLockdownUI(status) {
                 footer.parentNode.appendChild(notice);
             }
         }
-    } else {
-        if (footer) footer.style.display = 'flex';
+    } 
+    // 2. Logic for ACTIVE, ESCROW, or DISPUTED chats (Keep footer open)
+    else {
+        if (footer) {
+            footer.style.display = 'flex';
+            if (messageInput) messageInput.disabled = false;
+            if (attachBtn) attachBtn.style.pointerEvents = 'auto';
+        }
+        
+        // Update placeholder if disputed to clarify the state
+        if (messageInput && status === 'disputed') {
+            messageInput.placeholder = "Discuss the dispute here...";
+        } else if (messageInput) {
+            messageInput.placeholder = "Type a message...";
+        }
+        
         document.getElementById('closedNotice')?.remove();
     }
 }
