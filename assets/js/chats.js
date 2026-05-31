@@ -981,43 +981,67 @@ function syncLockdownUI(status, admin_id) {
     const footer = document.querySelector('.chat-footer');
     const messageInput = document.getElementById('messageInput');
     const attachBtn = document.getElementById('attachBtn');
+    
+    // Check if there is an Admin assigned
+    const hasAdmin = (admin_id !== null && admin_id !== undefined && admin_id !== "");
+    
+    // 1. Define states
+    const isLocked = (status === 'cancelled' || status === 'completed');
+    
+    // 2. Logic for Disputed chats
+    if (status === 'disputed') {
+        if (!hasAdmin) {
+            // Stage 1: No Admin -> Lock for everyone
+            lockChatFooter("Dispute initiated. Waiting for an admin to join...");
+        } else {
+            // Stage 2: Admin assigned -> Unlock for everyone
+            unlockChatFooter();
+        }
+        return;
+    }
 
-    // 1. Logic for CLOSED chats (only block if status is specifically cancelled or completed)
-    const isPermanentlyLocked = (status === 'cancelled' || status === 'completed');
+    // 3. Logic for Cancelled/Completed chats
+    if (isLocked) {
+        lockChatFooter("Transaction " + status.toUpperCase() + " — Messaging Disabled");
+        return;
+    }
 
-    if (isPermanentlyLocked) {
+    // 4. Logic for Active chats
+    unlockChatFooter();
+
+    // Helper functions
+    function lockChatFooter(message) {
         if (footer) {
-            footer.style.display = 'none';
-            if (messageInput) messageInput.disabled = true;
-            if (attachBtn) attachBtn.style.pointerEvents = 'none';
+            footer.style.display = 'none'; // Forces removal from layout
+        }
+        if (messageInput) messageInput.disabled = true;
+        if (attachBtn) attachBtn.style.pointerEvents = 'none'; // Ensures clicks are ignored
 
-            if (!document.getElementById('closedNotice')) {
-                const notice = document.createElement('div');
-                notice.id = 'closedNotice';
-                notice.className = 'chat-closed-notice';
-                notice.innerHTML = `<i class="ph-fill ph-lock"></i> Transaction ${status.toUpperCase()} — Messaging Disabled`;
+        if (!document.getElementById('closedNotice')) {
+            const notice = document.createElement('div');
+            notice.id = 'closedNotice';
+            notice.className = 'chat-closed-notice';
+            notice.innerHTML = `<i class="ph-fill ph-lock"></i> ${message}`;
+            // Append only if it doesn't exist
+            if (footer && footer.parentNode) {
                 footer.parentNode.appendChild(notice);
             }
         }
-    } 
-    // 2. Logic for ACTIVE, ESCROW, or DISPUTED chats (Keep footer open)
-    else {
+    }
+
+    function unlockChatFooter() {
         if (footer) {
-            footer.style.display = 'flex';
-            if (messageInput) messageInput.disabled = false;
-            if (attachBtn) attachBtn.style.pointerEvents = 'auto';
+            footer.style.display = 'flex'; // Restores layout
         }
-        
-        // Update placeholder if disputed to clarify the state
-        if (messageInput && status === 'disputed') {
-            messageInput.placeholder = "Discuss the dispute here...";
-        } else if (messageInput) {
+        if (messageInput) {
+            messageInput.disabled = false;
             messageInput.placeholder = "Type a message...";
         }
-        
+        if (attachBtn) attachBtn.style.pointerEvents = 'auto'; // Restores clicks
         document.getElementById('closedNotice')?.remove();
     }
 }
+
 
 window.toggleStatusMenu = async function(e) {
     if (e) e.stopPropagation();

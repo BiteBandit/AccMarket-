@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Directory | AccMarket Admin</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="assets/css/users.css">
+</head>
+<body>
+
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <aside class="sidebar" id="sidebar">
+        <div class="brand">
+            <div class="logo">A</div>
+            <span>AccMarket Admin</span>
+        </div>
+
+        <nav class="nav-menu">
+            <div class="nav-label">Analytics</div>
+            <a href="index.html" class="nav-item">
+                <i class="fa-solid fa-chart-line"></i> Dashboard
+            </a>
+
+            <div class="nav-label">User Governance</div>
+            <a href="users.html" class="nav-item active">
+                <i class="fa-solid fa-users"></i> Directory
+            </a>
+            <a href="kyc.html" class="nav-item">
+                <i class="fa-solid fa-id-card"></i> Identity Verification
+            </a>
+            <a href="banned.html" class="nav-item">
+                <i class="fa-solid fa-user-slash"></i> Restricted Access
+            </a>
+
+            <div class="nav-label">System Audit</div>
+            <a href="audit.html" class="nav-item">
+                <i class="fa-solid fa-shield-halved"></i> Account Audits
+            </a>
+            <a href="logs.html" class="nav-item">
+                <i class="fa-solid fa-comments"></i> Communication Logs
+            </a>
+
+            <div class="nav-label">Treasury Management</div>
+            <a href="withdrawals.html" class="nav-item">
+                <i class="fa-solid fa-money-bill-transfer"></i> Payout Requests
+            </a>
+            <a href="ledger.html" class="nav-item">
+                <i class="fa-solid fa-list-check"></i> Ledger Reports
+            </a>
+
+            <div class="nav-label">Marketplace Control</div>
+            <a href="listings.html" class="nav-item">
+                <i class="fa-solid fa-boxes-stacked"></i> Listing Requests
+            </a>
+            <a href="disputes.html" class="nav-item">
+                <i class="fa-solid fa-scale-balanced"></i> Active Disputes
+            </a>
+
+            <div class="nav-label">Marketing & Outreach</div>
+            <a href="broadcast.html" class="nav-item">
+                <i class="fa-solid fa-bullhorn"></i> Global Broadcast
+            </a>
+            <a href="blog.html" class="nav-item">
+                <i class="fa-solid fa-blog"></i> Platform News
+            </a>
+
+            <div class="nav-label">Support Services</div>
+            <a href="tickets.html" class="nav-item">
+                <i class="fa-solid fa-ticket"></i> Service Tickets
+            </a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <button id="adminLogoutBtn">
+                <i class="fa-solid fa-power-off"></i> Terminate Session
+            </button>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <header class="top-bar">
+            <div class="header-left">
+                <button class="menu-toggle" id="menuToggle" aria-label="Open Menu">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <h1 id="sectionTitle">User Intelligence Directory</h1>
+            </div>
+            
+            <div class="admin-profile">
+                <span id="adminUsername">Loading Security Profile...</span>
+            </div>
+        </header>
+
+        <section id="usersSection" class="content-section">
+            <div class="table-card">
+                <div class="table-header">
+                    <div class="header-info">
+                        <h2>User Intelligence Directory</h2>
+                        <p>Monitor and manage all registered platform entities.</p>
+                    </div>
+                    <div class="header-actions">
+                        <div class="search-box">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="userSearchInput" placeholder="Search identity or email...">
+                        </div>
+                        <button class="btn-refresh" title="Refresh Directory"><i class="fa-solid fa-rotate"></i></button>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Identity</th>
+                                <th>Classification</th>
+                                <th>Escrow Balance</th>
+                                <th>Onboarding Date</th>
+                                <th style="text-align: right;">Operations</th>
+                            </tr>
+                        </thead>
+                        <tbody id="userTableBody">
+                            <!-- User data will be injected here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script type="module" src="assets/js/users.js"></script>
+</body>
+</html>

@@ -590,68 +590,35 @@
 </div>
 
 <section id="disputes-section" class="content-section" style="display: none;">
-    <div class="table-card">
-        <div class="table-header">
-            <div class="header-info">
-                <h2>Active Transaction Disputes</h2>
-                <p>Arbitrate conflicting user claims, inspect live contract logs, and settle escrow balances.</p>
-            </div>
-            <button class="btn-refresh" onclick="window.loadActiveDisputes()">
-                <i class="fa-solid fa-rotate"></i>
-            </button>
-        </div>
-        <div class="table-responsive">
-            <table class="admin-table">
-                <thead>
-                    <tr>
-                        <th>Transaction Ref</th>
-                        <th>Claimant ID</th>
-                        <th>Reason / Title</th>
-                        <th>Amount</th>
-                        <th>Status</th>
-                        <th style="text-align: right;">Operations</th>
-                    </tr>
-                </thead>
-                <tbody id="disputesTableBody"></tbody>
-            </table>
-        </div>
+    <div class="section-header">
+        <h2><i class="fa-solid fa-scale-balanced"></i> Active Disputes</h2>
+        <p class="section-subtitle">Manage and arbitrate buyer-seller conflicts.</p>
+    </div>
+
+    <div class="table-container">
+        <table class="admin-table" id="disputes-table">
+            <thead>
+                <tr>
+                    <th>Created At</th>
+                    <th>Reason</th>
+                    <th>Description</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="disputes-table-body">
+                </tbody>
+        </table>
     </div>
 </section>
 
-<div id="disputeReviewModal" class="admin-modal" style="display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.7); backdrop-filter:blur(5px);">
-    <div class="modal-content" style="background:#fff; margin:30px auto; width:95%; max-width:950px; border-radius:15px; overflow:hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); display:flex; flex-direction:column; height:85vh;">
-        
-        <div class="modal-header" style="padding:15px 20px; background:#0b1e5b; color:white; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
-            <h3 style="margin:0; font-size:18px;"><i class="fa-solid fa-scale-balanced"></i> Escrow Arbitration Console</h3>
-            <span onclick="window.closeDisputeModal()" style="cursor:pointer; font-size:28px; line-height:1;">&times;</span>
+<div id="disputeDetailModal">
+    <div id="dispute-modal-body">
         </div>
-        
-        <div class="modal-split-body" style="display:flex; flex:1; overflow:hidden; background:#f8fafc;">
-            
-            <div style="flex:1.2; border-right:1px solid #e2e8f0; display:flex; flex-direction:column; background:#ffffff; height:100%;">
-                <div style="padding:12px 20px; background:#f1f5f9; border-bottom:1px solid #e2e8f0; font-weight:700; color:#334155; font-size:13px; text-transform:uppercase; letter-spacing:0.5px;">
-                    <i class="fa-solid fa-comments"></i> Transaction Chat History Log
-                </div>
-                <div id="disputeChatStream" style="flex:1; padding:20px; overflow-y:auto; display:flex; flex-direction:column; gap:12px; background:#fafafa;">
-                    </div>
-            </div>
-            
-            <div style="flex:1; padding:20px; overflow-y:auto; display:flex; flex-direction:column; gap:16px; height:100%;">
-                <div style="font-weight:700; color:#334155; font-size:13px; text-transform:uppercase; letter-spacing:0.5px; border-bottom:2px solid #e2e8f0; padding-bottom:6px;">
-                    <i class="fa-solid fa-folder-open"></i> Arbitration Case Data
-                </div>
-                <div id="disputeCaseDetails">
-                    </div>
-            </div>
-
-        </div>
-        
-        <div class="modal-footer" style="padding:15px 25px; background:#f1f5f9; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:12px; flex-shrink:0;">
-            <button onclick="window.closeDisputeModal()" style="padding:10px 20px; border-radius:8px; border:1px solid #cbd5e1; background:white; font-weight:600; cursor:pointer;">Exit Case</button>
-            <button id="arbitrateResolveBtn" style="padding:10px 25px; border-radius:8px; border:none; background:#10b981; color:white; font-weight:600; cursor:pointer; box-shadow:0 2px 4px rgba(16,185,129,0.2);">Execute Settlement</button>
-        </div>
-    </div>
 </div>
+
+
+
 
     </main>
 

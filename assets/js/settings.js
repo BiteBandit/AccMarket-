@@ -110,6 +110,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     countryEl.innerHTML = `<img src="${flag}" style="width:20px; margin-right:5px;"> ${countryName}`;
     countryCodeEl.textContent = countryCode;
 
+// ✅ Populate Network Stats from JSONB columns
+const followingData = profile.following?.uids || [];
+const followersData = profile.followers?.uids || [];
+
+const followingCountEl = document.getElementById("followingCount");
+const followersCountEl = document.getElementById("followersCount");
+
+if (followingCountEl) followingCountEl.textContent = followingData.length;
+if (followersCountEl) followersCountEl.textContent = followersData.length;
+
     // Save only if not already stored
     if (!profile.country || profile.country !== countryName) {
       await supabase
@@ -274,47 +284,63 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 
 
-  // ✅ Delete Account (set inactive)
-  deleteBtn.addEventListener("click", async () => {
-    const confirm = await Swal.fire({
-      title: "Are you sure?",
-      text: "Your account and all data will be permanently deleted!",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#d33",
-      cancelButtonColor: "#3085d6",
-      confirmButtonText: "Yes, delete it!",
-    });
 
-    if (confirm.isConfirmed) {
+  // ✅ Delete Account (set inactive)
+  DeleteBtn.addEventListener("click", async (event) => {
+  const button = event.currentTarget;
+  
+  const result = await Swal.fire({
+    title: "Are you sure?",
+    text: "Your account and all data will be permanently deactivated!",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonColor: "#d33",
+    cancelButtonColor: "#3085d6",
+    confirmButtonText: "Yes, deactivate it!",
+    showLoaderOnConfirm: true,
+    preConfirm: async () => {
+      // 1. Disable button to prevent duplicate clicks
+      button.disabled = true;
+
+      // 2. Perform the update
       const { error: delError } = await supabase
         .from("profiles")
         .update({ is_active: false })
         .eq("id", userId);
 
       if (delError) {
-        Swal.fire({
-          icon: "error",
-          title: "Delete Failed",
-          text: delError.message,
-        });
-        return;
+        button.disabled = false;
+        Swal.showValidationMessage(`Request failed: ${delError.message}`);
+        return false;
       }
-
-      await supabase.auth.signOut();
-
-      Swal.fire({
-        icon: "success",
-        title: "Account Deleted",
-        text: "Your account has been deactivated successfully.",
-        timer: 2000,
-        showConfirmButton: false,
-      }).then(() => {
-        window.location.href = "/login.html";
-      });
-    }
+      return true;
+    },
+    allowOutsideClick: () => !Swal.isLoading()
   });
+
+  if (result.isConfirmed) {
+    // 3. Sign out and redirect
+    const { error: signoutError } = await supabase.auth.signOut();
+    
+    if (signoutError) {
+      console.error("Signout error:", signoutError);
+    }
+
+    await Swal.fire({
+      icon: "success",
+      title: "Account Deactivated",
+      text: "Your account has been deactivated successfully.",
+      timer: 2000,
+      showConfirmButton: false,
+    });
+    
+    window.location.href = "/login.html";
+  } else {
+    // Re-enable button if user cancels
+    button.disabled = false;
+  }
 });
+
 
 // ✅ Add this to your existing script
 document.addEventListener("DOMContentLoaded", async () => {
