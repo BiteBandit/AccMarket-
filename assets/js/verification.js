@@ -75,23 +75,42 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  // 3. SECURE VERIFICATION CLICK HANDLER (RPC)
+  // 3. SECURE VERIFICATION CLICK HANDLER (RPC & STATUS UPDATE)
   startBtn?.addEventListener("click", async () => {
     try {
       startBtn.disabled = true;
       startBtn.textContent = "Processing Transaction...";
 
-      // Call the Database Function
-      const { error } = await supabase.rpc('handle_verification_fee', {
+      // Call the Database Function (Deducts fee, creates/checks ledger, etc.)
+      const { error: rpcError } = await supabase.rpc('handle_verification_fee', {
         user_id_input: user.id,
         user_email_input: user.email
       });
 
-      if (error) {
-        // If the balance was low, the SQL 'RAISE EXCEPTION' will appear here
-        Swal.fire("Transaction Failed", error.message, "error");
+      if (rpcError) {
+        // If the balance was low or something failed, the SQL 'RAISE EXCEPTION' appears here
+        Swal.fire("Transaction Failed", rpcError.message, "error");
+        
+        // Reset button text based on previous state
+        const currentStatus = verification?.dispatch_status;
+        startBtn.textContent = currentStatus === 'rejected' ? "Re-request Verification" : "Request Verification";
         startBtn.disabled = false;
-        startBtn.textContent = "Request Verification";
+        return;
+      }
+
+      // ✅ NEW: Update user_verifications status to 'pending' on a successful Re-request
+      const { error: updateError } = await supabase
+        .from("user_verifications")
+        .update({ 
+          dispatch_status: "pending",
+          status: "pending", // Reset general status too if you track it separately
+          updated_at: new Date().toISOString() // Good practice for auditing re-requests
+        })
+        .eq("user_id", user.id);
+
+      if (updateError) {
+        console.error("Error updating verification status:", updateError);
+        Swal.fire("Partial Success", "Fee deducted, but failed to update status. Please contact support.", "warning");
         return;
       }
 
@@ -99,7 +118,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       Swal.fire({
         icon: "success",
         title: "Success!",
-        text: "1,000 deducted. Your request is now pending.",
+        text: "1,000 deducted. Your re-request is now pending review.",
         confirmButtonColor: "#0b1e5b"
       });
       
@@ -112,7 +131,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       startBtn.disabled = false;
     }
   });
-});
+
 
 // --- NOTIFICATIONS, LOGOUT, & ROLE UI (Remained same) ---
 async function loadNotificationCount() {
