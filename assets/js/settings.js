@@ -87,7 +87,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
-    // ✅ Fill all fields
+  // ✅ Fill all fields
   fullNameEl.textContent = profile.full_name || "Not set";
   usernameEl.textContent = profile.username || "@username";
   emailEl.textContent = user.email || "No email";
@@ -110,15 +110,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     countryEl.innerHTML = `<img src="${flag}" style="width:20px; margin-right:5px;"> ${countryName}`;
     countryCodeEl.textContent = countryCode;
 
-// ✅ Populate Network Stats from JSONB columns
-const followingData = profile.following?.uids || [];
-const followersData = profile.followers?.uids || [];
+    // ✅ Populate Network Stats from JSONB columns
+    const followingData = profile.following?.uids || [];
+    const followersData = profile.followers?.uids || [];
 
-const followingCountEl = document.getElementById("followingCount");
-const followersCountEl = document.getElementById("followersCount");
+    const followingCountEl = document.getElementById("followingCount");
+    const followersCountEl = document.getElementById("followersCount");
 
-if (followingCountEl) followingCountEl.textContent = followingData.length;
-if (followersCountEl) followersCountEl.textContent = followersData.length;
+    if (followingCountEl) followingCountEl.textContent = followingData.length;
+    if (followersCountEl) followersCountEl.textContent = followersData.length;
 
     // Save only if not already stored
     if (!profile.country || profile.country !== countryName) {
@@ -154,10 +154,8 @@ if (followersCountEl) followersCountEl.textContent = followersData.length;
 
       // --- 🎯 UNIQUE USERNAME SCANNER (Facebook Style with Warnings) ---
       if (isUsernameField) {
-        newValue = newValue.toLowerCase();
-        
-        // Test if the username contains forbidden characters
-        const hasInvalidCharacters = /[^a-z0-9___-]/g.test(newValue);
+        // Test if the username contains forbidden characters (Allows A-Z, a-z, 0-9, underscores, and hyphens)
+        const hasInvalidCharacters = /[^a-zA-Z0-9___-]/g.test(newValue);
         
         if (hasInvalidCharacters) {
           Swal.fire({
@@ -176,12 +174,12 @@ if (followersCountEl) followersCountEl.textContent = followersData.length;
           return;
         }
 
-        // Scan the database to see if any other profile has already taken this name
+        // Scan the database using a case-insensitive query (ilike) so "User" matches "user"
         const { data: existingUser, error: scanError } = await supabase
           .from("profiles")
           .select("id")
-          .eq("username", newValue)
-          .neq("id", userId) // Ignore the user's current record so they can re-save their own name
+          .ilike("username", newValue)
+          .neq("id", userId) // Ignore the user's current record
           .maybeSingle();
 
         if (scanError) {
@@ -202,6 +200,7 @@ if (followersCountEl) followersCountEl.textContent = followersData.length;
         
         usernameEl.textContent = newValue;
       }
+
 
       // --- 📞 SMART UNIQUE PHONE VALIDATOR ---
       if (isPhoneField && newValue.length > 0) {
@@ -282,67 +281,68 @@ if (followersCountEl) followersCountEl.textContent = followersData.length;
     });
   });
 
-
-
-
   // ✅ Delete Account (set inactive)
-  DeleteBtn.addEventListener("click", async (event) => {
-  const button = event.currentTarget;
-  
-  const result = await Swal.fire({
-    title: "Are you sure?",
-    text: "Your account and all data will be permanently deactivated!",
-    icon: "warning",
-    showCancelButton: true,
-    confirmButtonColor: "#d33",
-    cancelButtonColor: "#3085d6",
-    confirmButtonText: "Yes, deactivate it!",
-    showLoaderOnConfirm: true,
-    preConfirm: async () => {
-      // 1. Disable button to prevent duplicate clicks
-      button.disabled = true;
+  // Fixed casing error here (DeleteBtn -> deleteBtn based on your declaration above)
+  if (deleteBtn) {
+    deleteBtn.addEventListener("click", async (event) => {
+      const button = event.currentTarget;
+      
+      const result = await Swal.fire({
+        title: "Are you sure?",
+        text: "Your account and all data will be permanently deactivated!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "Yes, deactivate it!",
+        showLoaderOnConfirm: true,
+        preConfirm: async () => {
+          // 1. Disable button to prevent duplicate clicks
+          button.disabled = true;
 
-      // 2. Perform the update
-      const { error: delError } = await supabase
-        .from("profiles")
-        .update({ is_active: false })
-        .eq("id", userId);
+          // 2. Perform the update
+          const { error: delError } = await supabase
+            .from("profiles")
+            .update({ is_active: false })
+            .eq("id", userId);
 
-      if (delError) {
+          if (delError) {
+            button.disabled = false;
+            Swal.showValidationMessage(`Request failed: ${delError.message}`);
+            return false;
+          }
+          return true;
+        },
+        allowOutsideClick: () => !Swal.isLoading()
+      });
+
+      if (result.isConfirmed) {
+        // 3. Sign out and redirect
+        const { error: signoutError } = await supabase.auth.signOut();
+        
+        if (signoutError) {
+          console.error("Signout error:", signoutError);
+        }
+
+        await Swal.fire({
+          icon: "success",
+          title: "Account Deactivated",
+          text: "Your account has been deactivated successfully.",
+          timer: 2000,
+          showConfirmButton: false,
+        });
+        
+        window.location.href = "/login.html";
+      } else {
+        // Re-enable button if user cancels
         button.disabled = false;
-        Swal.showValidationMessage(`Request failed: ${delError.message}`);
-        return false;
       }
-      return true;
-    },
-    allowOutsideClick: () => !Swal.isLoading()
-  });
-
-  if (result.isConfirmed) {
-    // 3. Sign out and redirect
-    const { error: signoutError } = await supabase.auth.signOut();
-    
-    if (signoutError) {
-      console.error("Signout error:", signoutError);
-    }
-
-    await Swal.fire({
-      icon: "success",
-      title: "Account Deactivated",
-      text: "Your account has been deactivated successfully.",
-      timer: 2000,
-      showConfirmButton: false,
     });
-    
-    window.location.href = "/login.html";
-  } else {
-    // Re-enable button if user cancels
-    button.disabled = false;
   }
 });
 
 
-// ✅ Add this to your existing script
+// ✅ Security PIN Update Block
 document.addEventListener("DOMContentLoaded", async () => {
   const changePinBtn = document.getElementById("changePinBtn");
 
@@ -430,7 +430,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 
-
+// ✅ Telegram Toggles Block
 document.addEventListener("DOMContentLoaded", async () => {
   const telegramToggle = document.getElementById("telegramAlertsToggle");
   if (!telegramToggle) return console.error("Toggle element not found!");
@@ -484,6 +484,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 });
 
+// ✅ Privacy Toggles Block
 document.addEventListener("DOMContentLoaded", async () => {
   const {
     data: { user },
@@ -544,6 +545,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 });
 
+// ✅ Switch Roles Block
 document.addEventListener("DOMContentLoaded", async () => {
   const switchRoleBtn = document.getElementById("switchRole");
   const roleText = document.getElementById("roleText");
@@ -599,67 +601,68 @@ document.addEventListener("DOMContentLoaded", async () => {
     roleText.style.fontWeight = "bold";
   }
 
-  // ✅ Handle Switch Role button click
-  switchRoleBtn.addEventListener("click", async () => {
-    const { data: latestProfile, error } = await supabase
-      .from("profiles")
-      .select("role, kyc_status")
-      .eq("id", userId)
-      .single();
+  // Handle Switch Role button click
+  if (switchRoleBtn) {
+    switchRoleBtn.addEventListener("click", async () => {
+      const { data: latestProfile, error } = await supabase
+        .from("profiles")
+        .select("role, kyc_status")
+        .eq("id", userId)
+        .single();
 
-    if (error) {
-      console.error("Failed to fetch role:", error.message);
-      return;
-    }
+      if (error) {
+        console.error("Failed to fetch role:", error.message);
+        return;
+      }
 
-    if (latestProfile.role === "seller") {
+      if (latestProfile.role === "seller") {
+        Swal.fire({
+          icon: "info",
+          title: "You’re already a Seller",
+          text: "Your account is verified as a seller.",
+        });
+        return;
+      }
+
+      if (latestProfile.kyc_status === "pending") {
+        Swal.fire({
+          icon: "warning",
+          title: "KYC Under Review",
+          text: "Your verification is still being processed.",
+        });
+        return;
+      }
+
+      if (latestProfile.kyc_status === "rejected") {
+        Swal.fire({
+          icon: "error",
+          title: "Verification Rejected",
+          text: "Your KYC was rejected. Please resubmit.",
+        }).then(() => {
+          window.location.href = "/verification.html";
+        });
+        return;
+      }
+
+      // If KYC not yet started
       Swal.fire({
         icon: "info",
-        title: "You’re already a Seller",
-        text: "Your account is verified as a seller.",
+        title: "Switch to Seller",
+        text: "To become a seller, you must complete KYC verification and pay a small monthly fee.",
+        showCancelButton: true,
+        confirmButtonText: "Start Verification",
+      }).then((result) => {
+        if (result.isConfirmed) {
+          window.location.href = "verification.html";
+        }
       });
-      return;
-    }
-
-    if (latestProfile.kyc_status === "pending") {
-      Swal.fire({
-        icon: "warning",
-        title: "KYC Under Review",
-        text: "Your verification is still being processed.",
-      });
-      return;
-    }
-
-    if (latestProfile.kyc_status === "rejected") {
-      Swal.fire({
-        icon: "error",
-        title: "Verification Rejected",
-        text: "Your KYC was rejected. Please resubmit.",
-      }).then(() => {
-        window.location.href = "/verification.html";
-      });
-      return;
-    }
-
-    // If KYC not yet started
-    Swal.fire({
-      icon: "info",
-      title: "Switch to Seller",
-      text: "To become a seller, you must complete KYC verification and pay a small monthly fee.",
-      showCancelButton: true,
-      confirmButtonText: "Start Verification",
-    }).then((result) => {
-      if (result.isConfirmed) {
-        window.location.href = "verification.html";
-      }
     });
-  });
+  }
 });
 
-// ✅ Get unread notification count for current user (fixed)
+// ✅ Get unread notification count for current user
 async function loadNotificationCount() {
   try {
-    // Get current logged-in user from Supabase
     const {
       data: { user },
       error: userError,
@@ -670,10 +673,9 @@ async function loadNotificationCount() {
       return;
     }
 
-    // Fetch only count of unread notifications
     const { count, error } = await supabase
       .from("notifications")
-      .select("*", { count: "exact", head: true }) // count only, no rows
+      .select("*", { count: "exact", head: true }) 
       .eq("user_id", user.id)
       .eq("is_read", false);
 
@@ -685,31 +687,27 @@ async function loadNotificationCount() {
     const badge = document.getElementById("notification-count");
     const unreadCount = count || 0;
 
-    if (unreadCount > 0) {
-      badge.textContent = unreadCount;
-      badge.style.display = "inline-block";
-
-      // Small pop animation
-      badge.classList.add("pop");
-      setTimeout(() => badge.classList.remove("pop"), 200);
-    } else {
-      badge.style.display = "none";
+    if (badge) {
+      if (unreadCount > 0) {
+        badge.textContent = unreadCount;
+        badge.style.display = "inline-block";
+        badge.classList.add("pop");
+        setTimeout(() => badge.classList.remove("pop"), 200);
+      } else {
+        badge.style.display = "none";
+      }
     }
   } catch (err) {
     console.error("Unexpected error loading notification count:", err);
   }
 }
 
-// ✅ Run when dashboard loads
+// Run when dashboard loads
 loadNotificationCount();
-
-// ✅ Auto-refresh every 30 seconds
 setInterval(loadNotificationCount, 30000);
 
-// ✅ Preload notification sound from assets folder
 const notificationSound = new Audio("notification.mp3");
 
-// ✅ Real-time updates for notifications
 async function setupNotificationRealtime() {
   try {
     const {
@@ -724,17 +722,15 @@ async function setupNotificationRealtime() {
       .on(
         "postgres_changes",
         {
-          event: "*", // listen for INSERT, UPDATE, DELETE
+          event: "*", 
           schema: "public",
           table: "notifications",
           filter: `user_id=eq.${user.id}`,
         },
         async (payload) => {
           console.log("🔔 Realtime notification event:", payload.eventType);
-          // Reload the badge counter
           await loadNotificationCount();
 
-          // Play sound only on new notifications
           if (payload.eventType === "INSERT") {
             notificationSound.play().catch((e) => console.warn(e));
           }
@@ -746,13 +742,10 @@ async function setupNotificationRealtime() {
   }
 }
 
-// ✅ Activate realtime listener
 setupNotificationRealtime();
 
-// ✅ 1. Preload the notification sound
 const chatNotificationSound = new Audio("notification.mp3");
 
-// ✅ 2. Get total unread messages
 async function loadTotalChatCount() {
   try {
     const { data: { user } } = await supabase.auth.getUser();
@@ -782,7 +775,6 @@ async function loadTotalChatCount() {
   }
 }
 
-// ✅ 3. Real-time listener WITH SOUND
 async function setupGlobalChatRealtime() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
@@ -797,10 +789,8 @@ async function setupGlobalChatRealtime() {
         table: "messages",
       },
       async (payload) => {
-        // Refresh the count regardless of event type
         await loadTotalChatCount();
         
-        // 🎯 PLAY SOUND: Only on NEW messages sent by someone else
         if (payload.eventType === "INSERT" && payload.new.sender_id !== user.id) {
             chatNotificationSound.play().catch((e) => console.warn("Sound blocked by browser:", e));
         }
@@ -809,7 +799,6 @@ async function setupGlobalChatRealtime() {
     .subscribe();
 }
 
-// ✅ 4. Initialize
 loadTotalChatCount();
 setupGlobalChatRealtime();
 
@@ -817,17 +806,15 @@ setupGlobalChatRealtime();
 // ---- LOGOUT FUNCTIONALITY ----
 document.addEventListener("click", async (e) => {
   if (e.target.closest(".logout")) {
-    e.preventDefault(); // stop redirect
+    e.preventDefault(); 
 
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
 
-      // Optional: clear cached data (just to be safe)
       localStorage.clear();
       sessionStorage.clear();
 
-      // Redirect to login page
       window.location.href = "auth.html";
     } catch (err) {
       console.error("Logout failed:", err.message);
@@ -836,10 +823,8 @@ document.addEventListener("click", async (e) => {
   }
 });
 
-// ✅ Show Sell Account link ONLY for Sellers
 async function showSellerAndAdminLinks() {
   try {
-    // Get current logged-in user
     const {
       data: { user },
       error: userError,
@@ -850,7 +835,6 @@ async function showSellerAndAdminLinks() {
       return;
     }
 
-    // Get user profile and role
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("role")
@@ -862,11 +846,8 @@ async function showSellerAndAdminLinks() {
       return;
     }
 
-    // Select the Sell Account menu link
     const sellAccountLink = document.querySelector(".seller-only");
 
-    // Sell Account → ONLY visible for "seller"
-    // This will hide the  link for both "buyer" and "admin"
     if (sellAccountLink) {
       if (profile.role === "seller") {
         sellAccountLink.style.display = "block";
@@ -874,36 +855,30 @@ async function showSellerAndAdminLinks() {
         sellAccountLink.style.display = "none";
       }
     }
-
-
-
   } catch (err) {
     console.error("⚠️ Error checking role:", err);
   }
 }
 
-// Run it once page loads
 showSellerAndAdminLinks();
 
 
 /* ---------- SECURE PROFILE PICTURE UPLOAD ---------- */
-
 const handleProfilePicStats = async () => {
   const profileInput = document.getElementById("profileInput");
   const profilePreview = document.getElementById("profilePreview");
 
-  // Get current user
+  if (!profileInput || !profilePreview) return;
+
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
 
-  // 1. Fetch Profile (including our new tracking column)
   const { data: profile } = await supabase
     .from("profiles")
     .select("avatar_url, full_name, last_avatar_update")
     .eq("id", user.id)
     .single();
 
-  // Initial load of the picture
   if (profile?.avatar_url) {
     profilePreview.src = profile.avatar_url;
   } else {
@@ -911,12 +886,10 @@ const handleProfilePicStats = async () => {
     profilePreview.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0b1e5b&color=fff&size=128`;
   }
 
-  // 2. Handle Upload
   profileInput.addEventListener("change", async (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
-    // --- LIMIT 1: File Size (2MB) ---
     const maxSize = 2 * 1024 * 1024;
     if (file.size > maxSize) {
       Swal.fire({ icon: "error", title: "Too big!", text: "Keep it under 2MB." });
@@ -924,7 +897,6 @@ const handleProfilePicStats = async () => {
       return;
     }
 
-    // --- LIMIT 2: Database-Level Cooldown (7 Days) ---
     const cooldownDays = 7;
     if (profile?.last_avatar_update) {
       const lastUpdate = new Date(profile.last_avatar_update).getTime();
@@ -946,7 +918,6 @@ const handleProfilePicStats = async () => {
       }
     }
 
-    // --- PROCEED WITH UPLOAD ---
     Swal.fire({ 
         title: 'Uploading...', 
         allowOutsideClick: false,
@@ -955,7 +926,6 @@ const handleProfilePicStats = async () => {
 
     try {
       const fileExt = file.name.split(".").pop();
-      // Using a constant filename forces Supabase to OVERWRITE, saving space.
       const filePath = `${user.id}/avatar.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
@@ -968,8 +938,6 @@ const handleProfilePicStats = async () => {
         .from("avatars")
         .getPublicUrl(filePath);
 
-      // Update URL and the cooldown timestamp
-      // We add ?t= to the URL to force the browser to refresh the image (cache busting)
       const { error: updateError } = await supabase
         .from("profiles")
         .update({ 
@@ -987,7 +955,7 @@ const handleProfilePicStats = async () => {
         timer: 3000,
         showConfirmButton: false
       }).then(() => {
-          location.reload(); // Refresh to lock the cooldown and show new pic
+          location.reload(); 
       });
 
     } catch (err) {
@@ -999,7 +967,7 @@ const handleProfilePicStats = async () => {
 
 handleProfilePicStats();
 
-// ✅ Push Notifications Settings Toggle (With Full Debugging Console Logs)
+// ✅ Push Notifications Settings Toggle
 document.addEventListener("DOMContentLoaded", async () => {
   console.log("🚀 OneSignal Toggle Script: DOMContentLoaded triggered.");
   
@@ -1010,7 +978,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   console.log("🎯 OneSignal Toggle Script: Bound successfully to #oneSignalSetupBtn element.");
 
-  // Get current logged-in user context from Supabase
   console.log("🔍 OneSignal Toggle Script: Requesting user authentication context from Supabase...");
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   
@@ -1026,7 +993,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const userId = user.id;
   console.log("👤 OneSignal Toggle Script: Authenticated User ID matched:", userId);
 
-  // 1️⃣ Load initial toggle status from database on refresh/page load
   try {
     console.log("📂 OneSignal Toggle Script: Fetching existing notification flags from profiles table...");
     const { data: profile, error: fetchError } = await supabase
@@ -1042,7 +1008,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       onesignal_id: profile?.onesignal_id
     });
 
-    // Turn the switch graphic ON if the tracking flag is true OR if a token already exists
     if (profile && (profile.push_notifications_enabled || profile.onesignal_id)) {
       console.log("💡 OneSignal Toggle Script: Existing active record found! Forcing visual toggle state to CHECKED.");
       pushToggle.checked = true;
@@ -1054,15 +1019,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     console.error("❌ OneSignal Toggle Script: Failed to download initial push notification parameters from Supabase:", err.message);
   }
 
-  // Modern asynchronous pause utility
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  // 2️⃣ Listen for user interactions on the switch toggle element
   pushToggle.addEventListener("change", async () => {
     const isTurningOn = pushToggle.checked;
     console.log(`🔄 OneSignal Toggle Event: User flipped the switch slider graphic. New visual state: [${isTurningOn ? "ON" : "OFF"}]`);
 
-    // --- CASE A: USER IS TURNING NOTIFICATIONS ON ---
     if (isTurningOn) {
       console.log("⏳ OneSignal Toggle Event: Queueing OneSignal background operations via window.OneSignalDeferred...");
       
@@ -1113,7 +1075,6 @@ document.addEventListener("DOMContentLoaded", async () => {
               title: "Permission Needed",
               text: "Notifications were not enabled. Please check your browser's site settings permission and allow alerts manually."
             });
-            console.log("📉 OneSignal Queue: Snapping switch graphic back to UNCHECKED off position.");
             pushToggle.checked = false; 
           }
         } catch (err) {
@@ -1123,12 +1084,10 @@ document.addEventListener("DOMContentLoaded", async () => {
             title: "Sync Error",
             text: "We couldn't save your device key to your profile. Please try again later."
           });
-          console.log("📉 OneSignal Queue: Catch block triggered. Forcing switch graphic back to UNCHECKED off position.");
           pushToggle.checked = false; 
         }
       });
 
-    // --- CASE B: USER IS TURNING NOTIFICATIONS OFF ---
     } else {
       console.log("⚠️ OneSignal Toggle Event: Opt-out request caught. Spawning cancel confirmation alert modal...");
       
@@ -1168,7 +1127,6 @@ document.addEventListener("DOMContentLoaded", async () => {
           });
         } catch (err) {
           console.error("❌ OneSignal Toggle Event: Failed to clear registration indexes from target profile row:", err.message);
-          console.log("📈 OneSignal Toggle Event: Reverting visual slider back to CHECKED active position due to update failure.");
           pushToggle.checked = true; 
         }
       } else {

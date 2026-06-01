@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Directory | AccMarket Admin</title>
+    <title>Identity Verification | AccMarket Admin</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <link rel="stylesheet" href="assets/css/users.css">
+    <link rel="stylesheet" href="assets/css/kyc.css"> 
 </head>
 <body>
 
@@ -24,8 +24,8 @@
             <a href="dashboard.html" class="nav-item"><i class="fa-solid fa-chart-line"></i> Dashboard</a>
 
             <div class="nav-label">User Governance</div>
-            <a href="users.html" class="nav-item active"><i class="fa-solid fa-users"></i> Directory</a>
-            <a href="kyc.html" class="nav-item"><i class="fa-solid fa-id-card"></i> Identity Verification</a>
+            <a href="users.html" class="nav-item"><i class="fa-solid fa-users"></i> Directory</a>
+            <a href="kyc.html" class="nav-item active"><i class="fa-solid fa-id-card"></i> Identity Verification</a>
             <a href="banned.html" class="nav-item"><i class="fa-solid fa-user-slash"></i> Restricted Access</a>
 
             <div class="nav-label">System Audit</div>
@@ -59,25 +59,25 @@
         <header class="top-bar">
             <div class="header-left">
                 <button class="menu-toggle" id="menuToggle"><i class="fa-solid fa-bars"></i></button>
-                <h1>User Directory</h1>
+                <h1>Identity Verification</h1>
             </div>
             <div class="admin-profile">Admin Session Active</div>
         </header>
 
-        <!-- Removed display:none, this page now only contains this section -->
-        <section id="usersSection" class="content-section">
+        <!-- Removed the inline display:none condition to allow natural DOM layout visibility -->
+        <section id="kycSection" class="content-section">
             <div class="table-card">
                 <div class="table-header">
                     <div class="header-info">
-                        <h2>User Intelligence Directory</h2>
-                        <p>Monitor and manage all registered platform entities.</p>
+                        <h2>Treasury-Cleared Verifications</h2>
+                        <p>Monitor paid requests, dispatch Digit links, and promote verified sellers.</p>
                     </div>
                     <div class="header-actions">
                         <div class="search-box">
                             <i class="fa-solid fa-magnifying-glass"></i>
-                            <input type="text" id="userSearchInput" placeholder="Search identity or email...">
+                            <input type="text" id="kycSearchInput" placeholder="Search Email or UID...">
                         </div>
-                        <button class="btn-refresh" title="Refresh Directory"><i class="fa-solid fa-rotate"></i></button>
+                        <button class="btn-refresh" id="refreshKycBtn" title="Refresh Pipeline"><i class="fa-solid fa-rotate"></i></button>
                     </div>
                 </div>
 
@@ -85,15 +85,15 @@
                     <table class="admin-table">
                         <thead>
                             <tr>
-                                <th>Identity</th>
-                                <th>Classification</th>
-                                <th>Escrow Balance</th>
-                                <th>Onboarding Date</th>
+                                <th>User Identity (Email / UID)</th>
+                                <th>Amount Paid</th>
+                                <th>Dispatch Progress</th>
+                                <th>Request Date</th>
                                 <th style="text-align: right;">Operations</th>
                             </tr>
                         </thead>
-                        <tbody id="userTableBody">
-                            <!-- Data will be populated by your JS -->
+                        <tbody id="kycTableBody">
+                            <!-- Populated dynamically via your kyc.js logic engine -->
                         </tbody>
                     </table>
                 </div>
@@ -101,14 +101,12 @@
         </section>
     </main>
 
-
- 
-    <!-- Specific script for this page -->
-    <script type="module" src="assets/js/users.js"></script>
+    <!-- Page Specific Verification Handler Logic Module -->
+    <script type="module" src="assets/js/kyc.js"></script>
 
     <script>
 document.addEventListener('DOMContentLoaded', () => {
-    // Menu Toggle Logic
+    // Mobile Responsive Menu Toggle Mechanism
     const menuToggle = document.getElementById('menuToggle');
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebarOverlay');
@@ -127,7 +125,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
-
     </script>
 </body>
 </html>
