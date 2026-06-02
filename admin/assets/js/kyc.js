@@ -240,7 +240,20 @@ window.promoteToSeller = async (userId, requestId) => {
         Swal.fire({ title: 'Processing Structural Upgrades...', didOpen: () => Swal.showLoading() });
 
         try {
-            // 1. Mutate the main profile classification role to seller and set verification status
+            // 1. Fetch live user profile data needed for the notification payload
+            const { data: profile, error: profileFetchError } = await supabase
+                .from("profiles")
+                .select("email, username, telegram_chat_id, telegram_alerts")
+                .eq("id", userId)
+                .single();
+
+            if (profileFetchError) throw new Error(`Profile Fetch Failed: ${profileFetchError.message}`);
+
+            // 2. Fetch current session to get the access token for authorization
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            if (sessionError || !session) throw new Error("Could not retrieve valid session token.");
+
+            // 3. Mutate the main profile classification role to seller and set verification status
             const { error: profileError } = await supabase
                 .from('profiles')
                 .update({ 
@@ -251,31 +264,54 @@ window.promoteToSeller = async (userId, requestId) => {
 
             if (profileError) throw profileError;
 
-            // 2. Mark the verification table status track as completed
+            // 4. Mark the verification table status track as completed
             const { error: verificationError } = await supabase
                 .from('user_verifications')
                 .update({ 
-                    status: 'completed', 
+                    status: 'verified', 
+                    dispatch_status: 'verified', // Ensures state alignment across both columns
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', requestId);
 
             if (verificationError) throw verificationError;
 
-            Swal.fire('Account Activated', 'User has been successfully promoted to verified seller status.', 'success');
-            window.loadPaidKYC();
+            // 5. Notify the User (Rebranded to Accmarket in Edge Function)
+            await supabase.functions.invoke('kyc-notifications', {
+                body: { 
+                    email: profile?.email,
+                    username: profile?.username,
+                    action: 'notify_approval',
+                    telegramId: profile?.telegram_chat_id,
+                    canSendTelegram: profile?.telegram_alerts || false 
+                },
+                headers: {
+                    Authorization: `Bearer ${session?.access_token}`
+                }
+            });
+
+            // 6. Success Alert & Table Refresh
+            Swal.fire('Approved', 'User is now a verified seller.', 'success');
+            
+            // Re-runs the dashboard loader wrapper cleanly
+            if (typeof window.loadPaidKYC === 'function') {
+                window.loadPaidKYC();
+            } else if (typeof loadPaidKYC === 'function') {
+                loadPaidKYC();
+            }
 
         } catch (err) {
             console.error("Promotion Error:", err);
-            Swal.fire('Operation Interrupted', err.message, 'error');
+            Swal.fire('Failed', err.message, 'error');
         }
     }
 };
 
+
 /**
  * 6. REJECT VERIFICATION PIPELINE
  */
-window.rejectVerification = async (userId, requestId) => {
+Window.rejectVerification = async (userId, requestId) => {
     const { value: reason } = await Swal.fire({
         title: 'Reject Compliance Application',
         input: 'text',
@@ -293,6 +329,20 @@ window.rejectVerification = async (userId, requestId) => {
         Swal.fire({ title: 'Logging System Mutation...', didOpen: () => Swal.showLoading() });
 
         try {
+            // 1. Fetch user profile data needed for the notification payload
+            const { data: profile, error: profileError } = await supabase
+                .from("profiles")
+                .select("email, username, telegram_chat_id, telegram_alerts")
+                .eq("id", userId)
+                .single();
+
+            if (profileError) throw new Error(`Profile Fetch Failed: ${profileError.message}`);
+
+            // 2. Fetch current session to get the access token for authorization
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            if (sessionError || !session) throw new Error("Could not retrieve valid session token.");
+
+            // 3. Update the database record
             const { error: updateError } = await supabase
                 .from('user_verifications')
                 .update({ 
@@ -304,15 +354,38 @@ window.rejectVerification = async (userId, requestId) => {
 
             if (updateError) throw updateError;
 
-            Swal.fire('Application Rejected', 'Submission closed and marked as rejected.', 'success');
-            window.loadPaidKYC();
+            // 4. Trigger the Edge Function to notify the user
+            await supabase.functions.invoke('kyc-notifications', {
+                body: { 
+                    email: profile?.email,
+                    username: profile?.username,
+                    reason: reason,
+                    action: 'notify_rejection',
+                    telegramId: profile?.telegram_chat_id,
+                    canSendTelegram: profile?.telegram_alerts || false 
+                },
+                headers: {
+                    Authorization: `Bearer ${session?.access_token}`
+                }
+            });
+
+            // 5. Success Notifications and UI Refresh
+            Swal.fire('Rejected', 'User remains in the "Paid" list with a REJECTED status.', 'success');
+            
+            // Runs whichever loader variant your global state utilizes
+            if (typeof window.loadPaidKYC === 'function') {
+                window.loadPaidKYC();
+            } else if (typeof loadPaidKYC === 'function') {
+                loadPaidKYC();
+            }
 
         } catch (err) {
             console.error("Rejection Error:", err);
-            Swal.fire('Log Placement Failed', err.message, 'error');
+            Swal.fire('Error', err.message, 'error');
         }
     }
 };
+
 
 /**
  * 7. Control Listeners & Global Registrations

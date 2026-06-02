@@ -145,6 +145,27 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Map original value from memory safely
       const originalValue = 
         el === fullNameEl ? profile.full_name :
+// Add this to your existing DOMContentLoaded listener in settings.js
+document.addEventListener("DOMContentLoaded", async () => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  // Create the script element
+  const script = document.createElement('script');
+  script.src = "https://telegram.org/js/telegram-widget.js?22";
+  script.async = true;
+  
+  // Set data attributes
+  script.setAttribute('data-telegram-login', 'YOUR_BOT_USERNAME');
+  script.setAttribute('data-size', 'large');
+  script.setAttribute('data-request-access', 'write');
+  
+  // PASS THE USER ID AS THE 'state' PARAMETER
+  script.setAttribute('data-auth-url', `https://qihzvglznpkytolxkuxz.supabase.co/functions/v1/telegram-auth?state=${user.id}`);
+
+  // Inject into the container
+  document.getElementById('telegram-login-container').appendChild(script);
+});
         el === usernameEl ? profile.username :
         el === phoneEl ? profile.phone : 
         profile.about;
@@ -822,6 +843,29 @@ document.addEventListener("click", async (e) => {
     }
   }
 });
+
+// Add this to your existing DOMContentLoaded listener in settings.js
+document.addEventListener("DOMContentLoaded", async () => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  // Create the script element
+  const script = document.createElement('script');
+  script.src = "https://telegram.org/js/telegram-widget.js?22";
+  script.async = true;
+  
+  // Set data attributes
+  script.setAttribute('data-telegram-login', 'Accmarket247bot');
+  script.setAttribute('data-size', 'large');
+  script.setAttribute('data-request-access', 'write');
+  
+  // PASS THE USER ID AS THE 'state' PARAMETER
+  script.setAttribute('data-auth-url', `https://qihzvglznpkytolxkuxz.supabase.co/functions/v1/telegram-auth?state=${user.id}`);
+
+  // Inject into the container
+  document.getElementById('telegram-login-container').appendChild(script);
+});
+
 
 async function showSellerAndAdminLinks() {
   try {
