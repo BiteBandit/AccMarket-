@@ -82,6 +82,30 @@ document.addEventListener("DOMContentLoaded", async () => {
     .eq("id", userId)
     .single();
 
+const telegramStatus = document.getElementById("telegramStatus");
+const openTelegramModal = document.getElementById("openTelegramModal");
+const telegramModal = document.getElementById("telegramModal");
+
+if (!profile.telegram_chat_id) {
+  telegramStatus.textContent = "Not Connected";
+
+  if (openTelegramModal) {
+    openTelegramModal.style.display = "inline-block";
+  }
+
+  // Auto-show once
+  if (!localStorage.getItem(`tgPrompt_${userId}`)) {
+    telegramModal.style.display = "block";
+    localStorage.setItem(`tgPrompt_${userId}`, "true");
+  }
+} else {
+  telegramStatus.textContent = "Connected ✅";
+
+  if (openTelegramModal) {
+    openTelegramModal.style.display = "none";
+  }
+}
+
   if (profileError) {
     console.error("❌ Failed to load profile:", profileError.message);
     return;
@@ -146,48 +170,30 @@ document.addEventListener("DOMContentLoaded", async () => {
       const originalValue = 
         el === fullNameEl ? profile.full_name :
 // Add this to your existing DOMContentLoaded listener in settings.js
+
 document.addEventListener("DOMContentLoaded", async () => {
-  const telegramStatus = document.getElementById("telegramStatus");
-  const openTelegramModalBtn = document.getElementById("openTelegramModal");
-  const modal = document.getElementById("telegramModal");
-  const closeModal = document.querySelector(".close-modal");
+  const { data: { user } } = await supabase.auth.getUser();
 
-  // 1. Check if user is linked
-  if (!profile.telegram_chat_id) {
-    telegramStatus.textContent = "Status: Not linked";
-    openTelegramModalBtn.style.display = "block"; // Show button if not linked
-  } else {
-    telegramStatus.textContent = "Status: Linked ✅";
-    openTelegramModalBtn.style.display = "none";  // Hide button if already linked
-  }
+  if (!user) return;
 
-  // 2. Open Modal Logic
-  openTelegramModalBtn.addEventListener("click", () => {
-    modal.style.display = "block";
-    
-    // Initialize widget ONLY on click to ensure it renders correctly
-    const container = document.getElementById('telegram-login-container');
-    if (container.innerHTML === '') { // Prevent duplicate scripts
-      const script = document.createElement('script');
-      script.src = "https://telegram.org/js/telegram-widget.js?22";
-      script.async = true;
-      script.setAttribute('data-telegram-login', 'Accmarket247bot');
-      script.setAttribute('data-size', 'large');
-      script.setAttribute('data-request-access', 'write');
-      script.setAttribute('data-auth-url', `https://qihzvglznpkytolxkuxz.supabase.co/functions/v1/telegram-auth?state=${user.id}`);
-      container.appendChild(script);
-    }
-  });
+  const container = document.getElementById("telegram-login-container");
 
-  // 3. Close Modal Logic
-  closeModal.addEventListener("click", () => {
-    modal.style.display = "none";
-  });
+  if (!container) return;
 
-  // Close modal when clicking outside
-  window.addEventListener("click", (e) => {
-    if (e.target === modal) modal.style.display = "none";
-  });
+  const script = document.createElement("script");
+  script.src = "https://telegram.org/js/telegram-widget.js?22";
+  script.async = true;
+
+  script.setAttribute("data-telegram-login", "Accmarket247bot");
+  script.setAttribute("data-size", "large");
+  script.setAttribute("data-request-access", "write");
+
+  script.setAttribute(
+    "data-auth-url",
+    `https://qihzvglznpkytolxkuxz.supabase.co/functions/v1/telegram-auth?state=${user.id}`
+  );
+
+  container.appendChild(script);
 });
 
       // --- 🎯 UNIQUE USERNAME SCANNER (Facebook Style with Warnings) ---
@@ -923,6 +929,26 @@ async function showSellerAndAdminLinks() {
 
 showSellerAndAdminLinks();
 
+
+document.addEventListener("DOMContentLoaded", () => {
+  const modal = document.getElementById("telegramModal");
+  const openBtn = document.getElementById("openTelegramModal");
+  const closeBtn = document.querySelector(".close-modal");
+
+  openBtn?.addEventListener("click", () => {
+    modal.style.display = "block";
+  });
+
+  closeBtn?.addEventListener("click", () => {
+    modal.style.display = "none";
+  });
+
+  window.addEventListener("click", (e) => {
+    if (e.target === modal) {
+      modal.style.display = "none";
+    }
+  });
+});
 
 /* ---------- SECURE PROFILE PICTURE UPLOAD ---------- */
 const handleProfilePicStats = async () => {
