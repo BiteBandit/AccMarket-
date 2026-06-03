@@ -82,30 +82,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     .eq("id", userId)
     .single();
 
-const telegramStatus = document.getElementById("telegramStatus");
-const openTelegramModal = document.getElementById("openTelegramModal");
-const telegramModal = document.getElementById("telegramModal");
-
-if (!profile.telegram_chat_id) {
-  telegramStatus.textContent = "Not Connected";
-
-  if (openTelegramModal) {
-    openTelegramModal.style.display = "inline-block";
-  }
-
-  // Auto-show once
-  if (!localStorage.getItem(`tgPrompt_${userId}`)) {
-    telegramModal.style.display = "block";
-    localStorage.setItem(`tgPrompt_${userId}`, "true");
-  }
-} else {
-  telegramStatus.textContent = "Connected ✅";
-
-  if (openTelegramModal) {
-    openTelegramModal.style.display = "none";
-  }
-}
-
   if (profileError) {
     console.error("❌ Failed to load profile:", profileError.message);
     return;
@@ -169,32 +145,13 @@ if (!profile.telegram_chat_id) {
       // Map original value from memory safely
       const originalValue = 
         el === fullNameEl ? profile.full_name :
-// Add this to your existing DOMContentLoaded listener in settings.js
+        el === usernameEl ? profile.username :
+        el === phoneEl ? profile.phone : 
+        profile.about;
 
-document.addEventListener("DOMContentLoaded", async () => {
-  const { data: { user } } = await supabase.auth.getUser();
+      // Skip if the user didn't actually change anything
+      if (newValue === (originalValue || "")) return;
 
-  if (!user) return;
-
-  const container = document.getElementById("telegram-login-container");
-
-  if (!container) return;
-
-  const script = document.createElement("script");
-  script.src = "https://telegram.org/js/telegram-widget.js?22";
-  script.async = true;
-
-  script.setAttribute("data-telegram-login", "Accmarket247bot");
-  script.setAttribute("data-size", "large");
-  script.setAttribute("data-request-access", "write");
-
-  script.setAttribute(
-    "data-auth-url",
-    `https://qihzvglznpkytolxkuxz.supabase.co/functions/v1/telegram-auth?state=${user.id}`
-  );
-
-  container.appendChild(script);
-});
 
       // --- 🎯 UNIQUE USERNAME SCANNER (Facebook Style with Warnings) ---
       if (isUsernameField) {
@@ -625,7 +582,42 @@ document.addEventListener("DOMContentLoaded", async () => {
       profile.role && profile.role.trim() !== ""
         ? profile.role.charAt(0).toUpperCase() + profile.role.slice(1)
         : "Buyer";
+
+const telegramSection = document.getElementById("telegramIntegrationSection");
+
+const isTelegramConnected =
+  profile.telegram_chat_id &&
+  profile.telegram_chat_id.toString().trim() !== "";
+
+if (!isTelegramConnected) {
+  telegramSection.style.display = "flex";
+
+  const container = document.getElementById("telegram-login-container");
+
+  // Prevent duplicate widgets
+  if (!container.querySelector("script")) {
+    const script = document.createElement("script");
+
+    script.src = "https://telegram.org/js/telegram-widget.js?22";
+    script.async = true;
+
+    script.setAttribute("data-telegram-login", "Accmarket247bot");
+    script.setAttribute("data-size", "large");
+    script.setAttribute("data-request-access", "write");
+
+    script.setAttribute(
+      "data-auth-url",
+      `https://qihzvglznpkytolxkuxz.supabase.co/functions/v1/telegram-auth?state=${user.id}`
+    );
+
+    container.appendChild(script);
+  }
+} else {
+  telegramSection.style.display = "none";
+}
     roleText.textContent = role;
+
+
 
     // Apply colors by role
     switch (profile.role) {
@@ -929,26 +921,6 @@ async function showSellerAndAdminLinks() {
 
 showSellerAndAdminLinks();
 
-
-document.addEventListener("DOMContentLoaded", () => {
-  const modal = document.getElementById("telegramModal");
-  const openBtn = document.getElementById("openTelegramModal");
-  const closeBtn = document.querySelector(".close-modal");
-
-  openBtn?.addEventListener("click", () => {
-    modal.style.display = "block";
-  });
-
-  closeBtn?.addEventListener("click", () => {
-    modal.style.display = "none";
-  });
-
-  window.addEventListener("click", (e) => {
-    if (e.target === modal) {
-      modal.style.display = "none";
-    }
-  });
-});
 
 /* ---------- SECURE PROFILE PICTURE UPLOAD ---------- */
 const handleProfilePicStats = async () => {
