@@ -147,31 +147,48 @@ document.addEventListener("DOMContentLoaded", async () => {
         el === fullNameEl ? profile.full_name :
 // Add this to your existing DOMContentLoaded listener in settings.js
 document.addEventListener("DOMContentLoaded", async () => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
+  const telegramStatus = document.getElementById("telegramStatus");
+  const openTelegramModalBtn = document.getElementById("openTelegramModal");
+  const modal = document.getElementById("telegramModal");
+  const closeModal = document.querySelector(".close-modal");
 
-  // Create the script element
-  const script = document.createElement('script');
-  script.src = "https://telegram.org/js/telegram-widget.js?22";
-  script.async = true;
-  
-  // Set data attributes
-  script.setAttribute('data-telegram-login', 'YOUR_BOT_USERNAME');
-  script.setAttribute('data-size', 'large');
-  script.setAttribute('data-request-access', 'write');
-  
-  // PASS THE USER ID AS THE 'state' PARAMETER
-  script.setAttribute('data-auth-url', `https://qihzvglznpkytolxkuxz.supabase.co/functions/v1/telegram-auth?state=${user.id}`);
+  // 1. Check if user is linked
+  if (!profile.telegram_chat_id) {
+    telegramStatus.textContent = "Status: Not linked";
+    openTelegramModalBtn.style.display = "block"; // Show button if not linked
+  } else {
+    telegramStatus.textContent = "Status: Linked ✅";
+    openTelegramModalBtn.style.display = "none";  // Hide button if already linked
+  }
 
-  // Inject into the container
-  document.getElementById('telegram-login-container').appendChild(script);
+  // 2. Open Modal Logic
+  openTelegramModalBtn.addEventListener("click", () => {
+    modal.style.display = "block";
+    
+    // Initialize widget ONLY on click to ensure it renders correctly
+    const container = document.getElementById('telegram-login-container');
+    if (container.innerHTML === '') { // Prevent duplicate scripts
+      const script = document.createElement('script');
+      script.src = "https://telegram.org/js/telegram-widget.js?22";
+      script.async = true;
+      script.setAttribute('data-telegram-login', 'Accmarket247bot');
+      script.setAttribute('data-size', 'large');
+      script.setAttribute('data-request-access', 'write');
+      script.setAttribute('data-auth-url', `https://qihzvglznpkytolxkuxz.supabase.co/functions/v1/telegram-auth?state=${user.id}`);
+      container.appendChild(script);
+    }
+  });
+
+  // 3. Close Modal Logic
+  closeModal.addEventListener("click", () => {
+    modal.style.display = "none";
+  });
+
+  // Close modal when clicking outside
+  window.addEventListener("click", (e) => {
+    if (e.target === modal) modal.style.display = "none";
+  });
 });
-        el === usernameEl ? profile.username :
-        el === phoneEl ? profile.phone : 
-        profile.about;
-
-      // Skip if the user didn't actually change anything
-      if (newValue === (originalValue || "")) return;
 
       // --- 🎯 UNIQUE USERNAME SCANNER (Facebook Style with Warnings) ---
       if (isUsernameField) {
