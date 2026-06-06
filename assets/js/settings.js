@@ -152,7 +152,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Skip if the user didn't actually change anything
       if (newValue === (originalValue || "")) return;
 
-
       // --- 🎯 UNIQUE USERNAME SCANNER (Facebook Style with Warnings) ---
       if (isUsernameField) {
         // Test if the username contains forbidden characters (Allows A-Z, a-z, 0-9, underscores, and hyphens)
@@ -342,93 +341,122 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 });
 
+// ✅ 2FA (TOTP) Authentication Logic
+const mfaActionBtn = document.getElementById("mfaActionBtn");
+const mfaStatus = document.getElementById("mfaStatus");
+const mfaEnrollArea = document.getElementById("mfaEnrollArea");
+const qrCodeContainer = document.getElementById("qrCodeContainer");
+const mfaCodeInput = document.getElementById("mfaCodeInput");
+const verifyMfaBtn = document.getElementById("verifyMfaBtn");
+const cancelMfaBtn = document.getElementById("cancelMfaBtn");
 
-// ✅ Security PIN Update Block
-document.addEventListener("DOMContentLoaded", async () => {
-  const changePinBtn = document.getElementById("changePinBtn");
+async function checkMfaStatus() {
+  const { data, error } = await supabase.auth.mfa.listFactors();
+  if (error) return;
+  
+  const totpFactor = data.totp[0];
+  if (totpFactor?.status === 'verified') {
+    mfaStatus.textContent = "Status: Enabled ✅";
+    mfaActionBtn.textContent = "Disable 2FA";
+    mfaActionBtn.onclick = async () => {
+        await supabase.auth.mfa.unenroll({ factorId: totpFactor.id });
+        location.reload();
+    };
+  } else {
+    mfaStatus.textContent = "Status: Disabled ❌";
+    mfaActionBtn.textContent = "Enable 2FA";
+    mfaActionBtn.onclick = startMfaEnrollment;
+  }
+}
 
-  // Get current user from Supabase
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-  if (userError || !user) return;
+async function startMfaEnrollment() {
+  try {
+    // 1. CLEAR EXISTING FACTORS
+    const { data: listData, error: listError } = await supabase.auth.mfa.listFactors();
+    
+    if (listError) throw listError;
 
-  // --- 🔐 UPDATE SECURITY PIN LOGIC ---
-  if (changePinBtn) {
-    changePinBtn.addEventListener("click", async () => {
-      // 1️⃣ Verify Identity with Login Password
-      const { value: password } = await Swal.fire({
-        title: 'Verify Identity',
-        text: 'Enter your account password to authorize PIN change',
-        input: 'password',
-        inputPlaceholder: 'Enter password',
-        showCancelButton: true,
-        confirmButtonColor: '#0b1e5b',
-        cancelButtonColor: '#6b7280',
-      });
+    if (listData?.totp && listData.totp.length > 0) {
+      console.log("Cleaning up existing factors:", listData.totp);
+      
+      // Perform unenrollment
+      await Promise.all(listData.totp.map(async (factor) => {
+        await supabase.auth.mfa.unenroll({ factorId: factor.id });
+      }));
+      
+      // Force a slight pause to allow Supabase Auth metadata to update
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
 
-      if (!password) return; // User cancelled
+    // 2. ENROLL
+    // We add a 'friendlyName' to distinguish the factor, which helps with Supabase tracking
+    const { data, error } = await supabase.auth.mfa.enroll({ 
+      factorType: 'totp',
+      friendlyName: 'main-totp-device' 
+    });
+    
+    if (error) {
+      console.error("Enrollment error details:", error);
+      throw error;
+    }
 
-      // Show loading state while checking password
-      Swal.fire({
-        title: 'Verifying...',
-        allowOutsideClick: false,
-        didOpen: () => Swal.showLoading()
-      });
+    const factorId = data.id;
+
+    // 3. UI RENDER
+    qrCodeContainer.innerHTML = data.totp.qr_code;
+    qrCodeContainer.insertAdjacentHTML('beforeend', `
+      <div style="margin: 20px 0; padding: 15px; background: #f9fafb; border: 1px dashed #d1d5db; border-radius: 8px; text-align: center;">
+        <p style="font-size: 13px; color: #4b5563; margin-bottom: 8px;">Manual entry key:</p>
+        <code style="font-weight: bold; font-size: 16px; color: #111827;">${data.totp.secret}</code>
+      </div>
+      <button id="cancelMfaBtn" style="background:#ef4444; color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer; width:100%;">Cancel Setup</button>
+    `);
+
+    mfaEnrollArea.style.display = "block";
+    mfaActionBtn.style.display = "none";
+
+    document.getElementById("cancelMfaBtn").onclick = () => {
+      mfaEnrollArea.style.display = "none";
+      mfaActionBtn.style.display = "inline-block";
+    };
+
+    // 4. VERIFY
+    verifyMfaBtn.onclick = async () => {
+      const code = mfaCodeInput.value.trim();
+      if (code.length !== 6) return Swal.fire("Warning", "Enter 6-digit code", "warning");
+
+      verifyMfaBtn.disabled = true;
+      verifyMfaBtn.textContent = "Verifying...";
 
       try {
-        // Re-authenticate user
-        const { error: authError } = await supabase.auth.signInWithPassword({
-          email: user.email,
-          password: password,
+        const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId });
+        if (challengeError) throw challengeError;
+
+        const { error: verifyError } = await supabase.auth.mfa.verify({
+          factorId,
+          challengeId: challenge.id,
+          code: code
         });
+        if (verifyError) throw verifyError;
 
-        if (authError) throw new Error("Incorrect password. Access denied.");
-
-        // 2️⃣ Ask for the New 4-Digit PIN
-        const { value: newPin } = await Swal.fire({
-          title: 'Set New PIN',
-          text: 'Enter a 4-digit PIN for withdrawals',
-          input: 'password',
-          inputPlaceholder: 'e.g., 1234',
-          inputAttributes: {
-            maxlength: 4,
-            autocapitalize: 'off',
-            autocorrect: 'off',
-            inputmode: 'numeric'
-          },
-          showCancelButton: true,
-          confirmButtonColor: '#0b1e5b',
-          preConfirm: (value) => {
-            if (!/^\d{4}$/.test(value)) {
-              Swal.showValidationMessage('PIN must be exactly 4 digits');
-            }
-            return value;
-          }
-        });
-
-        if (!newPin) return;
-
-        // 3️⃣ Update PIN in Database
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({ security_pin: newPin })
-          .eq('id', user.id);
-
-        if (updateError) throw updateError;
-
-        Swal.fire({
-          icon: 'success',
-          title: 'PIN Secured!',
-          text: 'Your security PIN has been updated.',
-          timer: 2500,
-          showConfirmButton: false
-        });
-
+        await Swal.fire("Success", "2FA Enabled!", "success");
+        location.reload();
       } catch (err) {
-        Swal.fire('Error', err.message, 'error');
+        verifyMfaBtn.disabled = false;
+        verifyMfaBtn.textContent = "Verify & Enable";
+        Swal.fire("Error", "Verification failed.", "error");
       }
-    });
+    };
+  } catch (err) {
+    Swal.fire("Error", "Setup failed: " + err.message, "error");
   }
-});
+}
+
+// Initialize on page load
+checkMfaStatus();
+
+
+
 
 
 // ✅ Telegram Toggles Block
@@ -582,42 +610,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       profile.role && profile.role.trim() !== ""
         ? profile.role.charAt(0).toUpperCase() + profile.role.slice(1)
         : "Buyer";
-
-const telegramSection = document.getElementById("telegramIntegrationSection");
-
-const isTelegramConnected =
-  profile.telegram_chat_id &&
-  profile.telegram_chat_id.toString().trim() !== "";
-
-if (!isTelegramConnected) {
-  telegramSection.style.display = "flex";
-
-  const container = document.getElementById("telegram-login-container");
-
-  // Prevent duplicate widgets
-  if (!container.querySelector("script")) {
-    const script = document.createElement("script");
-
-    script.src = "https://telegram.org/js/telegram-widget.js?22";
-    script.async = true;
-
-    script.setAttribute("data-telegram-login", "Accmarket247bot");
-    script.setAttribute("data-size", "large");
-    script.setAttribute("data-request-access", "write");
-
-    script.setAttribute(
-      "data-auth-url",
-      `https://qihzvglznpkytolxkuxz.supabase.co/functions/v1/telegram-auth?state=${user.id}`
-    );
-
-    container.appendChild(script);
-  }
-} else {
-  telegramSection.style.display = "none";
-}
     roleText.textContent = role;
-
-
 
     // Apply colors by role
     switch (profile.role) {
@@ -858,29 +851,6 @@ document.addEventListener("click", async (e) => {
     }
   }
 });
-
-// Add this to your existing DOMContentLoaded listener in settings.js
-document.addEventListener("DOMContentLoaded", async () => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-
-  // Create the script element
-  const script = document.createElement('script');
-  script.src = "https://telegram.org/js/telegram-widget.js?22";
-  script.async = true;
-  
-  // Set data attributes
-  script.setAttribute('data-telegram-login', 'Accmarket247bot');
-  script.setAttribute('data-size', 'large');
-  script.setAttribute('data-request-access', 'write');
-  
-  // PASS THE USER ID AS THE 'state' PARAMETER
-  script.setAttribute('data-auth-url', `https://qihzvglznpkytolxkuxz.supabase.co/functions/v1/telegram-auth?state=${user.id}`);
-
-  // Inject into the container
-  document.getElementById('telegram-login-container').appendChild(script);
-});
-
 
 async function showSellerAndAdminLinks() {
   try {

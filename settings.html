@@ -353,17 +353,6 @@
 </div>
 
 
-<div class="settings-item">
-  <div class="info">
-    <h4>Telegram Integration</h4>
-    <p>Connect your account for instant notifications.</p>
-    <!-- New Write-up -->
-    <p style="font-size: 0.85em; color: #6b7280; margin-top: 5px;">
-      <em>Note: Please press <strong>Start</strong> on our <a href="https://t.me/Accmarket247bot" target="_blank">Telegram bot</a> before connecting to ensure proper account syncing.</em>
-    </p>
-  </div>
-  <div id="telegram-login-container"></div>
-</div>
 
 
 
@@ -424,14 +413,25 @@
       <div class="settings-group">
         <h3>Security</h3>
 
+
   <div class="settings-item">
-    <div class="info">
-      <h4>Security PIN</h4>
-      <p>Used to authorize withdrawals and sensitive actions.</p>
-      <p class="small-text">Default is 0000. Change it to stay secure.</p>
-    </div>
-    <button id="changePinBtn" class="switch-btn">Update PIN</button>
+  <div class="info">
+    <h4>Two-Factor Authentication</h4>
+    <p id="mfaStatus">Status: Loading...</p>
   </div>
+  <button id="mfaActionBtn" class="switch-btn">Enable 2FA</button>
+</div>
+
+<div id="mfaEnrollArea" style="display:none;">
+  <div id="qrCodeContainer"></div>
+  <p>Scan this with Google Authenticator or Authy</p>
+  <input type="text" id="mfaCodeInput" placeholder="Enter 6-digit code">
+  <button id="verifyMfaBtn">Verify & Enable</button>
+  <button id="cancelMfaBtn">Cancel</button>
+</div>
+
+
+
 
 
         <div class="settings-item danger">
