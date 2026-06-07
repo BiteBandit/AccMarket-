@@ -793,7 +793,8 @@ body {
 
 /* 1. Base Styles for both Deposit and Withdraw */
 #confirmDepositBtn, 
-#confirmWithdrawBtn {
+#confirmWithdrawBtn,
+#verifyMfaBtn {
   width: 100%;
   border: none;
   border-radius: 14px;
@@ -811,7 +812,8 @@ body {
 
 /* 2. Hover States */
 #confirmDepositBtn:hover,
-#confirmWithdrawBtn:hover {
+#confirmWithdrawBtn:hover,
+#verifyMfaBtn:hover {
   transform: translateY(-1px);
   box-shadow: 0 14px 30px rgba(11, 30, 91, 0.3);
 }
@@ -1029,3 +1031,5 @@ body {
         opacity: 0; 
     }
 }
+
+

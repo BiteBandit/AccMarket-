@@ -380,147 +380,129 @@ confirmWithdrawBtn?.addEventListener('click', async () => {
 
     // --- 🟢 VALIDATIONS ---
     if (!amount || amount < 1000) {
-        return Swal.fire({
-            target: withdrawModal, // 👈 Force alert on top of modal
-            title: 'Invalid Amount',
-            text: 'Minimum withdrawal is ₦1,000',
-            icon: 'warning'
-        });
+        return Swal.fire({ target: withdrawModal, title: 'Invalid Amount', text: 'Minimum withdrawal is ₦1,000', icon: 'warning' });
     }
     if (!bank || !accNum || !accName) {
-        return Swal.fire({
-            target: withdrawModal, // 👈 Force alert on top of modal
-            title: 'Missing Info',
-            text: 'Please provide all bank details.',
-            icon: 'warning'
-        });
+        return Swal.fire({ target: withdrawModal, title: 'Missing Info', text: 'Please provide all bank details.', icon: 'warning' });
     }
 
     try {
-        // --- 🔵 STEP 1: FETCH PROFILE (Check Balance & PIN) ---
-        const { data: profile, error: profileErr } = await supabase
-            .from('profiles')
-            .select('balance, security_pin')
-            .eq('id', currentUser.id)
-            .single();
+        // --- 🔵 STEP 1: FETCH PROFILE & MFA FACTORS ---
+        const [{ data: profile, error: profileErr }, { data: factors, error: factorErr }] = await Promise.all([
+            supabase.from('profiles').select('balance').eq('id', currentUser.id).single(),
+            supabase.auth.mfa.listFactors()
+        ]);
 
         if (profileErr) throw profileErr;
         
-        // --- 🔒 SECURITY CHECK 1: FORBID DEFAULT PIN ---
-        if (profile.security_pin === '0000') {
+        const totpFactor = factors?.totp?.find(f => f.status === 'verified');
+        if (!totpFactor) {
             return Swal.fire({
                 target: withdrawModal,
-                title: 'Secure Your Account',
-                text: 'You are using the default PIN (0000). Please change it in Settings before withdrawing.',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Go to Settings',
-                confirmButtonColor: '#0b1e5b'
-            }).then((result) => {
-                if (result.isConfirmed) window.location.href = 'settings.html';
-            });
+                title: '2FA Not Enabled',
+                text: 'You must have 2FA enabled to make withdrawals.',
+                icon: 'warning'
+            }).then(() => window.location.href = 'settings.html');
         }
 
-        // --- 🔒 SECURITY CHECK 2: PIN VERIFICATION POPUP ---
-        const { value: enteredPin } = await Swal.fire({
-            target: withdrawModal, // 👈 Essential for the PIN popup
-            title: 'Enter Security PIN',
-            input: 'password',
-            inputLabel: 'Authorize this withdrawal',
-            inputPlaceholder: 'Enter 4-digit PIN',
-            inputAttributes: {
-                maxlength: 4,
-                autocapitalize: 'off',
-                autocorrect: 'off',
-                inputmode: 'numeric'
-            },
-            showCancelButton: true,
-            confirmButtonColor: '#0b1e5b'
-        });
-
-        if (!enteredPin) return; // User cancelled
-
-        if (enteredPin !== profile.security_pin) {
-            return Swal.fire({
-                target: withdrawModal,
-                title: 'Access Denied',
-                text: 'Invalid Security PIN.',
-                icon: 'error'
-            });
-        }
-
-        // Final balance check
+        // Final balance check before showing modal
         if (profile.balance < amount) {
-            return Swal.fire({
-                target: withdrawModal,
-                title: 'Insufficient Funds',
-                text: `Your balance is ₦${profile.balance.toLocaleString()}`,
-                icon: 'error'
-            });
+            return Swal.fire({ target: withdrawModal, title: 'Insufficient Funds', text: `Your balance is ₦${profile.balance.toLocaleString()}`, icon: 'error' });
         }
 
-        // UI Feedback: Start Processing
-        confirmWithdrawBtn.disabled = true;
-        confirmWithdrawBtn.innerText = "Processing...";
+        // --- 🔒 TRIGGER CUSTOM HTML MODAL ---
+        const mfaModal = document.getElementById('mfaModal');
+        const mfaCodeInput = document.getElementById('mfaCodeInput');
+        const verifyMfaBtn = document.getElementById('verifyMfaBtn');
+        const cancelMfaBtn = document.getElementById('cancelMfaBtn');
 
-        // --- 🟢 STEP 2: LOG TO WALLET TABLE FIRST (To get the ID) ---
-        const { data: walletLog, error: walletTableError } = await supabase
-            .from('wallet')
-            .insert([{
-                user_id: currentUser.id,
-                type: 'withdrawal',
-                amount: -amount, // Should be negative as it's a deduction
-                note: `Withdrawal to ${bank} (${accNum})`,
-                status: 'pending',
-                reference: `WDR-${Date.now()}-${currentUser.id.slice(0, 5)}`
-            }])
-            .select() // Important: this returns the created row
-            .single();
+        mfaModal.style.display = 'flex'; // Show your HTML modal
 
-        if (walletTableError) throw walletTableError;
+        // Reset and define button actions
+        verifyMfaBtn.onclick = async () => {
+            const mfaCode = mfaCodeInput.value.trim();
+            if (mfaCode.length !== 6) {
+  return Swal.fire({
+    icon: 'error',
+    title: 'Invalid Code',
+    text: 'Please enter a valid 6-digit code.',
+    timer: 3000,
+    timerProgressBar: true,
+    showConfirmButton: false
+  });
+}
 
-        // --- 🔵 STEP 3: LOG TO WITHDRAWALS TABLE (Linked to Step 1) ---
-        const { error: withdrawError } = await supabase
-            .from('withdrawals')
-            .insert([{
-                user_id: currentUser.id,
-                amount: amount,
-                method: 'Transfer',
-                details: `${bank} | Acc: ${accNum} | Name: ${accName}`,
-                status: 'pending',
-                transaction_id: walletLog.id // <--- Now we have the ID from Step 1
-            }]);
+            verifyMfaBtn.disabled = true;
+            verifyMfaBtn.innerText = "Verifying...";
 
-        if (withdrawError) throw withdrawError;
+            try {
+                // Challenge and Verify
+                const { data: challenge } = await supabase.auth.mfa.challenge({ factorId: totpFactor.id });
+                const { error: verifyError } = await supabase.auth.mfa.verify({
+                    factorId: totpFactor.id,
+                    challengeId: challenge.id,
+                    code: mfaCode
+                });
 
-        // --- 🔴 STEP 4: DEDUCT FROM BALANCE ---
-        const { error: updateError } = await supabase
-            .rpc('deduct_balance', { 
-                user_id: currentUser.id, 
-                amount_to_deduct: amount 
-            });
+                if (verifyError) throw new Error("Invalid 2FA code.");
 
-        if (updateError) throw updateError;
+                // --- 🟢 STEP 2: PROCEED WITH WITHDRAWAL (Move inside verification success) ---
+                mfaModal.style.display = 'none';
+                confirmWithdrawBtn.disabled = true;
+                confirmWithdrawBtn.innerText = "Processing...";
 
-        // --- 🟢 STEP 5: SUCCESS UI ---
-        Swal.fire({
-            target: withdrawModal,
-            title: 'Authorized!',
-            text: `₦${amount.toLocaleString()} deducted. Your funds will be sent within 24 hours.`,
-            icon: 'success',
-            confirmButtonText: 'Done'
-        }).then(() => {
-            window.location.reload(); 
-        });
-        
+                const { data: walletLog, error: walletTableError } = await supabase
+                    .from('wallet')
+                    .insert([{
+                        user_id: currentUser.id,
+                        type: 'withdrawal',
+                        amount: -amount,
+                        note: `Withdrawal to ${bank} (${accNum})`,
+                        status: 'pending',
+                        reference: `WDR-${Date.now()}-${currentUser.id.slice(0, 5)}`
+                    }])
+                    .select().single();
+
+                if (walletTableError) throw walletTableError;
+
+                const { error: withdrawError } = await supabase
+                    .from('withdrawals')
+                    .insert([{
+                        user_id: currentUser.id,
+                        amount: amount,
+                        method: 'Transfer',
+                        details: `${bank} | Acc: ${accNum} | Name: ${accName}`,
+                        status: 'pending',
+                        transaction_id: walletLog.id
+                    }]);
+
+                if (withdrawError) throw withdrawError;
+
+                await supabase.rpc('deduct_balance', { user_id: currentUser.id, amount_to_deduct: amount });
+
+                Swal.fire({
+                    target: withdrawModal,
+                    title: 'Authorized!',
+                    text: `₦${amount.toLocaleString()} deducted. Processing within 24 hours.`,
+                    icon: 'success'
+                }).then(() => window.location.reload());
+
+            } catch (err) {
+                alert(err.message);
+                verifyMfaBtn.disabled = false;
+                verifyMfaBtn.innerText = "Verify & Withdraw";
+            }
+        };
+
+        cancelMfaBtn.onclick = () => {
+            mfaModal.style.display = 'none';
+            verifyMfaBtn.disabled = false;
+            verifyMfaBtn.innerText = "Verify & Withdraw";
+        };
+
     } catch (err) {
         console.error("Withdrawal Error:", err);
-        Swal.fire({
-            target: withdrawModal,
-            title: 'System Error',
-            text: err.message,
-            icon: 'error'
-        });
+        Swal.fire({ target: withdrawModal, title: 'System Error', text: err.message, icon: 'error' });
     } finally {
         if (confirmWithdrawBtn) {
             confirmWithdrawBtn.disabled = false;
@@ -528,6 +510,7 @@ confirmWithdrawBtn?.addEventListener('click', async () => {
         }
     }
 });
+
 
 
 // --- 🔵 PAYSTACK LOGIC FUNCTION ---
