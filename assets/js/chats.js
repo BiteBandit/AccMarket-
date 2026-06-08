@@ -977,6 +977,10 @@ function updateEscrowUI(step) {
 }
 window.updateEscrowUI = updateEscrowUI;
 
+/**
+ * Updates the chat footer visibility and input state based on transaction status
+ * and admin assignment.
+ */
 function syncLockdownUI(status, admin_id) {
     const footer = document.querySelector('.chat-footer');
     const messageInput = document.getElementById('messageInput');
@@ -995,7 +999,7 @@ function syncLockdownUI(status, admin_id) {
             lockChatFooter("Dispute initiated. Waiting for an admin to join...");
         } else {
             // Stage 2: Admin assigned -> Unlock for everyone
-            unlockChatFooter();
+            unlockChatFooter(true); // Passing true to indicate 'dispute mode'
         }
         return;
     }
@@ -1007,38 +1011,57 @@ function syncLockdownUI(status, admin_id) {
     }
 
     // 4. Logic for Active chats
-    unlockChatFooter();
+    unlockChatFooter(false);
 
-    // Helper functions
+    // --- Helper Functions ---
+
     function lockChatFooter(message) {
         if (footer) {
             footer.style.display = 'none'; // Forces removal from layout
         }
-        if (messageInput) messageInput.disabled = true;
-        if (attachBtn) attachBtn.style.pointerEvents = 'none'; // Ensures clicks are ignored
+        if (messageInput) {
+            messageInput.disabled = true;
+        }
+        if (attachBtn) {
+            attachBtn.style.pointerEvents = 'none'; // Ensures clicks are ignored
+        }
 
+        // Add notice if it doesn't exist
         if (!document.getElementById('closedNotice')) {
             const notice = document.createElement('div');
             notice.id = 'closedNotice';
             notice.className = 'chat-closed-notice';
             notice.innerHTML = `<i class="ph-fill ph-lock"></i> ${message}`;
-            // Append only if it doesn't exist
+            
             if (footer && footer.parentNode) {
                 footer.parentNode.appendChild(notice);
             }
         }
     }
 
-    function unlockChatFooter() {
+    function unlockChatFooter(isDisputeMode) {
         if (footer) {
             footer.style.display = 'flex'; // Restores layout
         }
         if (messageInput) {
             messageInput.disabled = false;
-            messageInput.placeholder = "Type a message...";
+            
+            // Dynamic placeholder logic
+            if (isDisputeMode) {
+                messageInput.placeholder = "Discuss the dispute here...";
+            } else {
+                messageInput.placeholder = "Type a message...";
+            }
         }
-        if (attachBtn) attachBtn.style.pointerEvents = 'auto'; // Restores clicks
-        document.getElementById('closedNotice')?.remove();
+        if (attachBtn) {
+            attachBtn.style.pointerEvents = 'auto'; // Restores clicks
+        }
+        
+        // Remove notice if it exists
+        const existingNotice = document.getElementById('closedNotice');
+        if (existingNotice) {
+            existingNotice.remove();
+        }
     }
 }
 

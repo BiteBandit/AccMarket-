@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Communication Logs | AccMarket Admin</title>
+    <title>Listing Requests | AccMarket Admin</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <link rel="stylesheet" href="assets/css/logs.css"> 
+    <link rel="stylesheet" href="assets/css/listings.css"> 
 </head>
 <body>
 
@@ -30,16 +30,16 @@
 
             <div class="nav-label">System Audit</div>
             <a href="audits.html" class="nav-item"><i class="fa-solid fa-shield-halved"></i> Account Audits</a>
-            <a href="logs.html" class="nav-item active" data-section="conversations">
-                <i class="fa-solid fa-comments"></i> Communication Logs
-            </a>
+            <a href="logs.html" class="nav-item"><i class="fa-solid fa-comments"></i> Communication Logs</a>
 
             <div class="nav-label">Treasury Management</div>
             <a href="withdrawals.html" class="nav-item"><i class="fa-solid fa-money-bill-transfer"></i> Payout Requests</a>
             <a href="ledger.html" class="nav-item"><i class="fa-solid fa-list-check"></i> Ledger Reports</a>
 
             <div class="nav-label">Marketplace Control</div>
-            <a href="listings.html" class="nav-item"><i class="fa-solid fa-boxes-stacked"></i> Listing Requests</a>
+            <a href="listings.html" class="nav-item active" data-section="listings">
+                <i class="fa-solid fa-boxes-stacked"></i> Listing Requests
+            </a>
             <a href="disputes.html" class="nav-item"><i class="fa-solid fa-scale-balanced"></i> Active Disputes</a>
 
             <div class="nav-label">Marketing & Outreach</div>
@@ -61,41 +61,35 @@
         <header class="top-bar">
             <div class="header-left">
                 <button class="menu-toggle" id="menuToggle"><i class="fa-solid fa-bars"></i></button>
-                <h1>Communication Intelligence</h1>
+                <h1>Marketplace Submissions</h1>
             </div>
-            <div class="admin-profile">Admin Session Active</div>
+            <div class="admin-profile">Admin Inventory Manager</div>
         </header>
 
-        <section id="conversationsSection" class="content-section">
+        <section id="listings-section" class="content-section">
             <div class="table-card">
                 <div class="table-header">
                     <div class="header-info">
-                        <h2><i class="fa-solid fa-comments"></i> Communication Intelligence</h2>
-                        <p>Monitoring active trade spaces, escrow chats, and direct messages.</p>
+                        <h2>Pending Listing Requests</h2>
+                        <p>Review details, visit profiles, and moderate submissions for the marketplace.</p>
                     </div>
-                    <div class="header-actions">
-                        <div class="search-box">
-                            <i class="fa-solid fa-magnifying-glass"></i>
-                            <input type="text" id="chatSearchInput" placeholder="Search by Username...">
-                        </div>
-                        <button class="btn-refresh" id="refreshChatsBtn" title="Re-sync Chat Networks">
-                            <i class="fa-solid fa-rotate"></i>
-                        </button>
-                    </div>
+                    <button class="btn-refresh" id="refreshListingsBtn" title="Synchronize Stock">
+                        <i class="fa-solid fa-rotate"></i>
+                    </button>
                 </div>
-
                 <div class="table-responsive">
                     <table class="admin-table">
                         <thead>
                             <tr>
-                                <th>Channel ID</th>
-                                <th>Participants</th>
-                                <th>Latest Activity</th>
-                                <th>Last Message Highlight</th>
-                                <th style="text-align: right;">AI Integrity</th>
+                                <th>Proof Preview</th>
+                                <th>Platform</th>
+                                <th>Asking Price</th>
+                                <th>Account Link</th>
+                                <th>Status</th>
+                                <th style="text-align: right;">Moderation</th>
                             </tr>
                         </thead>
-                        <tbody id="conversationsTableBody">
+                        <tbody id="listingsTableBody">
                             </tbody>
                     </table>
                 </div>
@@ -103,11 +97,26 @@
         </section>
     </main>
 
-    <script type="module" src="assets/js/logs.js"></script>
+    <div id="listingReviewModal" class="admin-modal" style="display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px);">
+        <div class="modal-content" style="background:#fff; margin:5% auto; width:95%; max-width:600px; border-radius:12px; overflow:hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+            <div class="modal-header" style="padding:20px; background:#0b1e5b; color:white; display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="margin:0; font-size:18px;"><i class="fa-solid fa-clipboard-check"></i> Review Listing Details</h3>
+                <span onclick="window.closeReviewModal()" style="cursor:pointer; font-size:24px; font-weight: 300;">&times;</span>
+            </div>
+            <div class="modal-body" style="padding:20px; max-height:70vh; overflow-y:auto;" id="modalBody">
+                </div>
+            <div class="modal-footer" style="padding:15px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:10px;">
+                <button onclick="window.closeReviewModal()" style="padding:10px 15px; border-radius:6px; border:1px solid #cbd5e1; background:white; cursor:pointer; font-weight: 500;">Cancel</button>
+                <button id="saveDetailsBtn" style="padding:10px 20px; border-radius:6px; border:none; background:#0b1e5b; color:white; cursor:pointer; font-weight:600;">Update & Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="assets/js/listings.js"></script>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // Responsive Draw Menu Interface Drawer Trigger Mechanics
+            // Responsive Sidebar Drawer Panel Toggle
             const menuToggle = document.getElementById('menuToggle');
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('sidebarOverlay');

@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Communication Logs | AccMarket Admin</title>
+    <title>Active Disputes | AccMarket Admin</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <link rel="stylesheet" href="assets/css/logs.css"> 
+    <link rel="stylesheet" href="assets/css/users.css"> 
 </head>
 <body>
 
@@ -30,9 +30,7 @@
 
             <div class="nav-label">System Audit</div>
             <a href="audits.html" class="nav-item"><i class="fa-solid fa-shield-halved"></i> Account Audits</a>
-            <a href="logs.html" class="nav-item active" data-section="conversations">
-                <i class="fa-solid fa-comments"></i> Communication Logs
-            </a>
+            <a href="logs.html" class="nav-item"><i class="fa-solid fa-comments"></i> Communication Logs</a>
 
             <div class="nav-label">Treasury Management</div>
             <a href="withdrawals.html" class="nav-item"><i class="fa-solid fa-money-bill-transfer"></i> Payout Requests</a>
@@ -40,7 +38,9 @@
 
             <div class="nav-label">Marketplace Control</div>
             <a href="listings.html" class="nav-item"><i class="fa-solid fa-boxes-stacked"></i> Listing Requests</a>
-            <a href="disputes.html" class="nav-item"><i class="fa-solid fa-scale-balanced"></i> Active Disputes</a>
+            <a href="disputes.html" class="nav-item active" data-section="disputes">
+                <i class="fa-solid fa-scale-balanced"></i> Active Disputes
+            </a>
 
             <div class="nav-label">Marketing & Outreach</div>
             <a href="broadcast.html" class="nav-item"><i class="fa-solid fa-bullhorn"></i> Global Broadcast</a>
@@ -61,41 +61,37 @@
         <header class="top-bar">
             <div class="header-left">
                 <button class="menu-toggle" id="menuToggle"><i class="fa-solid fa-bars"></i></button>
-                <h1>Communication Intelligence</h1>
+                <h1>Arbitration Chamber</h1>
             </div>
-            <div class="admin-profile">Admin Session Active</div>
+            <div class="admin-profile">Admin Magistrate</div>
         </header>
 
-        <section id="conversationsSection" class="content-section">
+        <section id="disputes-section" class="content-section">
             <div class="table-card">
                 <div class="table-header">
                     <div class="header-info">
-                        <h2><i class="fa-solid fa-comments"></i> Communication Intelligence</h2>
-                        <p>Monitoring active trade spaces, escrow chats, and direct messages.</p>
+                        <h2><i class="fa-solid fa-scale-balanced"></i> Active Disputes</h2>
+                        <p>Manage and arbitrate buyer-seller conflicts.</p>
                     </div>
                     <div class="header-actions">
-                        <div class="search-box">
-                            <i class="fa-solid fa-magnifying-glass"></i>
-                            <input type="text" id="chatSearchInput" placeholder="Search by Username...">
-                        </div>
-                        <button class="btn-refresh" id="refreshChatsBtn" title="Re-sync Chat Networks">
+                        <button class="btn-refresh" id="refreshDisputesBtn" title="Sync Conflict Log Entries">
                             <i class="fa-solid fa-rotate"></i>
                         </button>
                     </div>
                 </div>
 
                 <div class="table-responsive">
-                    <table class="admin-table">
+                    <table class="admin-table" id="disputes-table">
                         <thead>
                             <tr>
-                                <th>Channel ID</th>
-                                <th>Participants</th>
-                                <th>Latest Activity</th>
-                                <th>Last Message Highlight</th>
-                                <th style="text-align: right;">AI Integrity</th>
+                                <th>Created At</th>
+                                <th>Reason</th>
+                                <th>Description</th>
+                                <th>Status</th>
+                                <th style="text-align: right;">Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="conversationsTableBody">
+                        <tbody id="disputes-table-body">
                             </tbody>
                     </table>
                 </div>
@@ -103,11 +99,25 @@
         </section>
     </main>
 
-    <script type="module" src="assets/js/logs.js"></script>
+    <div id="disputeDetailModal" class="admin-modal" style="display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px);">
+        <div class="modal-content" style="background:#fff; margin:4% auto; width:95%; max-width:650px; border-radius:12px; overflow:hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+            <div class="modal-header" style="padding:20px; background:#0b1e5b; color:white; display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="margin:0; font-size:18px;"><i class="fa-solid fa-gavel"></i> Case File Review</h3>
+                <span onclick="window.closeDisputeModal()" style="cursor:pointer; font-size:24px; font-weight:300;">&times;</span>
+            </div>
+            <div class="modal-body" style="padding:20px; max-height:70vh; overflow-y:auto;" id="dispute-modal-body">
+                </div>
+            <div class="modal-footer" style="padding:15px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:10px;">
+                <button onclick="window.closeDisputeModal()" style="padding:10px 15px; border-radius:6px; border:1px solid #cbd5e1; background:white; cursor:pointer; font-weight:500;">Exit File</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="assets/js/disputes.js"></script>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // Responsive Draw Menu Interface Drawer Trigger Mechanics
+            // Mobile Overlay Toggle Drawers Engine
             const menuToggle = document.getElementById('menuToggle');
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('sidebarOverlay');

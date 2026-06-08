@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Communication Logs | AccMarket Admin</title>
+    <title>Ledger Reports | AccMarket Admin</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <link rel="stylesheet" href="assets/css/logs.css"> 
+    <link rel="stylesheet" href="assets/css/ledger.css"> 
 </head>
 <body>
 
@@ -30,13 +30,13 @@
 
             <div class="nav-label">System Audit</div>
             <a href="audits.html" class="nav-item"><i class="fa-solid fa-shield-halved"></i> Account Audits</a>
-            <a href="logs.html" class="nav-item active" data-section="conversations">
-                <i class="fa-solid fa-comments"></i> Communication Logs
-            </a>
+            <a href="logs.html" class="nav-item"><i class="fa-solid fa-comments"></i> Communication Logs</a>
 
             <div class="nav-label">Treasury Management</div>
             <a href="withdrawals.html" class="nav-item"><i class="fa-solid fa-money-bill-transfer"></i> Payout Requests</a>
-            <a href="ledger.html" class="nav-item"><i class="fa-solid fa-list-check"></i> Ledger Reports</a>
+            <a href="ledger.html" class="nav-item active" data-section="transactions">
+                <i class="fa-solid fa-list-check"></i> Ledger Reports
+            </a>
 
             <div class="nav-label">Marketplace Control</div>
             <a href="listings.html" class="nav-item"><i class="fa-solid fa-boxes-stacked"></i> Listing Requests</a>
@@ -61,24 +61,20 @@
         <header class="top-bar">
             <div class="header-left">
                 <button class="menu-toggle" id="menuToggle"><i class="fa-solid fa-bars"></i></button>
-                <h1>Communication Intelligence</h1>
+                <h1>Financial Ledger</h1>
             </div>
-            <div class="admin-profile">Admin Session Active</div>
+            <div class="admin-profile">Admin Financial Audits</div>
         </header>
 
-        <section id="conversationsSection" class="content-section">
+        <section id="transactionsSection" class="content-section">
             <div class="table-card">
                 <div class="table-header">
                     <div class="header-info">
-                        <h2><i class="fa-solid fa-comments"></i> Communication Intelligence</h2>
-                        <p>Monitoring active trade spaces, escrow chats, and direct messages.</p>
+                        <h2>Financial Ledger Reports</h2>
+                        <p>Click on IDs to copy them to your clipboard for tracking.</p>
                     </div>
                     <div class="header-actions">
-                        <div class="search-box">
-                            <i class="fa-solid fa-magnifying-glass"></i>
-                            <input type="text" id="chatSearchInput" placeholder="Search by Username...">
-                        </div>
-                        <button class="btn-refresh" id="refreshChatsBtn" title="Re-sync Chat Networks">
+                        <button class="btn-refresh" id="refreshLedgerBtn" title="Refresh Ledger">
                             <i class="fa-solid fa-rotate"></i>
                         </button>
                     </div>
@@ -88,14 +84,15 @@
                     <table class="admin-table">
                         <thead>
                             <tr>
-                                <th>Channel ID</th>
-                                <th>Participants</th>
-                                <th>Latest Activity</th>
-                                <th>Last Message Highlight</th>
-                                <th style="text-align: right;">AI Integrity</th>
+                                <th>Date</th>
+                                <th>User (UID)</th>
+                                <th>Transaction ID</th>
+                                <th>Type</th>
+                                <th>Amount</th>
+                                <th>Status</th>
                             </tr>
                         </thead>
-                        <tbody id="conversationsTableBody">
+                        <tbody id="ledgerTableBody">
                             </tbody>
                     </table>
                 </div>
@@ -103,11 +100,11 @@
         </section>
     </main>
 
-    <script type="module" src="assets/js/logs.js"></script>
+    <script type="module" src="assets/js/ledger.js"></script>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // Responsive Draw Menu Interface Drawer Trigger Mechanics
+            // Mobile Sidebar Overlay Navigation Toggle Menu
             const menuToggle = document.getElementById('menuToggle');
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('sidebarOverlay');

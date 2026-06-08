@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Broadcast Center | AccMarket Admin</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="assets/css/broadcasts.css"> 
+    <style>
+        /* Modern Communication Center View-Specific Overrides */
+        .comm-card {
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+            margin-top: 20px;
+        }
+        .comm-header {
+            background: #0b1e5b;
+            padding: 24px;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .header-icon {
+            font-size: 28px;
+            background: rgba(255, 255, 255, 0.15);
+            width: 56px;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+        }
+        .header-text h2 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 600;
+            letter-spacing: -0.3px;
+        }
+        .header-text p {
+            margin: 4px 0 0 0;
+            font-size: 13px;
+            color: #93c5fd;
+        }
+        .comm-content {
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+        .input-box {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .input-box label, .message-zone label, .channel-zone label {
+            font-size: 13px;
+            font-weight: 700;
+            color: #334155;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .modern-select, .modern-input, .modern-textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 1px solid #cbd5e1;
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            color: #1e293b;
+            background-color: #f8fafc;
+            transition: all 0.2s ease;
+            box-sizing: border-box;
+        }
+        .modern-select:focus, .modern-input:focus, .modern-textarea:focus {
+            outline: none;
+            border-color: #3b82f6;
+            background-color: #ffffff;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        .bold-text {
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+        .modern-textarea {
+            resize: vertical;
+        }
+        .channel-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 16px;
+            margin-top: 8px;
+        }
+        .channel-item {
+            position: relative;
+            cursor: pointer;
+        }
+        .channel-item input {
+            position: absolute;
+            opacity: 0;
+            cursor: pointer;
+            height: 0;
+            width: 0;
+        }
+        .pill {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 14px;
+            background: #f1f5f9;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #475569;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            text-align: center;
+        }
+        .channel-item input:checked ~ .pill {
+            background: #eff6ff;
+            border-color: #3b82f6;
+            color: #2563eb;
+        }
+        .btn-execute {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            background: #0b1e5b;
+            color: #ffffff;
+            border: none;
+            padding: 14px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 10px;
+            box-shadow: 0 4px 10px rgba(11, 30, 91, 0.15);
+        }
+        .btn-execute:hover {
+            background: #081643;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 14px rgba(11, 30, 91, 0.2);
+        }
+        .btn-execute:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .fade-in {
+            animation: fadeIn 0.25s ease forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <aside class="sidebar" id="sidebar">
+        <div class="brand">
+            <div class="logo">A</div>
+            <span>AccMarket Admin</span>
+        </div>
+
+        <nav class="nav-menu">
+            <div class="nav-label">Analytics</div>
+            <a href="dashboard.html" class="nav-item"><i class="fa-solid fa-chart-line"></i> Dashboard</a>
+
+            <div class="nav-label">User Governance</div>
+            <a href="users.html" class="nav-item"><i class="fa-solid fa-users"></i> Directory</a>
+            <a href="kyc.html" class="nav-item"><i class="fa-solid fa-id-card"></i> Identity Verification</a>
+            <a href="banned.html" class="nav-item"><i class="fa-solid fa-user-slash"></i> Restricted Access</a>
+
+            <div class="nav-label">System Audit</div>
+            <a href="audits.html" class="nav-item"><i class="fa-solid fa-shield-halved"></i> Account Audits</a>
+            <a href="logs.html" class="nav-item"><i class="fa-solid fa-comments"></i> Communication Logs</a>
+
+            <div class="nav-label">Treasury Management</div>
+            <a href="withdrawals.html" class="nav-item"><i class="fa-solid fa-money-bill-transfer"></i> Payout Requests</a>
+            <a href="ledger.html" class="nav-item"><i class="fa-solid fa-list-check"></i> Ledger Reports</a>
+
+            <div class="nav-label">Marketplace Control</div>
+            <a href="listings.html" class="nav-item"><i class="fa-solid fa-boxes-stacked"></i> Listing Requests</a>
+            <a href="disputes.html" class="nav-item"><i class="fa-solid fa-scale-balanced"></i> Active Disputes</a>
+
+            <div class="nav-label">Marketing & Outreach</div>
+            <a href="broadcast.html" class="nav-item active" data-section="broadcast">
+                <i class="fa-solid fa-bullhorn"></i> Global Broadcast
+            </a>
+            <a href="blog.html" class="nav-item"><i class="fa-solid fa-blog"></i> Platform News</a>
+
+            <div class="nav-label">Support Services</div>
+            <a href="tickets.html" class="nav-item"><i class="fa-solid fa-ticket"></i> Service Tickets</a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <button id="adminLogoutBtn">
+                <i class="fa-solid fa-power-off"></i> Terminate Session
+            </button>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <header class="top-bar">
+            <div class="header-left">
+                <button class="menu-toggle" id="menuToggle"><i class="fa-solid fa-bars"></i></button>
+                <h1>Outreach Arrays</h1>
+            </div>
+            <div class="admin-profile">Admin Magistrate</div>
+        </header>
+
+        <section id="broadcast-section" class="content-section">
+            <div class="comm-card">
+                <div class="comm-header">
+                    <div class="header-icon"><i class="fa-solid fa-tower-broadcast"></i></div>
+                    <div class="header-text">
+                        <h2>Advanced Communication Center</h2>
+                        <p>Multi-channel transmission to targeted user groups.</p>
+                    </div>
+                </div>
+
+                <div class="comm-content">
+                    <div class="targeting-zone">
+                        <div class="input-box">
+                            <label>1. Select Target Audience</label>
+                            <select id="targetType" onchange="toggleTargetFields()" class="modern-select">
+                                <option value="all">Everyone (Global)</option>
+                                <option value="single">Single User (via UID)</option>
+                                <option value="role">By User Role (Buyer/Seller)</option>
+                            </select>
+                        </div>
+
+                        <div id="targetInputContainer" class="input-box" style="margin-top: 12px;">
+                            <div id="singleUserInput" style="display:none;" class="fade-in">
+                                <label style="margin-bottom: 6px; display: block;">User UID</label>
+                                <input type="text" id="targetUID" placeholder="Paste user ID here..." class="modern-input">
+                            </div>
+                            <div id="roleSelectInput" style="display:none;" class="fade-in">
+                                <label style="margin-bottom: 6px; display: block;">Select Role</label>
+                                <select id="targetRole" class="modern-select">
+                                    <option value="buyer">Buyers Only</option>
+                                    <option value="seller">Sellers Only</option>
+                                    <option value="admin">Admins Only</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="message-zone">
+                        <label style="margin-bottom: 8px; display: block;">2. Compose Message</label>
+                        <input type="text" id="broadcastTitle" placeholder="Notification Subject/Title" class="modern-input bold-text">
+                        <textarea id="broadcastMessage" rows="5" placeholder="Type your message here..." class="modern-textarea"></textarea>
+                    </div>
+
+                    <div class="channel-zone">
+                        <label>3. Choose Channels</label>
+                        <div class="channel-grid">
+                            <label class="channel-item">
+                                <input type="checkbox" id="chanInApp" checked>
+                                <div class="pill"><i class="fa-solid fa-bell"></i> In-App</div>
+                            </label>
+                            <label class="channel-item">
+                                <input type="checkbox" id="chanTelegram">
+                                <div class="pill"><i class="fa-brands fa-telegram"></i> Telegram</div>
+                            </label>
+                            <label class="channel-item">
+                                <input type="checkbox" id="chanEmail">
+                                <div class="pill"><i class="fa-solid fa-envelope"></i> Email</div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <button onclick="processBroadcast()" class="btn-execute">
+                        <i class="fa-solid fa-paper-plane"></i> Execute Transmission
+                    </button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script type="module" src="assets/js/broadcast.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Mobile Overlay Drawers Toggling Engine
+            const menuToggle = document.getElementById('menuToggle');
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+
+            if (menuToggle && sidebar) {
+                menuToggle.addEventListener('click', () => {
+                    sidebar.classList.toggle('active');
+                    if (overlay) overlay.classList.toggle('active');
+                });
+            }
+
+            if (overlay) {
+                overlay.addEventListener('click', () => {
+                    sidebar.classList.remove('active');
+                    overlay.classList.remove('active');
+                });
+            }
+        });
+    </script>
+</body>
+</html>
