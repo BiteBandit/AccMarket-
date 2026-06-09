@@ -6,32 +6,12 @@ import { supabase } from '../../../assets/js/supabase-config.js';
  * ============================================================================
  */
 
-// --- 1. GLOBAL WINDOW INTERFACE HOOKS ---
-// Explicitly exposes functions on the global window scope immediately during compilation 
-// to prevent "is not a function" race-condition errors with inline HTML onclick attributes.
-window.loadBlogs = window.loadBlogs || (() => {});
-window.openBlogModal = window.openBlogModal || (() => {});
-window.closeBlogModal = window.closeBlogModal || (() => {});
-window.editBlog = window.editBlog || (() => {});
-window.saveBlogPost = window.saveBlogPost || (() => {});
-window.deleteBlogPost = window.deleteBlogPost || (() => {});
-
 // Global Z-Index alignment fix to prevent SweetAlert2 modals from getting stuck behind DOM overlays
 const style = document.createElement('style');
 style.innerHTML = `.swal2-container { z-index: 999999 !important; }`;
 document.head.appendChild(style);
 
-// --- CACHE & DOM REFS ---
-const saveBtn = document.getElementById('saveBtn');
-
-// Helper function to extract path out of public URL for object cleanups
-function getPathFromUrl(url) {
-    if (!url) return null;
-    const splitParts = url.split('/storage/v1/object/public/blog-media/');
-    return splitParts.length > 1 ? splitParts[1] : null;
-}
-
-// --- 2. READ VECTOR: LEDGER SYNCHRONIZATION ---
+// --- 1. READ VECTOR: LEDGER SYNCHRONIZATION ---
 window.loadBlogs = async function() {
     const tbody = document.getElementById('blogTableBody');
     if (!tbody) return;
@@ -45,12 +25,7 @@ window.loadBlogs = async function() {
         if (error) throw error;
 
         if (!blogs || blogs.length === 0) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="5" style="text-align: center; padding: 40px; color: #94a3b8;">
-                        <i class="fa-solid fa-folder-open"></i> No published platform news found.
-                    </td>
-                </tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 40px; color: #94a3b8;"><i class="fa-solid fa-folder-open"></i> No published platform news found.</td></tr>`;
             return;
         }
 
@@ -58,53 +33,32 @@ window.loadBlogs = async function() {
             // Detect file taxonomy rules directly via the existing video_url path parameter
             const hasVideo = post.video_url && post.video_url.trim() !== "";
             
-            // Format Timestamp nicely according to Admin aesthetic preferences
-            const displayDate = post.created_at 
-                ? new Date(post.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                : "Just Now";
-
-            // Enforce layout container architecture patterns matching HTML workspace styling
-            let mediaPreview = "";
-            if (hasVideo) {
-                mediaPreview = `
-                    <div class="media-preview-container" title="Video Broadcast Post">
-                        <i class="fa-solid fa-video" style="color: #2563eb; font-size: 16px;"></i>
-                    </div>`;
-            } else {
-                mediaPreview = `
-                    <div class="media-preview-container">
-                        <img src="${post.image_url}" class="media-preview-img" onerror="this.src='https://via.placeholder.com/70x45?text=No+Img'">
-                    </div>`;
-            }
-
             return `
-            <tr style="border-bottom: 1px solid #e2e8f0; transition: background-color 0.2s;">
-                <td style="padding: 12px 15px; vertical-align: middle;">${mediaPreview}</td>
-                <td style="padding: 12px 15px; font-weight: 500; color: #1e293b; vertical-align: middle;">${post.title || 'Untitled'}</td>
-                <td style="padding: 12px 15px; color: #475569; vertical-align: middle;">${post.author || 'Admin'}</td>
-                <td style="padding: 12px 15px; font-size: 13px; color: #64748b; vertical-align: middle;">${displayDate}</td>
-                <td style="padding: 12px 15px; text-align: center; vertical-align: middle;">
-                    <button onclick="window.editBlog('${post.id}')" class="btn-action-edit" title="Modify Layout Profile">
-                        <i class="fa-solid fa-pen-to-square"></i> Edit
-                    </button>
-                    <button onclick="window.deleteBlogPost('${post.id}')" class="btn-action-delete" title="Purge Record">
-                        <i class="fa-solid fa-trash-can"></i> Delete
-                    </button>
+            <tr style="border-bottom: 1px solid #f1f5f9; transition: background-color 0.2s;">
+                <td style="padding: 15px; vertical-align: middle;">
+                    ${hasVideo ? 
+                        `<div style="width:45px; height:30px; background:#0b1e5b; border-radius:4px; display:flex; align-items:center; justify-content:center; color:white; font-size:12px;" title="Video Broadcast Post">
+                            <i class="fa-solid fa-video"></i>
+                         </div>` : 
+                        `<img src="${post.image_url}" style="width:45px; height:30px; object-fit:cover; border-radius:4px; border:1px solid #e2e8f0;" onerror="this.src='https://via.placeholder.com/45x30?text=No+Img'">`
+                    }
+                </td>
+                <td style="padding:15px; font-weight:600; color:#1e293b; vertical-align: middle;">${post.title}</td>
+                <td style="padding:15px; color:#64748b; vertical-align: middle;">${post.author || 'Admin'}</td>
+                <td style="padding:15px; font-size:12px; color:#94a3b8; vertical-align: middle;">${new Date(post.created_at).toLocaleDateString()}</td>
+                <td style="padding:15px; text-align:center; vertical-align: middle;">
+                    <button onclick="window.editBlog('${post.id}')" class="btn-action-edit" title="Modify Layout Profile"><i class="fa-solid fa-pen-to-square"></i> Edit</button>
+                    <button onclick="window.deleteBlogPost('${post.id}')" class="btn-action-delete" title="Purge Record"><i class="fa-solid fa-trash"></i> Delete</button>
                 </td>
             </tr>`;
         }).join('');
     } catch (err) {
         console.error("❌ Failed to pull blog ledger updates:", err);
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="5" style="text-align: center; padding: 40px; color: #ef4444;">
-                    <i class="fa-solid fa-triangle-exclamation"></i> Sync failure: ${err.message}
-                </td>
-            </tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 40px; color: #ef4444;"><i class="fa-solid fa-triangle-exclamation"></i> Sync failure: ${err.message}</td></tr>`;
     }
 };
 
-// --- 3. MODAL VIEW MANAGER INTERACTION HANDLERS ---
+// --- 2. MODAL VIEW MANAGER INTERACTION HANDLERS ---
 window.openBlogModal = function() {
     document.getElementById('editBlogId').value = "";
     document.getElementById('blogTitle').value = "";
@@ -126,9 +80,9 @@ window.editBlog = async function(id) {
         
         if (post) {
             document.getElementById('editBlogId').value = post.id;
-            document.getElementById('blogTitle').value = post.title || "";
+            document.getElementById('blogTitle').value = post.title;
             document.getElementById('blogAuthor').value = post.author || "Admin";
-            document.getElementById('blogContent').value = post.content || "";
+            document.getElementById('blogContent').value = post.content;
             document.getElementById('blogFile').value = ""; 
             document.getElementById('modalTitle').innerText = "Edit News Post";
             document.getElementById('blogModal').style.display = "flex";
@@ -139,7 +93,7 @@ window.editBlog = async function(id) {
     }
 };
 
-// --- 4. WRITE VECTOR: UPSERT TRANSACTIONS WITH STORAGE ATTACHMENTS ---
+// --- 3. WRITE VECTOR: UPSERT TRANSACTIONS WITH STORAGE ATTACHMENTS ---
 window.saveBlogPost = async function() {
     const id = document.getElementById('editBlogId').value;
     const title = document.getElementById('blogTitle').value.trim();
@@ -157,32 +111,14 @@ window.saveBlogPost = async function() {
         return Swal.fire({ icon: "warning", title: "Media Asset Required", text: "Please attach an onboarding display image or an MP4 file vector." });
     }
 
-    // Display localized workflow execution overlay and stall DOM mutations
-    if (saveBtn) {
-        saveBtn.disabled = true;
-        saveBtn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Saving...`;
-    }
+    // Display localized workflow execution overlay 
     Swal.fire({ title: 'Processing Transaction...', text: 'Uploading media blobs and caching database entries...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
     try {
         let uploadedUrl = null;
         let isVideoFile = false;
-        let oldMediaUrlToClean = null;
-
-        // If editing, pull historical media signatures to avoid orphaned assets inside the storage bucket
-        if (id && file) {
-            const { data: currentPost } = await supabase.from('blogs').select('image_url, video_url').eq('id', id).single();
-            if (currentPost) {
-                oldMediaUrlToClean = currentPost.video_url || currentPost.image_url;
-            }
-        }
         
         if (file) {
-            // Enforcement rule check: 10MB maximum limit guardrail
-            if (file.size > 10 * 1024 * 1024) {
-                throw new Error("Target file asset passes recommended 10MB configuration bounds.");
-            }
-
             // Enhanced taxonomy sorting algorithm checking explicit MIME signatures or trailing file extensions
             isVideoFile = file.type.startsWith('video/') || file.name.toLowerCase().match(/\.(mp4|webm|ogg|mov)$/);
             
@@ -219,14 +155,6 @@ window.saveBlogPost = async function() {
 
         if (dbError) throw dbError;
 
-        // Purge historical storage resources post-update success
-        if (oldMediaUrlToClean) {
-            const cleanPath = getPathFromUrl(oldMediaUrlToClean);
-            if (cleanPath) {
-                await supabase.storage.from('blog-media').remove([cleanPath]);
-            }
-        }
-
         // Visual layout clean up operations 
         window.closeBlogModal();
         Swal.fire({ icon: "success", title: "Record Saved Successfully", text: "Platform news matrix synchronization execution absolute.", confirmButtonColor: '#0b1e5b' });
@@ -235,46 +163,35 @@ window.saveBlogPost = async function() {
     } catch (err) {
         console.error("📢 News persist failure exception:", err);
         Swal.fire({ icon: "error", title: "Write Interrupted", text: err.message || "The cluster drops writing transaction actions updates." });
-    } finally {
-        if (saveBtn) {
-            saveBtn.disabled = false;
-            saveBtn.innerHTML = `<i class="fa-solid fa-paper-plane" style="margin-right: 5px;"></i> Save Post`;
-        }
     }
 };
 
-// --- 5. PURGE VECTOR: DESTRUCTION ARRAYS ENGINE ---
+// --- 4. PURGE VECTOR: DESTRUCTION ARRAYS ENGINE ---
 window.deleteBlogPost = async function(id) {
     try {
         const { isConfirmed } = await Swal.fire({
-            title: 'Confirm Deletion?',
-            text: "This process wipes out historical platform records permanently from subscriber streams.",
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#ef4444',
-            cancelButtonColor: '#64748b',
-            confirmButtonText: 'Yes, purge row structure'
+            title: 'Delete this item?',
+  text: 'This will permanently remove the record.',
+  icon: 'warning',
+  showCancelButton: true,
+  confirmButtonColor: '#ef4444',
+  cancelButtonColor: '#64748b',
+  confirmButtonText: 'Yes, delete'
         });
 
         if (!isConfirmed) return;
 
-        // Fetch media targets to fully scrub the object binary out of Supabase Bucket
-        const { data: targetPost } = await supabase.from('blogs').select('image_url, video_url').eq('id', id).single();
-        
         const { error } = await supabase.from('blogs').delete().eq('id', id);
         if (error) throw error;
 
-        // Perform cascading asset drop from Bucket Storage if paths check out
-        if (targetPost) {
-            const targetUrl = targetPost.video_url || targetPost.image_url;
-            const cleanPath = getPathFromUrl(targetUrl);
-            if (cleanPath) {
-                await supabase.storage.from('blog-media').remove([cleanPath]);
-            }
-        }
+        Swal.fire({
+  title: "Deleted",
+  text: "The post has been removed.",
+  icon: "success",
+  confirmButtonColor: '#0b1e5b'
+});
 
-        Swal.fire({ title: "Purged", text: "The target news asset post has been cleared.", icon: "success", confirmButtonColor: '#0b1e5b' });
-        window.loadBlogs();
+window.loadBlogs();
 
     } catch (err) {
         console.error("❌ Core Delete procedure interruption:", err);
@@ -282,7 +199,7 @@ window.deleteBlogPost = async function(id) {
     }
 };
 
-// --- 6. INITIALIZATION RUNTIME ANCHOR ---
+// --- 5. INITIALIZATION RUNTIME ANCHOR ---
 document.addEventListener('DOMContentLoaded', () => {
     window.loadBlogs();
 });

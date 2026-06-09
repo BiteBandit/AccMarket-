@@ -1,24 +1,29 @@
-// Initialize Supabase
-const supabaseUrl = "https://qihzvglznpkytolxkuxz.supabase.co";
-const supabaseKey =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpaHp2Z2x6bnBreXRvbHhrdXh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk5NTc4NDIsImV4cCI6MjA3NTUzMzg0Mn0.VHyy3_Amr-neYoudHudoW-TJwNPfhkRV2TTCfVgY_zM";
-const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+import { supabase } from './supabase-config.js';
 
+// --- Verification Logic ---
 async function handleVerification() {
   const loadingState = document.getElementById("verify-loading");
   const successState = document.getElementById("verify-success");
   const errorState = document.getElementById("verify-error");
 
-  // Show loading initially
+  // Guard clause: If these elements aren't on the current page, don't run verification
+  if (!loadingState || !successState || !errorState) return;
+
   loadingState.classList.add("active");
   successState.classList.remove("active");
   errorState.classList.remove("active");
 
   try {
-    // Instead of using token, just assume email is already verified
-    // because Supabase confirms it when link is clicked
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code'); 
 
-    // Hide loading, show success
+    if (code) {
+      const { error } = await supabase.auth.exchangeCodeForSession(code);
+      if (error) throw error;
+    } else {
+      throw new Error("No verification token found in the URL.");
+    }
+
     loadingState.classList.remove("active");
     successState.classList.add("active");
 
@@ -31,8 +36,9 @@ async function handleVerification() {
     });
 
     setTimeout(() => {
-      window.location.href = "auth.html"; // redirect to login
+      window.location.href = "auth.html"; 
     }, 2500);
+
   } catch (err) {
     console.error("Verification error:", err.message);
 
@@ -42,31 +48,34 @@ async function handleVerification() {
     Swal.fire({
       icon: "error",
       title: "Verification Failed",
-      text: "Something went wrong. Please request a new verification email.",
+      text: err.message || "Something went wrong. Please request a new verification email.",
     });
   }
 }
 
-document.addEventListener("DOMContentLoaded", handleVerification);
-// Select elements
+// --- Initialize Functions ---
+// (Note: Since this is now loaded as a type="module", it safely fires after DOM is ready)
+handleVerification();
+
+// Sidebar Toggle Logic
 const sidebarToggle = document.getElementById("sidebarToggle");
 const leftSidebar = document.getElementById("leftSidebar");
 const closeLeft = document.getElementById("closeLeft");
 
-// Left sidebar
-sidebarToggle.addEventListener("click", () => {
-  leftSidebar.classList.add("active");
-});
-closeLeft.addEventListener("click", () => {
-  leftSidebar.classList.remove("active");
-});
+if (sidebarToggle && leftSidebar && closeLeft) {
+  sidebarToggle.addEventListener("click", () => {
+    leftSidebar.classList.add("active");
+  });
+  closeLeft.addEventListener("click", () => {
+    leftSidebar.classList.remove("active");
+  });
+}
 
-// Sidebar Search Function (Live Search)
-document.addEventListener("DOMContentLoaded", () => {
-  const searchInput = document.querySelector(".search-box input");
-  const items = document.querySelectorAll("#categoryList li a");
+// Sidebar Search Logic
+const searchInput = document.querySelector(".search-box input");
+const items = document.querySelectorAll("#categoryList li a");
 
-  // Live filter while typing
+if (searchInput) {
   searchInput.addEventListener("keyup", () => {
     let input = searchInput.value.toLowerCase().trim();
 
@@ -78,4 +87,4 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   });
-});
+}
