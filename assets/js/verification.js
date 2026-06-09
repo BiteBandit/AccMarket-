@@ -25,8 +25,12 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-// --- MAIN AUTH & VERIFICATION FLOW ---
+// Sound Preload
+const chatNotificationSound = new Audio("notification.mp3");
+
+// --- MAIN INITIALIZATION FLOW ---
 document.addEventListener("DOMContentLoaded", async () => {
+  // ✅ FIX: Fetch user ONCE and pass it down
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     window.location.href = "/auth.html";
@@ -40,7 +44,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   ]);
 
   const profile = profileRes.data;
-  const verification = verificationRes.data;
+  let verification = verificationRes.data; // Changed to let so we can update local state
 
   // 1. Account Deactivation Check
   if (profile && profile.is_active === false) {
@@ -57,56 +61,63 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
+  // Hide/Show Seller Link based on loaded profile
+  const sellLink = document.querySelector(".seller-only");
+  if (sellLink) sellLink.style.display = profile?.role === "seller" ? "block" : "none";
+
   // 2. UI Button State
   const startBtn = document.getElementById("startDidit");
-  if (startBtn && verification) {
-    if (verification.dispatch_status === 'pending') {
+  
+  function updateButtonUI(status) {
+    if (!startBtn) return;
+    if (status === 'pending') {
       startBtn.disabled = true;
       startBtn.textContent = "Pending Review";
-    } else if (verification.dispatch_status === 'sent') {
+    } else if (status === 'sent') {
       startBtn.disabled = true;
       startBtn.textContent = "Verification link sent";
-    } else if (verification.dispatch_status === 'verified') {
+    } else if (status === 'verified') {
       startBtn.disabled = true;
       startBtn.textContent = "Verified ✅";
-    } else if (verification.dispatch_status === 'rejected') {
+    } else if (status === 'rejected') {
       startBtn.disabled = false;
       startBtn.textContent = "Re-request Verification";
+    } else {
+      startBtn.disabled = false;
+      startBtn.textContent = "Request Verification";
     }
   }
 
-  // 3. SECURE VERIFICATION CLICK HANDLER (RPC & STATUS UPDATE)
+  // Initialize button state
+  updateButtonUI(verification?.dispatch_status);
+
+  // 3. SECURE VERIFICATION CLICK HANDLER
   startBtn?.addEventListener("click", async () => {
     try {
       startBtn.disabled = true;
       startBtn.textContent = "Processing Transaction...";
 
-      // Call the Database Function (Deducts fee, creates/checks ledger, etc.)
+      // Call Database Function
       const { error: rpcError } = await supabase.rpc('handle_verification_fee', {
         user_id_input: user.id,
         user_email_input: user.email
       });
 
       if (rpcError) {
-        // If the balance was low or something failed, the SQL 'RAISE EXCEPTION' appears here
         Swal.fire("Transaction Failed", rpcError.message, "error");
-        
-        // Reset button text based on previous state
-        const currentStatus = verification?.dispatch_status;
-        startBtn.textContent = currentStatus === 'rejected' ? "Re-request Verification" : "Request Verification";
-        startBtn.disabled = false;
+        updateButtonUI(verification?.dispatch_status);
         return;
       }
 
-      // ✅ NEW: Update user_verifications status to 'pending' on a successful Re-request
+      // ✅ FIX: Use UPSERT instead of UPDATE to handle new rows safely
       const { error: updateError } = await supabase
         .from("user_verifications")
-        .update({ 
+        .upsert({ 
+          user_id: user.id,
           dispatch_status: "pending",
-          status: "pending", // Reset general status too if you track it separately
-          updated_at: new Date().toISOString() // Good practice for auditing re-requests
-        })
-        .eq("user_id", user.id);
+          status: "pending", 
+          updated_at: new Date().toISOString() 
+        });
 
       if (updateError) {
         console.error("Error updating verification status:", updateError);
@@ -114,62 +125,56 @@ document.addEventListener("DOMContentLoaded", async () => {
         return;
       }
 
-      // Success
+      // Sync local state variable
+      if (!verification) verification = {};
+      verification.dispatch_status = "pending";
+
       Swal.fire({
         icon: "success",
         title: "Success!",
-        text: "1,000 deducted. Your re-request is now pending review.",
+        text: "3,000 deducted. Your request is now pending review.",
         confirmButtonColor: "#0b1e5b"
       });
       
-      startBtn.textContent = "Pending Review";
-      startBtn.disabled = true;
+      updateButtonUI("pending");
 
     } catch (err) {
       console.error(err);
       Swal.fire("Error", "Critical system error. Please refresh.", "error");
-      startBtn.disabled = false;
+      updateButtonUI(verification?.dispatch_status);
     }
   });
 
+  // Run Notification & Chat Logic passing the existing user instance
+  loadNotificationCount(user);
+  setInterval(() => loadNotificationCount(user), 30000);
 
-// --- NOTIFICATIONS, LOGOUT, & ROLE UI (Remained same) ---
-async function loadNotificationCount() {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-  const { count } = await supabase.from("notifications").select("*", { count: "exact", head: true }).eq("user_id", user.id).eq("is_read", false);
+  loadTotalChatCount(user);
+  setupGlobalChatRealtime(user);
+});
+
+// --- NOTIFICATIONS & CHAT FUNCTIONS ---
+async function loadNotificationCount(user) {
+  const { count } = await supabase
+    .from("notifications")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .eq("is_read", false);
+
   const badge = document.getElementById("notification-count");
   if (badge) {
     badge.textContent = count || 0;
     badge.style.display = count > 0 ? "inline-block" : "none";
   }
 }
-loadNotificationCount();
-setInterval(loadNotificationCount, 30000);
 
-document.addEventListener("click", async (e) => {
-  if (e.target.closest(".logout")) {
-    e.preventDefault();
-    await supabase.auth.signOut();
-    localStorage.clear();
-    window.location.href = "auth.html";
-  }
-});
-
-// ✅ 1. Preload the notification sound
-const chatNotificationSound = new Audio("notification.mp3");
-
-// ✅ 2. Get total unread messages
-async function loadTotalChatCount() {
+async function loadTotalChatCount(user) {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
     const { count, error } = await supabase
       .from("messages")
       .select("*", { count: "exact", head: true })
       .eq("is_read", false)
-      .neq("sender_id", user.id); 
+      .neq("sender_id", user.id); // Add an explicit receiver check here if your DB schema supports it
 
     if (error) throw error;
 
@@ -189,26 +194,16 @@ async function loadTotalChatCount() {
   }
 }
 
-// ✅ 3. Real-time listener WITH SOUND
-async function setupGlobalChatRealtime() {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-
+async function setupGlobalChatRealtime(user) {
   supabase
     .channel("global-chat-updates")
     .on(
       "postgres_changes",
-      {
-        event: "*", 
-        schema: "public",
-        table: "messages",
-      },
+      { event: "INSERT", schema: "public", table: "messages" }, // Only listen to INSERTS to save processing power
       async (payload) => {
-        // Refresh the count regardless of event type
-        await loadTotalChatCount();
-        
-        // 🎯 PLAY SOUND: Only on NEW messages sent by someone else
-        if (payload.eventType === "INSERT" && payload.new.sender_id !== user.id) {
+        // ✅ OPTIMIZATION: Only run calculations if the message is from someone else
+        if (payload.new.sender_id !== user.id) {
+            await loadTotalChatCount(user);
             chatNotificationSound.play().catch((e) => console.warn("Sound blocked by browser:", e));
         }
       }
@@ -216,14 +211,12 @@ async function setupGlobalChatRealtime() {
     .subscribe();
 }
 
-// ✅ 4. Initialize
-loadTotalChatCount();
-setupGlobalChatRealtime();
-
-(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-    const sellLink = document.querySelector(".seller-only");
-    if (sellLink) sellLink.style.display = profile?.role === "seller" ? "block" : "none";
-})();
+// Global Logout event listener
+document.addEventListener("click", async (e) => {
+  if (e.target.closest(".logout")) {
+    e.preventDefault();
+    await supabase.auth.signOut();
+    localStorage.clear();
+    window.location.href = "auth.html";
+  }
+});
