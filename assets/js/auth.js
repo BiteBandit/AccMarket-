@@ -311,7 +311,7 @@ if (registerForm) {
         email,
         password,
         options: { 
-          emailRedirectTo: "https://accmarket.name.ng/verify.html",
+          emailRedirectTo: "https://accmarket.name.ng/auth.html",
           captchaToken: token 
         }
       });
