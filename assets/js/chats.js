@@ -200,7 +200,6 @@ async function loadSidebar(filter = "") {
     const chatList = document.querySelector('.chat-list');
     if (!chatList || !currentUser) return;
 
-    // 1. Added admin_id to the select query
     let { data: conversations, error } = await supabase
         .from('conversations')
         .select(`
@@ -209,7 +208,6 @@ async function loadSidebar(filter = "") {
             buyer:profiles!conversations_buyer_id_fkey(id, username, avatar_url, last_seen, show_online, trust_score),
             messages(is_read, sender_id)
         `)
-        // 2. Added admin_id to the filter
         .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id},admin_id.eq.${currentUser.id}`)
         .order('updated_at', { ascending: false });
 
@@ -217,19 +215,17 @@ async function loadSidebar(filter = "") {
 
     chatList.innerHTML = '';
     conversations.forEach(chat => {
-        // 3. Logic to determine who the "other" person is for display
         const isMeBuyer = chat.buyer_id === currentUser.id;
-        const isMeSeller = chat.seller_id === currentUser.id;
         const isMeAdmin = chat.admin_id === currentUser.id;
 
-        // If admin, prioritize showing the buyer or seller name
         let otherUser;
         if (isMeAdmin) {
-            otherUser = chat.buyer; // Or logic to show both parties
+            otherUser = chat.buyer; 
         } else {
             otherUser = isMeBuyer ? chat.seller : chat.buyer;
         }
 
+        if (!otherUser) return;
         if (filter && !otherUser.username.toLowerCase().includes(filter.toLowerCase())) return;
 
         const hasUnread = chat.messages.some(m => 
@@ -241,7 +237,6 @@ async function loadSidebar(filter = "") {
         );
         const isActive = chat.id === activeChatId ? 'active' : '';
 
-        // --- Date Logic ---
         const msgDate = new Date(chat.updated_at);
         const today = new Date();
         const yesterday = new Date(today);
@@ -256,7 +251,6 @@ async function loadSidebar(filter = "") {
         const item = document.createElement('div');
         item.className = `chat-item ${isActive} ${hasUnread ? 'unread-item' : ''}`;
         
-        // 4. Added an Admin Label if the user is the admin
         const adminBadge = isMeAdmin ? `<span style="font-size:10px; background:#e0e7ff; color:#4338ca; padding:2px 5px; border-radius:4px; margin-left:5px;">Admin</span>` : '';
 
         item.innerHTML = `
@@ -287,8 +281,7 @@ async function loadSidebar(filter = "") {
     });
 }
 
-
-// --- 5. CHAT WINDOW (WITH EXPLICIT JOIN) ---
+// --- 5. CHAT WINDOW ---
 async function initChatWindow() {
     const container = document.querySelector('.message-container');
     const headerName = document.getElementById('headerName');
@@ -296,7 +289,6 @@ async function initChatWindow() {
 
     if (!container || !activeChatId) return;
 
-    // 🟢 1. PRE-LOAD ALL ADMIN PROFILES
     if (!window.adminProfilesCache) {
         window.adminProfilesCache = {};
         try {
@@ -319,7 +311,6 @@ async function initChatWindow() {
     subscribeToMessages();
     subscribeToConversationChanges();
 
-    // 🟢 2. UPDATED QUERY: Fetch admin_id
     const { data: chat } = await supabase
         .from('conversations')
         .select(`*, 
@@ -335,32 +326,32 @@ async function initChatWindow() {
     if (chat) {
         window.activeChatData = chat; 
 
-        // 🟢 3. Trigger Unified Menu Logic
-        await refreshMenuVisibility(chat);
+        await refreshMenuVisibility();
 
         const otherUser = chat.buyer_id === currentUser.id ? chat.seller : chat.buyer;
         
         const goldBadgeSvg = generateGoldBadge(otherUser?.trust_score || 0, `header-${chat.id}`);
 
-        headerName.style.display = "inline-flex";
-        headerName.style.alignItems = "center";
-        headerName.style.gap = "1px";
-        headerName.innerHTML = `${otherUser.username} ${goldBadgeSvg}`;
+        if(headerName) {
+            headerName.style.display = "inline-flex";
+            headerName.style.alignItems = "center";
+            headerName.style.gap = "1px";
+            headerName.innerHTML = `${otherUser.username} ${goldBadgeSvg}`;
+        }
 
-        headerAvatar.src = otherUser.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUser.username}`;
+        if(headerAvatar) {
+            headerAvatar.src = otherUser.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUser.username}`;
+        }
 
-             if (chat.escrow_step === 0) {
+        if (chat.escrow_step === 0) {
             console.log("[ESCROW] Initializing Step 1...");
             await upgradeToStepOne(); 
         } else {
             updateEscrowUI(chat.escrow_step);
         }
 
-        // Updated to pass chat.admin_id
         syncLockdownUI(chat.status, chat.admin_id);
 
-    
-        // --- PRODUCT CONTEXT BAR & LOGO LOGIC ---
         const pTitle = document.getElementById('productTitle');
         const pPrice = document.getElementById('productPrice');
         const pImg = document.getElementById('productImg');
@@ -402,8 +393,7 @@ async function initChatWindow() {
         watchPartnerPresence(otherUser);
     }
 
-    // --- MESSAGE LOADING ---
-    const { data: messages, error } = await supabase
+    const { data: messages } = await supabase
         .from('messages')
         .select(`*, sender:profiles(username, avatar_url, role, trust_score), reply_to:messages!reply_to_id(id, content, type, sender_id, sender:profiles(username))`)
         .eq('conversation_id', activeChatId)
@@ -433,7 +423,6 @@ async function initChatWindow() {
 
     if (messages) messages.forEach(msg => appendMessageUI(msg));
 }
-
 
 // --- 6. PARTNER STATUS WATCHER ---
 function watchPartnerPresence(partner) {
@@ -488,7 +477,8 @@ function subscribeToMessages() {
         }, async (payload) => {
             console.log("[REALTIME] New message incoming...");
             
-            // Re-route check to read admin parameters dynamically during insertion stream loops
+            if (document.getElementById(`msg-${payload.new.id}`)) return;
+
             const cachedAdmin = window.adminProfilesCache ? window.adminProfilesCache[payload.new.sender_id] : null;
 
             if (payload.new.type === 'system' && !cachedAdmin) {
@@ -511,7 +501,7 @@ function subscribeToMessages() {
                 else appendMessageUI(payload.new);
             }
             
-  if (payload.new.sender_id !== currentUser.id) await markMessagesAsRead(activeChatId);
+            if (payload.new.sender_id !== currentUser.id) await markMessagesAsRead(activeChatId);
             await loadSidebar();
         })
         .on('postgres_changes', { 
@@ -562,25 +552,18 @@ function subscribeToConversationChanges() {
             const updatedChat = payload.new;
             window.activeChatData = updatedChat;
 
-            // 1. Update Escrow UI
             if (typeof updateEscrowUI === 'function') {
                 updateEscrowUI(updatedChat.escrow_step);
             }
 
-            // 2. Refresh Menu (Pass updated chat object for role-based check)
-            refreshMenuVisibility(updatedChat);
-
-            // 3. Update Lockdown UI (Pass admin_id to enable admin chat during disputes)
+            refreshMenuVisibility();
             syncLockdownUI(updatedChat.status, updatedChat.admin_id);
-
-            // 4. Update Sidebar
             loadSidebar();
         })
         .subscribe();
 }
 
-
-// --- 9. DELETE LOGIC WITH SWEETALERT ---
+// --- 9. DELETE LOGIC ---
 async function deleteMessage(msgId, senderId) {
     if (!currentUser || senderId !== currentUser.id) return;
 
@@ -726,7 +709,6 @@ function setReplyUI(msg) {
                 line-height: 1;
             }
             .close-reply-btn:hover { color: #ef4444; }
-            
             @keyframes slideUp {
                 from { opacity: 0; transform: translateY(10px); }
                 to { opacity: 1; transform: translateY(0); }
@@ -779,7 +761,6 @@ function appendMessageUI(msg) {
     const isAdminUser = cachedAdmin || msg.sender?.role === 'admin';
     const isMe = msg.sender_id === currentUser.id;
 
-    // --- 🟢 DYNAMIC NOTIFICATION FILTER: All 'system' types become pills ---
     if (msg.type === 'system') {
         const text = msg.content || "";
         const isDisputeOrCancel = text.includes('DISPUTE') || text.includes('CANCELLED') || text.includes('⚠️') || text.includes('❌');
@@ -791,10 +772,9 @@ function appendMessageUI(msg) {
         
         container.appendChild(systemDiv);
         container.scrollTop = container.scrollHeight;
-        return; // Exit here, do not proceed to bubble rendering
+        return; 
     }
 
-    // --- 🟢 BUBBLE RENDERING LOGIC ---
     const msgDate = new Date(msg.created_at);
     const today = new Date();
     const yesterday = new Date(today);
@@ -806,7 +786,6 @@ function appendMessageUI(msg) {
 
     const time = `${dateLabel}, ${msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`; 
     
-    // Assign class: outgoing if me, incoming if them or staff
     const messageClass = (isMe ? 'outgoing' : (msg.isAdminChatBubble || isAdminUser ? 'incoming admin-custom-bubble' : 'incoming'));
 
     const div = document.createElement('div');
@@ -831,7 +810,6 @@ function appendMessageUI(msg) {
 
     const isLocked = ['disputed', 'cancelled', 'completed'].includes(window.activeChatData?.status);
 
-    // --- 🟢 SENDER HEADER ---
     let senderHeaderNameHTML = '';
     if (msg.isAdminChatBubble || isAdminUser) {
         const adminName = cachedAdmin?.username || msg.sender?.username || "System Admin";
@@ -850,7 +828,6 @@ function appendMessageUI(msg) {
             <div class="msg-status"><span class="time">${time}</span>${isMe ? `<i class="ph ${msg.is_read ? 'ph-checks' : 'ph-check'}" id="icon-${msg.id}"></i>` : ''}</div>
         </div>`;
 
-    // --- 🟢 SWIPE LOGIC ---
     const bubble = div.querySelector('.msg-bubble');
     let startX = 0, currentX = 0;
     bubble.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }, { passive: true });
@@ -867,7 +844,6 @@ function appendMessageUI(msg) {
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
 }
-
 
 function scrollToMessage(id) {
     const target = document.getElementById(`msg-${id}`);
@@ -950,7 +926,7 @@ async function upgradeToStepOne() {
     updateEscrowUI(1);
     await loadSidebar();
 }
- 
+
 function updateEscrowUI(step) {
     const stepPaid = document.querySelector('.status-step:nth-child(1)');
     const lineDelivery = document.querySelector('.status-line:nth-child(2)');
@@ -977,94 +953,58 @@ function updateEscrowUI(step) {
 }
 window.updateEscrowUI = updateEscrowUI;
 
-/**
- * Updates the chat footer visibility and input state based on transaction status
- * and admin assignment.
- */
 function syncLockdownUI(status, admin_id) {
     const footer = document.querySelector('.chat-footer');
     const messageInput = document.getElementById('messageInput');
     const attachBtn = document.getElementById('attachBtn');
     
-    // Check if there is an Admin assigned
     const hasAdmin = (admin_id !== null && admin_id !== undefined && admin_id !== "");
-    
-    // 1. Define states
     const isLocked = (status === 'cancelled' || status === 'completed');
     
-    // 2. Logic for Disputed chats
     if (status === 'disputed') {
         if (!hasAdmin) {
-            // Stage 1: No Admin -> Lock for everyone
             lockChatFooter("Dispute initiated. Waiting for an admin to join...");
         } else {
-            // Stage 2: Admin assigned -> Unlock for everyone
-            unlockChatFooter(true); // Passing true to indicate 'dispute mode'
+            unlockChatFooter(true);
         }
         return;
     }
 
-    // 3. Logic for Cancelled/Completed chats
     if (isLocked) {
         lockChatFooter("Transaction " + status.toUpperCase() + " — Messaging Disabled");
         return;
     }
 
-    // 4. Logic for Active chats
     unlockChatFooter(false);
 
-    // --- Helper Functions ---
-
     function lockChatFooter(message) {
-        if (footer) {
-            footer.style.display = 'none'; // Forces removal from layout
-        }
-        if (messageInput) {
-            messageInput.disabled = true;
-        }
-        if (attachBtn) {
-            attachBtn.style.pointerEvents = 'none'; // Ensures clicks are ignored
-        }
+        if (footer) footer.style.display = 'none';
+        if (messageInput) messageInput.disabled = true;
+        if (attachBtn) attachBtn.style.pointerEvents = 'none';
 
-        // Add notice if it doesn't exist
-        if (!document.getElementById('closedNotice')) {
-            const notice = document.createElement('div');
+        let notice = document.getElementById('closedNotice');
+        if (!notice) {
+            notice = document.createElement('div');
             notice.id = 'closedNotice';
             notice.className = 'chat-closed-notice';
-            notice.innerHTML = `<i class="ph-fill ph-lock"></i> ${message}`;
-            
             if (footer && footer.parentNode) {
                 footer.parentNode.appendChild(notice);
             }
         }
+        notice.innerHTML = `<i class="ph-fill ph-lock"></i> ${message}`;
     }
 
     function unlockChatFooter(isDisputeMode) {
-        if (footer) {
-            footer.style.display = 'flex'; // Restores layout
-        }
+        if (footer) footer.style.display = 'flex';
         if (messageInput) {
             messageInput.disabled = false;
-            
-            // Dynamic placeholder logic
-            if (isDisputeMode) {
-                messageInput.placeholder = "Discuss the dispute here...";
-            } else {
-                messageInput.placeholder = "Type a message...";
-            }
+            messageInput.placeholder = isDisputeMode ? "Discuss the dispute here..." : "Type a message...";
         }
-        if (attachBtn) {
-            attachBtn.style.pointerEvents = 'auto'; // Restores clicks
-        }
+        if (attachBtn) attachBtn.style.pointerEvents = 'auto';
         
-        // Remove notice if it exists
-        const existingNotice = document.getElementById('closedNotice');
-        if (existingNotice) {
-            existingNotice.remove();
-        }
+        document.getElementById('closedNotice')?.remove();
     }
 }
-
 
 window.toggleStatusMenu = async function(e) {
     if (e) e.stopPropagation();
@@ -1080,7 +1020,6 @@ window.toggleStatusMenu = async function(e) {
 async function refreshMenuVisibility() {
     if (!activeChatId || !currentUser) return;
 
-    // 1. Fetch full data including admin_id and status
     const { data: chat, error } = await supabase
         .from("conversations")
         .select("seller_id, buyer_id, admin_id, escrow_step, status")
@@ -1092,14 +1031,12 @@ async function refreshMenuVisibility() {
         return;
     }
 
-    // 2. Define Roles and States
     const isSeller = currentUser.id === chat.seller_id;
     const isBuyer = currentUser.id === chat.buyer_id;
     const isAssignedAdmin = (currentUser.id === chat.admin_id);
     const isDisputed = (chat.status === 'disputed');
     const step = chat.escrow_step || 1;
 
-    // 3. Get all button references
     const btnConfirm = document.getElementById("btnConfirmDelivery");
     const btnRelease = document.getElementById("btnReleaseFunds");
     const btnCancel = document.getElementById("btnCancel");
@@ -1107,26 +1044,20 @@ async function refreshMenuVisibility() {
     const btnAdminRefund = document.getElementById("btnAdminRefund");
     const btnAdminRelease = document.getElementById("btnAdminRelease");
 
-    // 4. Logic: If I am the Admin
     if (isAssignedAdmin) {
-        // Hide all user buttons
         if (btnConfirm) btnConfirm.style.display = "none";
         if (btnRelease) btnRelease.style.display = "none";
         if (btnCancel) btnCancel.style.display = "none";
         if (btnDispute) btnDispute.style.display = "none";
 
-        // Show Admin buttons ONLY if disputed
         if (btnAdminRefund) btnAdminRefund.style.display = isDisputed ? "flex" : "none";
         if (btnAdminRelease) btnAdminRelease.style.display = isDisputed ? "flex" : "none";
         return;
     }
 
-    // 5. Logic: If I am a standard user (Buyer/Seller)
-    // Always hide Admin buttons for non-admins
     if (btnAdminRefund) btnAdminRefund.style.display = "none";
     if (btnAdminRelease) btnAdminRelease.style.display = "none";
 
-    // Handle Completed/Cancelled state for users
     if (chat.status === 'cancelled' || chat.status === 'completed') {
         if (btnConfirm) btnConfirm.style.display = "none";
         if (btnRelease) btnRelease.style.display = "none";
@@ -1135,7 +1066,6 @@ async function refreshMenuVisibility() {
         return;
     }
 
-    // Show User buttons based on flow
     if (btnDispute) btnDispute.style.display = "flex"; 
     if (btnCancel) btnCancel.style.display = (step === 1) ? "flex" : "none";
     if (btnConfirm) btnConfirm.style.display = (isSeller && step === 1) ? "flex" : "none";
@@ -1246,7 +1176,7 @@ window.handleCancelDeal = async function() {
         }
 
         Swal.fire('Success', 'Deal cancelled.', 'success');
-        if (typeof loadSidebar === 'function') await loadSidebar();
+        await loadSidebar();
         initChatWindow();
 
     } catch (error) {
@@ -1338,7 +1268,7 @@ window.upgradeToStepTwo = async function() {
 
         updateEscrowUI(2); 
         document.getElementById('statusMenu')?.classList.remove('show');
-        if (typeof loadSidebar === 'function') await loadSidebar();
+        await loadSidebar();
         
         Swal.fire('Success', 'Delivery confirmed. Buyer has been notified.', 'success');
 
@@ -1428,7 +1358,7 @@ window.upgradeToStepThree = async function() {
         }
 
         updateEscrowUI(3);
-        if (typeof loadSidebar === 'function') await loadSidebar();
+        await loadSidebar();
         document.getElementById('ratingModal').classList.add('active'); 
 
     } catch (error) {
@@ -1445,14 +1375,9 @@ window.handleDispute = function() {
     }
 };
 
-/**
- * Unified Admin Action Handler
- * Uses existing RPCs to resolve disputes.
- */
 window.handleAdminAction = async function(actionType) {
     if (!activeChatId || !currentUser) return;
 
-    // 1. Confirm the action
     const confirm = await Swal.fire({
         title: actionType === 'refund' ? 'Refund Buyer?' : 'Release Funds to Seller?',
         text: "This action is final and will resolve the dispute.",
@@ -1465,7 +1390,6 @@ window.handleAdminAction = async function(actionType) {
     if (!confirm.isConfirmed) return;
 
     try {
-        // 2. Fetch conversation data for the RPC
         const { data: chat } = await supabase
             .from('conversations')
             .select('product_price, buyer_id, seller_id, product_name')
@@ -1477,9 +1401,7 @@ window.handleAdminAction = async function(actionType) {
         let rpcError;
         let systemText;
 
-        // 3. Trigger the appropriate RPC based on the actionType
         if (actionType === 'refund') {
-            // Reusing your existing Refund/Cancel RPC
             const { error } = await supabase.rpc('handle_cancel_refund', {
                 target_buyer_id: chat.buyer_id,
                 refund_amount: parseFloat(chat.product_price),
@@ -1489,7 +1411,6 @@ window.handleAdminAction = async function(actionType) {
             rpcError = error;
             systemText = "⚖️ Admin resolved: Refunded to Buyer.";
         } else {
-            // Reusing your existing Release Funds RPC
             const { error } = await supabase.rpc('handle_release_funds', {
                 target_seller_id: chat.seller_id,
                 amount_to_release: parseFloat(chat.product_price),
@@ -1502,10 +1423,9 @@ window.handleAdminAction = async function(actionType) {
 
         if (rpcError) throw rpcError;
 
-        // 4. Update status and notify
         await supabase.from('conversations').update({ 
             status: 'completed', 
-            last_message: systemText 
+            last_message: systemText
         }).eq('id', activeChatId);
 
         await supabase.from('messages').insert([{
@@ -1516,8 +1436,6 @@ window.handleAdminAction = async function(actionType) {
         }]);
 
         Swal.fire('Success', 'Dispute resolved successfully.', 'success');
-        
-        // Refresh UI
         await initChatWindow(); 
 
     } catch (error) {
@@ -1526,6 +1444,7 @@ window.handleAdminAction = async function(actionType) {
     }
 };
 
+// Modals Handling Event Listeners Setup
 document.getElementById('closeDispute')?.addEventListener('click', () => {
     document.getElementById('disputeModal').classList.remove('active');
 });
@@ -1604,7 +1523,7 @@ document.getElementById('submitDispute')?.addEventListener('click', async () => 
             confirmButtonColor: '#0b1e5b'
         });
 
-        if (typeof loadSidebar === 'function') await loadSidebar();
+        await loadSidebar();
         initChatWindow();
 
     } catch (error) {
@@ -1626,14 +1545,20 @@ if (ratingSlider) {
         if (percentValue) percentValue.innerText = val;
 
         if (val >= 90) {
-            percentLabel.innerText = "Excellent";
-            percentLabel.style.color = "#10b981";
+            if(percentLabel) {
+                percentLabel.innerText = "Excellent";
+                percentLabel.style.color = "#10b981";
+            }
         } else if (val >= 50) {
-            percentLabel.innerText = "Good";
-            percentLabel.style.color = "#f59e0b";
+            if(percentLabel) {
+                percentLabel.innerText = "Good";
+                percentLabel.style.color = "#f59e0b";
+            }
         } else {
-            percentLabel.innerText = "Poor";
-            percentLabel.style.color = "#ef4444";
+            if(percentLabel) {
+                percentLabel.innerText = "Poor";
+                percentLabel.style.color = "#ef4444";
+            }
         }
     });
 }
@@ -1687,15 +1612,18 @@ document.getElementById('submitRating')?.addEventListener('click', async () => {
         
         slider.value = 100;
         commentArea.value = "";
-        document.getElementById('percentValue').innerText = "100";
-        document.getElementById('percentLabel').innerText = "Excellent";
-        document.getElementById('percentLabel').style.color = "#10b981";
+        
+        const pVal = document.getElementById('percentValue');
+        const pLabel = document.getElementById('percentLabel');
+        if(pVal) pVal.innerText = "100";
+        if(pLabel) {
+            pLabel.innerText = "Excellent";
+            pLabel.style.color = "#10b981";
+        }
 
         await initChatWindow(); 
-
         Swal.fire('Success', 'Rating submitted! The transaction is now officially closed.', 'success');
-
-        if (typeof loadSidebar === 'function') await loadSidebar();
+        await loadSidebar();
 
     } catch (err) {
         console.error("Critical Error:", err);
