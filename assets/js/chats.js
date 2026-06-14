@@ -828,17 +828,30 @@ function appendMessageUI(msg) {
             <div class="msg-status"><span class="time">${time}</span>${isMe ? `<i class="ph ${msg.is_read ? 'ph-checks' : 'ph-check'}" id="icon-${msg.id}"></i>` : ''}</div>
         </div>`;
 
-    const bubble = div.querySelector('.msg-bubble');
+        const bubble = div.querySelector('.msg-bubble');
     let startX = 0, currentX = 0;
+    
+    // --- Double-click to reply (Works during active chats and disputes) ---
+    bubble.addEventListener('dblclick', () => {
+        const isClosed = ['cancelled', 'completed'].includes(window.activeChatData?.status);
+        if (!isClosed) {
+            setReplyUI(msg);
+        }
+    });
+
+    // Your touch swipe-to-delete logic continues right under it:
     bubble.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }, { passive: true });
     bubble.addEventListener('touchmove', (e) => {
-        if (isMe && !isLocked) {
+        if (isMe && !isLocked) { // Keeps delete locked down for disputes/closed deals
             currentX = e.touches[0].clientX - startX;
             if (currentX < 0) bubble.style.transform = `translateX(${Math.max(currentX, -80)}px)`;
         }
     }, { passive: true });
     bubble.addEventListener('touchend', () => {
-        if (isMe && !isLocked) bubble.style.transition = 'transform 0.3s', bubble.style.transform = currentX < -40 ? 'translateX(-70px)' : 'translateX(0)';
+        if (isMe && !isLocked) {
+            bubble.style.transition = 'transform 0.3s';
+            bubble.style.transform = currentX < -40 ? 'translateX(-70px)' : 'translateX(0)';
+        }
     });
 
     container.appendChild(div);
@@ -860,14 +873,90 @@ async function handleSendMessage() {
     const content = input.value.trim();
     if (!content || !activeChatId) return;
 
+    // =========================================================================
+    // --- LAYER 1: ULTRA-RELAXED LOCAL FILTERS (Only Catches Blatant Evasion Phrases) ---
+    // =========================================================================
+    // Only intercept locally if they explicitly text explicit redirection phrases
+    const SOCIAL_HANDLE_REDIRECTION = /(?:my|hit\s*me\s*up\s*on|message\s*me\s*on|add\s*me\s*on|dm\s*me|contact\s*me|text\s*me|whatsapp\s*me|chat\s*on)\s*(?:ig|instagram|snap|snapchat|tg|telegram|whatsapp|wa|twitter|x|phone|number)/gi;
+
+    // --- STRUCTURAL BYPASSES (Fast-track technical data to save AI credits completely) ---
+    const digitsOnly = content.replace(/\D/g, '');
+    const isShortNumericCode = digitsOnly.length > 0 && digitsOnly.length < 7; // OTPs/Pins
+    const IS_STRUCTURED_COMBO = content.includes('|') || content.includes(' / ') || (content.includes('[') && content.includes(']'));
+    const IS_BACKTICK_CODE = content.includes('`');
+    const IS_MULTILINE_LOG = content.split('\n').length >= 3;
+
+    let isScamAttempt = false;
+
+    // Frontend only flags blatant redirection commands. Raw links/numbers pass through safely to the AI.
+    if (SOCIAL_HANDLE_REDIRECTION.test(content)) {
+        if (!IS_STRUCTURED_COMBO && !IS_BACKTICK_CODE) {
+            isScamAttempt = true;
+        }
+    }
+
+    // Reset regex index state
+    SOCIAL_HANDLE_REDIRECTION.lastIndex = 0;
+
+    if (isScamAttempt) {
+        showSecurityAlert();
+        return;
+    }
+
+    // =========================================================================
+    // --- LAYER 2: SUPABASE EDGE FUNCTION AI CONTEXT INTERPRETATION ---
+    // =========================================================================
+    // Technical assets, accounts logs, and PINs skip the network request entirely for speed
+    const skipAiCheck = isShortNumericCode || IS_STRUCTURED_COMBO || IS_MULTILINE_LOG || IS_BACKTICK_CODE;
+
+    if (!skipAiCheck) {
+        input.disabled = true;
+        const originalPlaceholder = input.placeholder || "Type a message...";
+        input.placeholder = "Verifying security... 🛡️";
+
+        try {
+            const response = await fetch("https://qihzvglznpkytolxkuxz.supabase.co/functions/v1/moderate-message", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}`
+                },
+                body: JSON.stringify({ 
+                    text: content,
+                    conversation_id: activeChatId 
+                })
+            });
+
+            const data = await response.json();
+
+            if (data && data.blocked === true) {
+                console.warn(`[AI SECURITY BLOCK]: ${data.reason}`);
+                showSecurityAlert();
+                
+                input.disabled = false;
+                input.placeholder = originalPlaceholder;
+                return; // Blocks database insertion entirely
+            }
+
+        } catch (err) {
+            console.error("Supabase Edge Function AI offline. Defaulting to local validation:", err);
+        }
+
+        input.disabled = false;
+        input.placeholder = originalPlaceholder;
+    }
+
+    // =========================================================================
+    // --- LAYER 3: PRESERVED ORIGINAL CHAT SUBMISSION ---
+    // =========================================================================
     const replyId = replyingTo ? replyingTo.id : null;
-    input.value = ''; 
+    input.value = '';
     cancelReplyUI();
 
     const { error: msgError } = await supabase.from('messages').insert([{
-        conversation_id: activeChatId, 
-        sender_id: currentUser.id, 
-        content: content, 
+        conversation_id: activeChatId,
+        sender_id: currentUser.id,
+        content: content,
         type: 'text',
         is_read: false,
         reply_to_id: replyId
@@ -879,6 +968,16 @@ async function handleSendMessage() {
             .eq('id', activeChatId);
     }
 }
+
+function showSecurityAlert() {
+    Swal.fire({
+        title: 'Security System Alert 🛡️',
+        text: 'To guarantee payment protection via Escrow, exchanging contact details, social links, or taking conversations off-platform is completely restricted.',
+        icon: 'warning',
+        confirmButtonColor: '#0b1e5b'
+    });
+}
+
 
 async function markMessagesAsRead(convId) {
     if (!convId || !currentUser) return;

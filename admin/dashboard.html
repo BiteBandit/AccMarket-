@@ -3,11 +3,106 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Command Center | AccMarket</title>
+    <title>Operations Dashboard | AccMarket Admin</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <link rel="stylesheet" href="assets/css/admin-dashboard.css">
+    <link rel="stylesheet" href="assets/css/dashboard.css"> 
+    <style>
+        :root {
+            /* Main Dashboard Card Palette variables mapped to your theme */
+            --sidebar-bg: #0b1e5b;
+            --accent: #3b82f6;
+            --text-muted: #94a3b8;
+            --card-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --accent-red: #ef4444;
+        }
+
+        /* --- STATS CARDS GRID REFINEMENT ONLY --- */
+        .stats-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
+            gap: 24px; 
+            margin-bottom: 32px;
+        }
+
+        .stat-card { 
+            background: white; 
+            padding: 24px; 
+            border-radius: 16px; 
+            border: 1px solid #eef2f6;
+            box-shadow: var(--card-shadow); 
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .stat-card:hover { 
+            transform: translateY(-4px); 
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+
+        .card-header-block {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .stat-card h3 { 
+            font-size: 13px; 
+            text-transform: uppercase; 
+            letter-spacing: 0.5px; 
+            color: var(--text-muted); 
+            margin: 0; 
+            font-weight: 700;
+        }
+
+        .stat-value { 
+            font-size: 32px; 
+            font-weight: 800; 
+            color: var(--sidebar-bg); 
+            margin: 8px 0 4px 0; 
+            letter-spacing: -1px;
+            line-height: 1;
+        }
+
+        .stat-label {
+            color: #1e293b;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 15px;
+        }
+
+        .stat-row { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            padding: 12px 0;
+            font-size: 14px; 
+            color: #475569;
+        }
+
+        /* Adds thin dividers between rows except the very first item */
+        .stat-card > div > .stat-row:not(:first-of-type) {
+            border-top: 1px solid #f8fafc;
+        }
+
+        .stat-row span { color: var(--text-muted); font-weight: 500; }
+        .stat-row b { color: var(--sidebar-bg); font-weight: 700; }
+
+        /* Dynamic outstanding payouts layout text handler override */
+        #statPendingPayouts { color: var(--accent-red) !important; }
+
+        hr { border: none; border-top: 1px solid #f1f5f9; margin: 15px 0; }
+
+        @media (max-width: 992px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
 </head>
 <body>
 
@@ -21,61 +116,35 @@
 
         <nav class="nav-menu">
             <div class="nav-label">Analytics</div>
-            <a href="#" class="nav-item active" data-section="overview">
+            <a href="dashboard.html" class="nav-item active" data-section="overview">
                 <i class="fa-solid fa-chart-line"></i> Dashboard
             </a>
 
             <div class="nav-label">User Governance</div>
-            <a href="#" class="nav-item" data-section="users">
-                <i class="fa-solid fa-users"></i> Directory
-            </a>
-            <a href="#" class="nav-item" data-section="kyc">
-                <i class="fa-solid fa-id-card"></i> Identity Verification
-            </a>
-            <a href="#" class="nav-item" data-section="banned">
-                <i class="fa-solid fa-user-slash"></i> Restricted Access
-            </a>
+            <a href="users.html" class="nav-item"><i class="fa-solid fa-users"></i> Directory</a>
+            <a href="kyc.html" class="nav-item"><i class="fa-solid fa-id-card"></i> Identity Verification</a>
+            <a href="banned.html" class="nav-item"><i class="fa-solid fa-user-slash"></i> Restricted Access</a>
 
-<div class="nav-label">System Audit</div>
-<a href="#" class="nav-item" data-section="verification">
-    <i class="fa-solid fa-shield-halved"></i> Account Audits
-</a>
-
-            <a href="#" class="nav-item" data-section="conversations">
-                <i class="fa-solid fa-comments"></i> Communication Logs
-            </a>
+            <div class="nav-label">System Audit</div>
+            <a href="audits.html" class="nav-item"><i class="fa-solid fa-shield-halved"></i> Account Audits</a>
+            <a href="logs.html" class="nav-item"><i class="fa-solid fa-comments"></i> Communication Logs</a>
 
             <div class="nav-label">Treasury Management</div>
-            <a href="#" class="nav-item" data-section="withdrawals">
-                <i class="fa-solid fa-money-bill-transfer"></i> Payout Requests
-            </a>
-            <a href="#" class="nav-item" data-section="transactions">
-                <i class="fa-solid fa-list-check"></i> Ledger Reports
-            </a>
+            <a href="withdrawals.html" class="nav-item"><i class="fa-solid fa-money-bill-transfer"></i> Payout Requests</a>
+            <a href="ledger.html" class="nav-item"><i class="fa-solid fa-list-check"></i> Ledger Reports</a>
 
-<div class="nav-label">Marketplace Control</div>
-<a href="#" class="nav-item" data-section="listings">
-    <i class="fa-solid fa-boxes-stacked"></i> Listing Requests
-</a>
- <a href="#" class="nav-item" data-section="disputes">
-    <i class="fa-solid fa-scale-balanced"></i> Active Disputes
-</a>
+            <div class="nav-label">Marketplace Control</div>
+            <a href="listings.html" class="nav-item"><i class="fa-solid fa-boxes-stacked"></i> Listing Requests</a>
+            <a href="disputes.html" class="nav-item"><i class="fa-solid fa-scale-balanced"></i> Active Disputes</a>
 
-
-<div class="nav-label">Marketing & Outreach</div>
-<a href="#" class="nav-item" data-section="broadcast">
-    <i class="fa-solid fa-bullhorn"></i> Global Broadcast
-</a>
-<a href="#" class="nav-item" data-section="blog">
-    <i class="fa-solid fa-blog"></i> Platform News
-</a>
-
+            <div class="nav-label">Marketing & Outreach</div>
+            <a href="broadcast.html" class="nav-item"><i class="fa-solid fa-bullhorn"></i> Global Broadcast</a>
+            <a href="blog.html" class="nav-item"><i class="fa-solid fa-blog"></i> Platform News</a>
 
             <div class="nav-label">Support Services</div>
-<a href="#" class="nav-item" data-section="tickets">
-    <i class="fa-solid fa-ticket"></i> Service Tickets
-</a>
-
+            <a href="tickets.html" class="nav-item" data-section="tickets">
+                <i class="fa-solid fa-ticket"></i> Service Tickets
+            </a>
         </nav>
 
         <div class="sidebar-footer">
@@ -88,540 +157,97 @@
     <main class="main-content">
         <header class="top-bar">
             <div class="header-left">
-                <button class="menu-toggle" id="menuToggle" aria-label="Open Menu">
-                    <i class="fa-solid fa-bars"></i>
-                </button>
-                <h1 id="sectionTitle">Platform Overview</h1>
-            </div>
-            
-            <div class="admin-profile">
-                <span id="adminUsername">Loading Security Profile...</span>
+                <button class="menu-toggle" id="menuToggle"><i class="fa-solid fa-bars"></i></button>
+                <h1>Platform Overview</h1>
             </div>
         </header>
 
-        <section id="overviewSection" class="content-section">
+        <section id="overviewSection" class="content-section dashboard-active" style="padding: 0 20px 20px 20px;">
             <div class="stats-grid">
+                
                 <div class="stat-card">
-                    <h3>User Intelligence</h3>
-                    <div class="stat-row"><span>Active Buyers</span> <b id="statBuyers">0</b></div>
-                    <div class="stat-row"><span>Verified Sellers</span> <b id="statSellers">0</b></div>
-                    <div class="stat-row"><span>System Administrators</span> <b id="statAdmins">0</b></div>
-                </div>
-
-                <div class="stat-card">
-                    <h3>Financial Oversight</h3>
-                    <div class="stat-value" id="statTotalFunds">₦0.00</div>
-                    <div class="stat-label">Total Platform Liquidity</div>
-                    <hr>
-                    <div class="stat-row">
-                        <span>Outstanding Payouts</span> 
-                        <b id="statPendingPayouts" style="color: #ef4444;">₦0</b>
+                    <div>
+                        <div class="card-header-block">
+                            <h3>User Intelligence</h3>
+                        </div>
+                        <div class="stat-row">
+                            <span>Active Buyers</span> 
+                            <b id="statBuyers">0</b>
+                        </div>
+                        <div class="stat-row">
+                            <span>Verified Sellers</span> 
+                            <b id="statSellers">0</b>
+                        </div>
+                        <div class="stat-row">
+                            <span>System Administrators</span> 
+                            <b id="statAdmins">0</b>
+                        </div>
                     </div>
                 </div>
 
                 <div class="stat-card">
-                    <h3>Activity Metrics</h3>
-                    <div class="stat-row"><span>Communication Volume</span> <b id="statMessages">0</b></div>
-                    <div class="stat-row"><span>Active Disputes</span> <b id="statDisputes">0</b></div>
-                    <div class="stat-row"><span>Pending Asset Review</span> <b id="statPendingAccs">0</b></div>
+                    <div>
+                        <div class="card-header-block">
+                            <h3>Financial Oversight</h3>
+                        </div>
+                        <div class="stat-value" id="statTotalFunds">₦0.00</div>
+                        <div class="stat-label">Total Platform Liquidity</div>
+                    </div>
+                    <div>
+                        <hr>
+                        <div class="stat-row" style="padding: 0;">
+                            <span>Outstanding Payouts</span> 
+                            <b id="statPendingPayouts">₦0.00</b>
+                        </div>
+                    </div>
                 </div>
+
+                <div class="stat-card">
+                    <div>
+                        <div class="card-header-block">
+                            <h3>Activity Metrics</h3>
+                        </div>
+                        <div class="stat-row">
+                            <span>Communication Volume</span> 
+                            <b id="statMessages">0</b>
+                        </div>
+                        <div class="stat-row">
+                            <span>Active Disputes</span> 
+                            <b id="statDisputes">0</b>
+                        </div>
+                        <div class="stat-row">
+                            <span>Pending Asset Review</span> 
+                            <b id="statPendingAccs">0</b>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </section>
-
-<section id="overviewSection" class="content-section">
-    </section>
-
-<section id="usersSection" class="content-section" style="display: none;">
-    <div class="table-card">
-        <div class="table-header">
-            <div class="header-info">
-                <h2>User Intelligence Directory</h2>
-                <p>Monitor and manage all registered platform entities.</p>
-            </div>
-            <div class="header-actions">
-                <div class="search-box">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" id="userSearchInput" placeholder="Search identity or email...">
-                </div>
-                <button class="btn-refresh" title="Refresh Directory"><i class="fa-solid fa-rotate"></i></button>
-            </div>
-        </div>
-
-        <div class="table-responsive">
-            <table class="admin-table">
-                <thead>
-                    <tr>
-                        <th>Identity</th>
-                        <th>Classification</th>
-                        <th>Escrow Balance</th>
-                        <th>Onboarding Date</th>
-                        <th style="text-align: right;">Operations</th>
-                    </tr>
-                </thead>
-                <tbody id="userTableBody">
-                    </tbody>
-            </table>
-        </div>
-    </div>
-</section>
-<section id="kycSection" class="content-section" style="display: none;">
-    <div class="table-card">
-        <div class="table-header">
-            <div class="header-info">
-                <h2>Treasury-Cleared Verifications</h2>
-                <p>Monitor paid requests, dispatch Digit links, and promote verified sellers.</p>
-            </div>
-            <div class="header-actions">
-                <div class="search-box">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" id="kycSearchInput" placeholder="Search Email or UID..." onkeyup="filterKYCTable()">
-                </div>
-                <button class="btn-refresh" onclick="loadPaidKYC()"><i class="fa-solid fa-rotate"></i></button>
-            </div>
-        </div>
-
-        <div class="table-responsive">
-            <table class="admin-table">
-                <thead>
-                    <tr>
-                        <th>User Identity (Email / UID)</th>
-                        <th>Amount Paid</th>
-                        <th>Dispatch Progress</th>
-                        <th>Request Date</th>
-                        <th style="text-align: right;">Operations</th>
-                    </tr>
-                </thead>
-                <tbody id="kycTableBody">
-                    </tbody>
-            </table>
-        </div>
-    </div>
-</section>
-
-<section id="bannedSection" class="content-section" style="display: none;">
-    <div class="table-card">
-        <div class="table-header">
-            <div class="header-info">
-                <h2>Restricted Access Management</h2>
-                <p>View and manage users currently set to inactive status.</p>
-            </div>
-            <div class="header-actions">
-                <div class="search-box">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" id="bannedSearchInput" placeholder="Search Inactive Users..." onkeyup="filterBannedTable()">
-                </div>
-                <button class="btn-refresh" onclick="loadRestrictedUsers()" title="Refresh List">
-                    <i class="fa-solid fa-rotate"></i>
-                </button>
-            </div>
-        </div>
-
-        <div class="table-responsive">
-            <table class="admin-table">
-                <thead>
-                    <tr>
-                        <th>Identity (Username/UID)</th>
-                        <th>Restriction Type</th>
-                        <th>Access Status</th>
-                        <th>Date Flagged</th>
-                        <th style="text-align: right;">Operations</th>
-                    </tr>
-                </thead>
-                <tbody id="bannedTableBody">
-                    </tbody>
-            </table>
-        </div>
-    </div>
-</section>
-
-<section id="verificationSection" class="content-section" style="display: none;">
-    <div class="table-card">
-        <div class="table-header">
-            <div class="header-info">
-                <h2><i class="fa-solid fa-tower-broadcast"></i> System Live Feed</h2>
-                <p>Real-time monitoring of transactions, communications, and system events.</p>
-            </div>
-            <button class="btn-refresh" onclick="loadAccountAudits()">
-                <i class="fa-solid fa-sync"></i> 
-            </button>
-        </div>
-
-        <div class="table-responsive">
-            <table class="admin-table">
-<thead>
-    <tr>
-        <th>Event Type</th>
-        <th>Activity Description</th>
-        <th>Status / Result</th>
-        <th>Timestamp</th>
-        <th style="text-align: right;">AI Security Check</th> </tr>
-</thead>
-
-                <tbody id="verificationTableBody">
-                    </tbody>
-            </table>
-        </div>
-    </div>
-</section>
-
-<section id="conversationsSection" class="content-section" style="display: none;">
-    <div class="table-card">
-        <div class="table-header">
-            <div class="header-info">
-                <h2><i class="fa-solid fa-comments"></i> Communication Intelligence</h2>
-                <p>Monitoring active trade spaces, escrow chats, and direct messages.</p>
-            </div>
-            <div class="header-actions">
-                <div class="search-box">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" id="chatSearchInput" placeholder="Search by Username..." onkeyup="filterChatTable()">
-                </div>
-                <button class="btn-refresh" onclick="loadCommunicationLogs()">
-                    <i class="fa-solid fa-rotate"></i>
-                </button>
-            </div>
-        </div>
-
-        <div class="table-responsive">
-            <table class="admin-table">
-                <thead>
-                    <tr>
-                        <th>Channel ID</th>
-                        <th>Participants</th>
-                        <th>Latest Activity</th>
-                        <th>Last Message Highlight</th>
-                        <th style="text-align: right;">AI Integrity</th>
-                    </tr>
-                </thead>
-                <tbody id="conversationsTableBody">
-                    </tbody>
-            </table>
-        </div>
-    </div>
-</section>
- 
- <section id="withdrawalsSection" class="content-section" style="display: none;">
-    <div class="table-card">
-        <div class="table-header">
-            <div class="header-info">
-                <h2><i class="fa-solid fa-money-bill-transfer"></i> Payout Requests</h2>
-                <p>Manage and disburse seller earnings via Kora Pay Gateway.</p>
-            </div>
-            <div class="header-actions">
-                <button class="btn-refresh" onclick="loadWithdrawalRequests()">
-                    <i class="fa-solid fa-rotate"></i>
-                </button>
-            </div>
-        </div>
-
-        <div class="table-responsive">
-            <table class="admin-table">
-                <thead>
-                    <tr>
-                        <th>Recipient</th>
-                        <th>Bank Details</th>
-                        <th>Amount</th>
-                        <th>Request Date</th>
-                        <th>Status</th>
-                        <th style="text-align: right;">Operations</th>
-                    </tr>
-                </thead>
-                <tbody id="payoutsTableBody">
-                    </tbody>
-            </table>
-        </div>
-    </div>
-</section>
-   
-<section id="transactionsSection" class="content-section" style="display:none;">
-    <div class="table-card">
-        <div class="table-header">
-            <div class="header-info">
-                <h2>Financial Ledger Reports</h2>
-                <p>Click on IDs to copy them to your clipboard for tracking.</p>
-            </div>
-            <div class="header-actions">
-                <button class="btn-refresh" onclick="loadLedgerReports()" title="Refresh Ledger">
-                    <i class="fa-solid fa-rotate"></i>
-                </button>
-            </div>
-        </div>
-
-        <div class="table-responsive">
-            <table class="admin-table">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>User (UID)</th>
-                        <th>Transaction ID</th>
-                        <th>Type</th>
-                        <th>Amount</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody id="ledgerTableBody"></tbody>
-            </table>
-        </div>
-    </div>
-</section>
-
-  <section id="broadcast-section" class="content-section" style="display:none;">
-    <div class="comm-card">
-        <div class="comm-header">
-            <div class="header-icon"><i class="fa-solid fa-tower-broadcast"></i></div>
-            <div class="header-text">
-                <h2>Advanced Communication Center</h2>
-                <p>Multi-channel transmission to targeted user groups.</p>
-            </div>
-        </div>
-
-        <div class="comm-content">
-            <div class="targeting-zone">
-                <div class="input-box">
-                    <label>1. Select Target Audience</label>
-                    <select id="targetType" onchange="toggleTargetFields()" class="modern-select">
-                        <option value="all">Everyone (Global)</option>
-                        <option value="single">Single User (via UID)</option>
-                        <option value="role">By User Role (Buyer/Seller)</option>
-                    </select>
-                </div>
-
-                <div id="targetInputContainer" class="input-box">
-                    <div id="singleUserInput" style="display:none;" class="fade-in">
-                        <label>User UID</label>
-                        <input type="text" id="targetUID" placeholder="Paste user ID here..." class="modern-input">
-                    </div>
-                    <div id="roleSelectInput" style="display:none;" class="fade-in">
-                        <label>Select Role</label>
-                        <select id="targetRole" class="modern-select">
-                            <option value="buyer">Buyers Only</option>
-                            <option value="seller">Sellers Only</option>
-                            <option value="admin">Admins Only</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            <div class="message-zone">
-                <label>2. Compose Message</label>
-                <input type="text" id="broadcastTitle" placeholder="Notification Subject/Title" class="modern-input bold-text">
-                <textarea id="broadcastMessage" rows="4" placeholder="Type your message here..." class="modern-textarea"></textarea>
-            </div>
-
-            <div class="channel-zone">
-                <label>3. Choose Channels</label>
-                <div class="channel-grid">
-                    <label class="channel-item">
-                        <input type="checkbox" id="chanInApp" checked>
-                        <div class="pill"><i class="fa-solid fa-bell"></i> In-App</div>
-                    </label>
-                    <label class="channel-item">
-                        <input type="checkbox" id="chanTelegram">
-                        <div class="pill"><i class="fa-brands fa-telegram"></i> Telegram</div>
-                    </label>
-                    <label class="channel-item">
-                        <input type="checkbox" id="chanEmail">
-                        <div class="pill"><i class="fa-solid fa-envelope"></i> Email</div>
-                    </label>
-                </div>
-            </div>
-
-            <button onclick="processBroadcast()" class="btn-execute">
-                <i class="fa-solid fa-paper-plane"></i> Execute Transmission
-            </button>
-        </div>
-    </div>
-</section>
-
- <section id="blog-section" class="content-section" style="display: none;">
-    <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h2 style="color: #0b1e5b;"><i class="fa-solid fa-blog"></i> Platform News Management</h2>
-        <button onclick="window.openBlogModal()" style="padding: 10px 20px; background: #0b1e5b; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; transition: 0.3s;">
-            <i class="fa-solid fa-plus"></i> Create Post
-        </button>
-    </div>
-
-    <div style="background: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow-x: auto; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
-        <table style="width: 100%; border-collapse: collapse; text-align: left; min-width: 600px;">
-            <thead style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
-                <tr>
-                    <th style="padding: 15px; color: #64748b; font-weight: 600;">Media</th>
-                    <th style="padding: 15px; color: #64748b; font-weight: 600;">Title</th>
-                    <th style="padding: 15px; color: #64748b; font-weight: 600;">Author</th>
-                    <th style="padding: 15px; color: #64748b; font-weight: 600;">Date</th>
-                    <th style="padding: 15px; color: #64748b; text-align: center; font-weight: 600;">Actions</th>
-                </tr>
-            </thead>
-            <tbody id="blogTableBody">
-                </tbody>
-        </table>
-    </div>
-</section>
-
-
- 
-
-
-<div id="blogModal" style="display:none; position:fixed; z-index:9999; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.6); align-items:center; justify-content:center; backdrop-filter: blur(2px);">
-    <div style="background:white; padding:30px; border-radius:16px; width:95%; max-width:500px; position:relative; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
-        <h3 id="modalTitle" style="margin-top:0; color:#0b1e5b; font-size: 1.25rem;">Create News Post</h3>
-        <p style="font-size: 13px; color: #64748b; margin-bottom: 15px;">Fill in the details below to publish platform news.</p>
-        <hr style="border: 0; border-top: 1px solid #f1f5f9; margin-bottom: 20px;">
-        
-        <input type="hidden" id="editBlogId">
-        
-        <div style="margin-top:15px;">
-            <label style="display:block; font-size:12px; font-weight: 600; color:#475569; margin-bottom: 5px;">Header Media (Images or MP4 Videos)</label>
-<input type="file" id="blogFile" accept="*/*" style="width:100%; padding:8px; border:1px dashed #cbd5e1; border-radius:8px; background:#f8fafc; font-size:13px;">
-            <small style="color: #94a3b8; font-size: 11px;">Max recommended size: 10MB</small>
-        </div>
-
-        <div style="margin-top:15px;">
-            <label style="display:block; font-size:12px; font-weight: 600; color:#475569; margin-bottom: 5px;">Post Title</label>
-            <input type="text" id="blogTitle" placeholder="e.g. Major System Update" style="width:100%; padding:12px; border:1px solid #e2e8f0; border-radius:8px; font-size: 14px;">
-        </div>
-
-        <div style="margin-top:15px;">
-            <label style="display:block; font-size:12px; font-weight: 600; color:#475569; margin-bottom: 5px;">Author Display Name</label>
-            <input type="text" id="blogAuthor" placeholder="Admin" style="width:100%; padding:12px; border:1px solid #e2e8f0; border-radius:8px; font-size: 14px;">
-        </div>
-
-        <div style="margin-top:15px;">
-            <label style="display:block; font-size:12px; font-weight: 600; color:#475569; margin-bottom: 5px;">News Content</label>
-            <textarea id="blogContent" placeholder="Write the full news story here..." style="width:100%; padding:12px; border:1px solid #e2e8f0; border-radius:8px; height:150px; font-size: 14px; font-family: inherit; resize: vertical;"></textarea>
-        </div>
-        
-        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:25px;">
-            <button onclick="window.closeBlogModal()" style="padding:10px 20px; border-radius:8px; border:1px solid #e2e8f0; background: white; color: #64748b; cursor:pointer; font-weight: 600; font-size: 14px;">Cancel</button>
-            <button onclick="window.saveBlogPost()" id="saveBtn" style="padding:10px 20px; background:#0b1e5b; color:white; border-radius:8px; border:none; cursor:pointer; font-weight: 600; font-size: 14px;">
-                <i class="fa-solid fa-paper-plane" style="margin-right: 5px;"></i> Save Post
-            </button>
-        </div>
-    </div>
-</div>
-
-<section id="listings-section" class="content-section" style="display: none;">
-    <div class="table-card">
-        <div class="table-header">
-            <div class="header-info">
-                <h2>Pending Listing Requests</h2>
-                <p>Review details, visit profiles, and moderate submissions for the marketplace.</p>
-            </div>
-            <button class="btn-refresh" onclick="window.loadListingRequests()">
-                <i class="fa-solid fa-rotate"></i>
-            </button>
-        </div>
-        <div class="table-responsive">
-            <table class="admin-table">
-                <thead>
-                    <tr>
-                        <th>Proof Preview</th>
-                        <th>Platform</th>
-                        <th>Asking Price</th>
-                        <th>Account Link</th>
-                        <th>Status</th>
-                        <th style="text-align: right;">Moderation</th>
-                    </tr>
-                </thead>
-                <tbody id="listingsTableBody"></tbody>
-            </table>
-        </div>
-    </div>
-</section>
-
-<div id="listingReviewModal" class="admin-modal" style="display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px);">
-    <div class="modal-content" style="background:#fff; margin:5% auto; width:95%; max-width:600px; border-radius:12px; overflow:hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
-        <div class="modal-header" style="padding:20px; background:#0b1e5b; color:white; display:flex; justify-content:space-between; align-items:center;">
-            <h3 style="margin:0; font-size:18px;">Review Listing Details</h3>
-            <span onclick="window.closeReviewModal()" style="cursor:pointer; font-size:24px;">&times;</span>
-        </div>
-        <div class="modal-body" style="padding:20px; max-height:70vh; overflow-y:auto;" id="modalBody">
-            </div>
-        <div class="modal-footer" style="padding:15px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:10px;">
-            <button onclick="window.closeReviewModal()" style="padding:10px 15px; border-radius:6px; border:1px solid #cbd5e1; background:white; cursor:pointer;">Cancel</button>
-            <button id="saveDetailsBtn" style="padding:10px 20px; border-radius:6px; border:none; background:#0b1e5b; color:white; cursor:pointer; font-weight:600;">Update & Save</button>
-        </div>
-    </div>
-</div>
-
-
-<section id="tickets-section" class="content-section" style="display: none;">
-    <div class="table-card">
-        <div class="table-header">
-            <div class="header-info">
-                <h2>Active Support Tickets</h2>
-                <p>Respond to customer service issues and manage resolution workflows.</p>
-            </div>
-            <button class="btn-refresh" onclick="window.loadSupportTickets()">
-                <i class="fa-solid fa-rotate"></i>
-            </button>
-        </div>
-        <div class="table-responsive">
-            <table class="admin-table">
-                <thead>
-                    <tr>
-                        <th>Ticket No.</th>
-                        <th>Subject</th>
-                        <th>User ID</th>
-                        <th>Attachment</th>
-                        <th>Status</th>
-                        <th style="text-align: right;">Operations</th>
-                    </tr>
-                </thead>
-                <tbody id="ticketsTableBody"></tbody>
-            </table>
-        </div>
-    </div>
-</section>
-
-<div id="ticketReviewModal" class="admin-modal" style="display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.7); backdrop-filter:blur(5px);">
-    <div class="modal-content" style="background:#fff; margin:50px auto; width:90%; max-width:550px; border-radius:15px; overflow:hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
-        <div class="modal-header" style="padding:20px; background:#0b1e5b; color:white; display:flex; justify-content:space-between; align-items:center;">
-            <h3 style="margin:0; font-size:18px;"><i class="fa-solid fa-ticket"></i> Manage Support Ticket</h3>
-            <span onclick="window.closeTicketModal()" style="cursor:pointer; font-size:28px;">&times;</span>
-        </div>
-        <div class="modal-body" style="padding:25px; max-height:65vh; overflow-y:auto;" id="ticketModalBody">
-            </div>
-        <div class="modal-footer" style="padding:15px 25px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:12px;">
-            <button onclick="window.closeTicketModal()" style="padding:10px 20px; border-radius:8px; border:1px solid #cbd5e1; background:white; font-weight:600; cursor:pointer;">Cancel</button>
-            <button id="resolveTicketBtn" style="padding:10px 25px; border-radius:8px; border:none; background:#10b981; color:white; font-weight:600; cursor:pointer;">Mark Resolved</button>
-        </div>
-    </div>
-</div>
-
-<section id="disputes-section" class="content-section" style="display: none;">
-    <div class="section-header">
-        <h2><i class="fa-solid fa-scale-balanced"></i> Active Disputes</h2>
-        <p class="section-subtitle">Manage and arbitrate buyer-seller conflicts.</p>
-    </div>
-
-    <div class="table-container">
-        <table class="admin-table" id="disputes-table">
-            <thead>
-                <tr>
-                    <th>Created At</th>
-                    <th>Reason</th>
-                    <th>Description</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody id="disputes-table-body">
-                </tbody>
-        </table>
-    </div>
-</section>
-
-<div id="disputeDetailModal">
-    <div id="dispute-modal-body">
-        </div>
-</div>
-
-
-
-
     </main>
 
-    <script type="module" src="assets/js/admin-dashboard.js"></script>
+    <script type="module" src="assets/js/dashboard.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const menuToggle = document.getElementById('menuToggle');
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+
+            if (menuToggle && sidebar) {
+                menuToggle.addEventListener('click', () => {
+                    sidebar.classList.toggle('active');
+                    if (overlay) overlay.classList.toggle('active');
+                });
+            }
+
+            if (overlay) {
+                overlay.addEventListener('click', () => {
+                    sidebar.classList.remove('active');
+                    overlay.classList.remove('active');
+                });
+            }
+        });
+    </script>
 </body>
 </html>
