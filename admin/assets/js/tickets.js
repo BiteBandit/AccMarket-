@@ -268,8 +268,16 @@ window.inspectTicket = async function(id) {
     }
 };
 
+
 // --- 6. WRITE VECTOR: STATUS MUTATION WORKFLOWS ---
 window.updateTicketStatus = async function(id, nextStatus) {
+    console.log(`🚀 Dispatching update query. Ticket UUID: "${id}" | New Status: "${nextStatus}"`);
+
+    if (!id || id === 'undefined') {
+        console.error("❌ Aborted: The row ID passed to the function is invalid.");
+        return Swal.fire("Action Blocked", "The interface passed an invalid or empty row ID key reference.", "error");
+    }
+
     try {
         if (nextStatus === 'dismissed') {
             const { isConfirmed } = await Swal.fire({
@@ -283,22 +291,37 @@ window.updateTicketStatus = async function(id, nextStatus) {
             if (!isConfirmed) return;
         }
 
-        const { error } = await supabase
+        // Execute the update query strictly targeting the unique 'id' primary key
+        const { data, error } = await supabase
             .from('support_tickets')
             .update({ status: nextStatus })
-            .eq('id', id);
+            .eq('id', id)
+            .select(); 
 
         if (error) throw error;
+
+        // If data returns empty, it means your RLS policies are blocking updates
+        if (!data || data.length === 0) {
+            console.warn("⚠️ Database transaction returned empty. This points directly to an RLS permission issue.");
+            return Swal.fire({
+                icon: 'warning',
+                title: 'Permission Denied (RLS)',
+                text: 'The query executed but your account lacks permission to update this table. Please verify your Supabase Row Level Security (RLS) UPDATE policy.',
+                confirmButtonColor: '#0b1e5b'
+            });
+        }
+
+        console.log("✅ Database status mutation confirmed:", data);
 
         Swal.fire({ 
             icon: 'success', 
             title: `Ticket ${nextStatus.toUpperCase()}`, 
-            text: `Workflow transaction applied accurately.`, 
+            text: `Workflow transaction applied accurately to database row references.`, 
             timer: 1500, 
             showConfirmButton: false 
         });
         
-        // Instantly filters the mutated row completely out of the active rendering queue
+        // Refresh the table interface automatically
         window.loadSupportTickets();
 
     } catch (err) {
@@ -306,6 +329,7 @@ window.updateTicketStatus = async function(id, nextStatus) {
         Swal.fire("System Interrupted", err.message || "Failed to commit ticket mutation status records.", "error");
     }
 };
+
 
 window.closeTicketModal = function() {
     const modal = document.getElementById('ticketReviewModal');

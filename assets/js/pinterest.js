@@ -44,7 +44,7 @@ function syncFollowCache() {
  */
 const applyFilters = () => {
     // 1. Instantly parse UI metrics
-    const maxPrice = document.getElementById('priceRange') ? parseFloat(document.getElementById('priceRange').value) : 100000;
+    const maxPrice = document.getElementById('priceRange') ? parseFloat(document.getElementById('priceRange').value) : 500000;
     const minFollowers = document.getElementById('followerRange') ? parseInt(document.getElementById('followerRange').value) : 0;
     const minYear = document.getElementById('yearRange') ? parseInt(document.getElementById('yearRange').value) : 1999;
     const searchTerm = document.getElementById('assetSearch') ? document.getElementById('assetSearch').value.toLowerCase().trim() : "";

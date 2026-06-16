@@ -676,3 +676,21 @@ body {
 .chat-count-badge.pop {
   transform: scale(1.3);
 }
+
+.email-group a {
+  display: inline-block;
+  margin-bottom: 6px;
+  color: inherit; /* Keeps your theme's default footer text color */
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.email-group a:hover {
+  color: #0b1e5b; /* Adjust this color to match your brand's highlight color */
+}
+
+.email-group i {
+  margin-right: 8px;
+  font-size: 0.9em;
+  opacity: 0.8;
+}
