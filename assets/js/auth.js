@@ -1,26 +1,10 @@
 // ==========================================
-// 1. TURNSTILE TOKEN UTILITIES
-// ==========================================
-/**
- * Safely fetches the current Turnstile token from a widget container.
- * @param {string} selector - The CSS selector of the turnstile element (e.g., '#login-turnstile')
- * @returns {string|null} The token string if validated, otherwise null.
- */
-function getTurnstileToken(selector) {
-  if (typeof turnstile !== "undefined") {
-    return turnstile.getResponse(selector);
-  }
-  return null;
-}
-
-
-// ==========================================
-// 2. MODULE IMPORTS
+// 1. MODULE IMPORTS
 // ==========================================
 import { supabase } from './supabase-config.js'
 
 // ==========================================
-// 3. SIDEBARS & NAVIGATION UI LOGIC
+// 2. SIDEBARS & NAVIGATION UI LOGIC
 // ==========================================
 const sidebarToggle = document.getElementById("sidebarToggle");
 const leftSidebar = document.getElementById("leftSidebar");
@@ -55,7 +39,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // ==========================================
-// 4. AUTH SECTION SWITCHING ANIMATIONS
+// 3. AUTH SECTION SWITCHING ANIMATIONS
 // ==========================================
 const registerSection = document.getElementById("register-section");
 const loginSection = document.getElementById("login-section");
@@ -103,7 +87,7 @@ window.addEventListener("load", () => {
 });
 
 // ==========================================
-// 5. FORGOT PASSWORD MODAL UTILITIES
+// 4. FORGOT PASSWORD MODAL UTILITIES
 // ==========================================
 const forgotLink = document.querySelector(".forgot-link");
 const forgotModal = document.getElementById("forgot-modal");
@@ -125,7 +109,7 @@ window.addEventListener("click", (e) => {
 });
 
 // ==========================================
-// 6. BACK TO TOP BUTTON LOGIC
+// 5. BACK TO TOP BUTTON LOGIC
 // ==========================================
 const backToTop = document.getElementById("backToTop");
 if (backToTop) {
@@ -143,7 +127,7 @@ if (backToTop) {
 }
 
 // ==========================================
-// 7. INTERACTIVE ENTRY FIELD HELPERS
+// 6. INTERACTIVE ENTRY FIELD HELPERS
 // ==========================================
 
 // Password Strength Meter
@@ -237,7 +221,7 @@ document.addEventListener("click", (e) => {
 });
 
 // ==========================================
-// 8. SUPABASE & SECURE AUTHENTICATION TRANSACTION HANDLERS
+// 7. SUPABASE & SECURE AUTHENTICATION TRANSACTION HANDLERS
 // ==========================================
 
 // Register User Request
@@ -252,26 +236,13 @@ if (registerForm) {
     const termsCheckbox = document.getElementById("terms");
     const isTermsAccepted = termsCheckbox ? termsCheckbox.checked : false;
 
-    const token = getTurnstileToken("#register-turnstile");
-    if (!token) {
-      Swal.fire({ 
-        title: 'Security Check', 
-        text: 'Please fulfill the security verification challenge.', 
-        icon: 'warning', 
-        confirmButtonColor: '#0b1e5b' 
-      });
-      return;
-    }
-
     if (!email || !password) {
       Swal.fire({ title: 'Account Creation', text: 'Please fill in all mandatory fields.', icon: 'warning', confirmButtonColor: '#0b1e5b' });
-      if (typeof turnstile !== "undefined") turnstile.reset("#register-turnstile");
       return;
     }
 
     if (password !== confirmPassword) {
       Swal.fire({ title: 'Security Verification', text: 'The passwords entered do not match.', icon: 'error', confirmButtonColor: '#0b1e5b' });
-      if (typeof turnstile !== "undefined") turnstile.reset("#register-turnstile");
       return;
     }
 
@@ -279,7 +250,6 @@ if (registerForm) {
       Swal.fire({ title: 'Policy Agreement', text: 'You must review and agree to the Terms & Policies to proceed.', icon: 'info', confirmButtonColor: '#0b1e5b' });
       termsCheckbox.parentElement.classList.add('vibrate');
       setTimeout(() => termsCheckbox.parentElement.classList.remove('vibrate'), 300);
-      if (typeof turnstile !== "undefined") turnstile.reset("#register-turnstile");
       return;
     }
 
@@ -303,7 +273,6 @@ if (registerForm) {
           confirmButtonText: 'Proceed to Login',
           confirmButtonColor: '#0b1e5b'
         }).then((res) => { if (res.isConfirmed) document.getElementById('go-to-login').click(); });
-        if (typeof turnstile !== "undefined") turnstile.reset("#register-turnstile");
         return;
       }
 
@@ -311,20 +280,17 @@ if (registerForm) {
         email,
         password,
         options: { 
-          emailRedirectTo: "https://accmarket.name.ng/auth.html",
-          captchaToken: token 
+          emailRedirectTo: "https://accmarket.name.ng/auth.html"
         }
       });
 
       if (error) {
         Swal.fire({ title: 'Registration Failed', text: error.message, icon: 'error', confirmButtonColor: '#0b1e5b' });
-        if (typeof turnstile !== "undefined") turnstile.reset("#register-turnstile");
         return;
       }
 
       if (data?.user) {
         registerForm.reset();
-        if (typeof turnstile !== "undefined") turnstile.reset("#register-turnstile");
         Swal.fire({ 
           icon: 'success', 
           title: 'Verification Link Sent', 
@@ -332,7 +298,6 @@ if (registerForm) {
           confirmButtonColor: '#0b1e5b' 
         });
       } else {
-        if (typeof turnstile !== "undefined") turnstile.reset("#register-turnstile");
         Swal.fire({ 
           icon: 'info', 
           title: 'Check Your Inbox', 
@@ -343,7 +308,6 @@ if (registerForm) {
 
     } catch (err) {
       Swal.close();
-      if (typeof turnstile !== "undefined") turnstile.reset("#register-turnstile");
       Swal.fire({ title: 'System Error', text: 'An unexpected internal error occurred. Please try again later or contact support.', icon: 'error', confirmButtonColor: '#0b1e5b' });
     }
   });
@@ -358,15 +322,8 @@ if (loginForm) {
     const password = document.getElementById("login-password").value;
     const remember = document.getElementById("rememberMe")?.checked ?? false;
 
-    const token = getTurnstileToken("#login-turnstile");
-    if (!token) {
-      Swal.fire("Security Check", "Please fulfill the security verification challenge.", "warning");
-      return;
-    }
-
     if (!email || !password) {
       Swal.fire("Missing fields", "Please enter email and password.", "warning");
-      if (typeof turnstile !== "undefined") turnstile.reset("#login-turnstile");
       return;
     }
 
@@ -374,23 +331,18 @@ if (loginForm) {
 
     const { data, error } = await supabase.auth.signInWithPassword({ 
       email, 
-      password,
-      options: {
-        captchaToken: token
-      }
+      password
     });
     Swal.close();
 
     if (error) {
       Swal.fire("Login failed", error.message, "error");
-      if (typeof turnstile !== "undefined") turnstile.reset("#login-turnstile");
       return;
     }
 
     const user = data.user;
     if (!user.confirmed_at) {
       Swal.fire({ icon: "warning", title: "Email not verified", text: "Please verify your email." });
-      if (typeof turnstile !== "undefined") turnstile.reset("#login-turnstile");
       return;
     }
 
@@ -399,7 +351,6 @@ if (loginForm) {
     if (profile && profile.is_active === false) {
       await supabase.auth.signOut();
       Swal.fire({ icon: "warning", title: "Account Deactivated", text: "Contact support to reactivate." });
-      if (typeof turnstile !== "undefined") turnstile.reset("#login-turnstile");
       return;
     }
 
@@ -426,7 +377,6 @@ if (loginForm) {
       sessionStorage.setItem("supabaseSession", JSON.stringify(data.session));
     }
 
-    if (typeof turnstile !== "undefined") turnstile.reset("#login-turnstile");
     Swal.fire({ icon: "success", title: "Login successful", showConfirmButton: false, timer: 1400 });
     setTimeout(() => { window.location.href = "dashboard.html"; }, 1200);
   });
@@ -444,24 +394,12 @@ if (forgotForm) {
       return;
     }
 
-    // 1. Read from the SHARED login turnstile container
-    const token = getTurnstileToken("#login-turnstile");
-    if (!token) {
-      Swal.fire("Security Check", "Please fulfill the security verification challenge on the login card.", "warning");
-      return;
-    }
-
     Swal.fire({ title: "Sending reset link...", allowOutsideClick: false, didOpen: () => Swal.showLoading() });
     
-    // 2. ✅ FIXED: captchaToken is now correctly flat beside redirectTo
     const { error } = await supabase.auth.resetPasswordForEmail(email, { 
-      redirectTo: "https://accmarket.name.ng/reset.html",
-      captchaToken: token
+      redirectTo: "https://accmarket.name.ng/reset.html"
     });
     Swal.close();
-
-    // 3. Instantly reset the widget because single-use tokens expire immediately upon use
-    if (typeof turnstile !== "undefined") turnstile.reset("#login-turnstile");
 
     if (error) {
       Swal.fire("Error", error.message, "error");
