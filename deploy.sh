@@ -1,4 +1,5 @@
 #!/bin/bash
+cd /storage/emulated/0/Download/Accmarket
 cd ~/storage/shared/Download/AccMarket
 git status
 git add .
