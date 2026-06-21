@@ -413,3 +413,22 @@ if (forgotForm) {
     }
   });
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    const popup = document.getElementById('socialPopup');
+    const closeBtn = document.getElementById('closePopup');
+
+    if (!sessionStorage.getItem('socialPopupShown')) {
+        setTimeout(() => {
+            popup.style.display = 'flex';
+        }, 3000); // 5 Seconds
+    }
+
+    const closeHandler = () => {
+        popup.style.display = 'none';
+        sessionStorage.setItem('socialPopupShown', 'true');
+    };
+
+    closeBtn.onclick = closeHandler;
+    window.onclick = (e) => { if (e.target === popup) closeHandler(); };
+});
