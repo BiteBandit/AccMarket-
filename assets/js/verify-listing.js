@@ -97,6 +97,85 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
   platformLogo.src = platformLogos[platform.toLowerCase()] || "../images/default.png";
 
+  // ---------------- AI DESCRIPTION GENERATION ----------------
+  const aiGenerateBtn = document.getElementById("ai-generate-btn");
+  const descriptionTextarea = document.getElementById("description");
+
+  if (aiGenerateBtn) {
+    aiGenerateBtn.addEventListener("click", async (e) => {
+      e.preventDefault(); // Extra guard against accidental form actions
+
+      // 1. Grab elements securely
+      const followersEl = document.getElementById("followers");
+      const regionEl = document.getElementById("region");
+      const categoryEl = document.getElementById("category");
+      const usernameEl = document.getElementById("username");
+
+      const followers = followersEl ? followersEl.value.trim() : "";
+      const region = regionEl ? regionEl.value.trim() : "";
+      const category = categoryEl ? categoryEl.value : "";
+      const username = usernameEl ? usernameEl.value.trim() : "";
+
+      // 2. Debugging Check: Find out exactly which field is failing
+      let missingFields = [];
+      if (!followers) missingFields.push("Follower Count");
+      if (!region) missingFields.push("Account Region");
+      if (!category || category === "") missingFields.push("Account Category");
+
+      if (missingFields.length > 0) {
+        Swal.fire({
+          icon: "warning",
+          title: "Information Needed",
+          text: `Please fill out these remaining fields first: ${missingFields.join(", ")}`
+        });
+        return;
+      }
+
+      try {
+        // 3. Update button to a loading state
+        aiGenerateBtn.disabled = true;
+        aiGenerateBtn.style.opacity = "0.7";
+        aiGenerateBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Generating...`;
+        descriptionTextarea.placeholder = "AI is currently drafting a high-converting description for you...";
+
+        // 4. Invoke your Supabase Edge Function
+        const { data, error } = await supabase.functions.invoke('generate-description', {
+          body: { 
+            platform, 
+            username, 
+            followers, 
+            region, 
+            category 
+          }
+        });
+
+        if (error) throw error;
+
+        // 5. Inject generated copy into the textarea
+        if (data && data.description) {
+          descriptionTextarea.value = data.description;
+        } else {
+          throw new Error("No description content returned from backend.");
+        }
+
+      } catch (err) {
+        console.error("AI Generation Error:", err);
+        Swal.fire({
+          icon: "error",
+          title: "Generation Failed",
+          text: "We couldn't generate the description automatically. Please write it manually or try again."
+        });
+      } finally {
+        // 6. Restore original button state
+        aiGenerateBtn.disabled = false;
+        aiGenerateBtn.style.opacity = "1";
+        aiGenerateBtn.innerHTML = `<i class="fas fa-magic"></i> Generate with AI`;
+        descriptionTextarea.placeholder = "Describe the account, niche, engagement, audience type...";
+      }
+    });
+  }
+
+  
   // ---------------- FORM LOGIC ----------------
   const verifyForm = document.getElementById("verify-form");
   const bioLockSection = document.getElementById("bio-lock-section");

@@ -269,8 +269,13 @@
   <label><input type="checkbox" value="2fa_enabled"> 2FA Enabled</label>
 </div>
 
-  <label for="description">Account Description</label>
-  <textarea id="description" rows="4" placeholder="Describe the account, niche, engagement, audience type..." required></textarea>
+<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
+  <label for="description" style="margin-bottom: 0;">Account Description</label>
+  <button type="button" id="ai-generate-btn" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; border-radius: 8px; font-weight: 600; background: var(--dark-blue); color: #fff; border: none; cursor: pointer; transition: 0.3s;">
+    <i class="fas fa-magic"></i> Generate with AI
+  </button>
+</div>
+<textarea id="description" rows="4" placeholder="Describe the account, niche, engagement, audience type..." required></textarea>
 
 <label for="price">Price (A reasonable one)</label>
 <input type="number" id="price" placeholder="Enter account price" required>
