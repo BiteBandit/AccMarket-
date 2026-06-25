@@ -41,9 +41,8 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // --------------------------
-// 1️⃣ Supabase Config
+// Supabase Logic
 // --------------------------
-// js/main.js
 import { supabase } from './supabase-config.js';
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -89,35 +88,35 @@ document.addEventListener("DOMContentLoaded", async () => {
     const tableBody = document.querySelector("#seller-accounts-table tbody");
 
     if (!listings || listings.length === 0) {
-      tableBody.innerHTML = `<tr><td colspan="6">No accounts listed yet.</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--gray);">No accounts listed yet.</td></tr>`;
       return;
     }
 
-  
     // Populate table with numbering
-listings.forEach((listing, index) => {
-  const data = listing.data || {}; // JSONB column
+    listings.forEach((listing, index) => {
+      const data = listing.data || {}; // JSONB column
 
-  const tr = document.createElement("tr");
+      const tr = document.createElement("tr");
 
-  tr.innerHTML = `
-    <td>${index + 1}</td> <!-- Numbering -->
-    <td>${data.platform || "-"}</td>
-    <td>${data.username || "-"}</td>
-    <td>${data.followers || "-"}</td>
-    <td>${data.category || "-"}</td>
-    <td>
-  <span class="status ${listing.status || "pending"}">
-    ${listing.status || "pending"}
-  </span>
-</td>
-    <td>
-      <button class="view-btn" data-id="${listing.id}">View</button>
-    </td>
-  `;
+      tr.innerHTML = `
+        <td>${index + 1}</td>
+        <td>${data.platform || "-"}</td>
+        <td>${data.username || "-"}</td>
+        <td>${data.followers || "-"}</td>
+        <td>${data.category || "-"}</td>
+        <td>
+          <span class="status ${listing.status || "pending"}">
+            ${listing.status || "pending"}
+          </span>
+        </td>
+        <td>
+          <button class="view-btn" data-id="${listing.id}">View</button>
+        </td>
+      `;
 
-  tableBody.appendChild(tr);
-});
+      tableBody.appendChild(tr);
+    });
+
     // ---------------- VIEW BUTTON ----------------
     document.querySelectorAll(".view-btn").forEach(btn => {
       btn.addEventListener("click", () => {
@@ -132,26 +131,22 @@ listings.forEach((listing, index) => {
   }
 });
 
-
 (async () => {
-  // 1. Check if user is logged in
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return; // Now valid because it's inside a function
+  if (!user) return;
 
-  // 2. Fetch the is_active status
   const { data: profile } = await supabase
     .from("profiles")
     .select("is_active")
     .eq("id", user.id)
     .single();
 
-  // 3. Professional Account Status Check
   if (profile && profile.is_active === false) {
     Swal.fire({
       title: "Account Deactivated",
       text: "Your account has been deactivated. Please contact support for assistance.",
       icon: "error",
-      confirmButtonColor: "#0b1e5b", // Matches your dark blue theme
+      confirmButtonColor: "#0b1e5b",
       confirmButtonText: "Close",
       allowOutsideClick: false,
       allowEscapeKey: false
@@ -159,22 +154,14 @@ listings.forEach((listing, index) => {
       await supabase.auth.signOut();
       window.location.href = "auth.html";
     });
-    return; // Exit the IIFE
+    return;
   }
 })();
 
-
 async function loadNotificationCount() {
   try {
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      console.warn("No logged-in user, skipping notification count.");
-      return;
-    }
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) return;
 
     const { count, error } = await supabase
       .from("notifications")
@@ -203,23 +190,14 @@ async function loadNotificationCount() {
   }
 }
 
-// ✅ Run when page loads
 loadNotificationCount();
-
-// ✅ Refresh every 30 seconds
 setInterval(loadNotificationCount, 30000);
 
-// ✅ Preload notification sound
 const notificationSound = new Audio("notification.mp3");
 
-// ✅ Real-time updates
 async function setupNotificationRealtime() {
   try {
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) return;
 
     supabase
@@ -233,7 +211,6 @@ async function setupNotificationRealtime() {
           filter: `user_id=eq.${user.id}`,
         },
         async (payload) => {
-          console.log("🔔 Realtime notification event:", payload.eventType);
           await loadNotificationCount();
           if (payload.eventType === "INSERT") {
             notificationSound.play().catch((e) => console.warn(e));
@@ -245,14 +222,10 @@ async function setupNotificationRealtime() {
     console.error("Error setting up realtime notifications:", err);
   }
 }
-
-// ✅ Activate real-time listener
 setupNotificationRealtime();
 
-// ✅ 1. Preload the notification sound
 const chatNotificationSound = new Audio("notification.mp3");
 
-// ✅ 2. Get total unread messages
 async function loadTotalChatCount() {
   try {
     const { data: { user } } = await supabase.auth.getUser();
@@ -262,7 +235,7 @@ async function loadTotalChatCount() {
       .from("messages")
       .select("*", { count: "exact", head: true })
       .eq("is_read", false)
-      .neq("sender_id", user.id); 
+      .neq("sender_id", user.id);
 
     if (error) throw error;
 
@@ -282,7 +255,6 @@ async function loadTotalChatCount() {
   }
 }
 
-// ✅ 3. Real-time listener WITH SOUND
 async function setupGlobalChatRealtime() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
@@ -292,42 +264,30 @@ async function setupGlobalChatRealtime() {
     .on(
       "postgres_changes",
       {
-        event: "*", 
+        event: "*",
         schema: "public",
         table: "messages",
       },
       async (payload) => {
-        // Refresh the count regardless of event type
         await loadTotalChatCount();
-        
-        // 🎯 PLAY SOUND: Only on NEW messages sent by someone else
         if (payload.eventType === "INSERT" && payload.new.sender_id !== user.id) {
-            chatNotificationSound.play().catch((e) => console.warn("Sound blocked by browser:", e));
+          chatNotificationSound.play().catch((e) => console.warn("Sound blocked:", e));
         }
       }
     )
     .subscribe();
 }
-
-// ✅ 4. Initialize
 loadTotalChatCount();
 setupGlobalChatRealtime();
 
-
-// ---- LOGOUT FUNCTIONALITY ----
 document.addEventListener("click", async (e) => {
   if (e.target.closest(".logout")) {
-    e.preventDefault(); // stop redirect
-
+    e.preventDefault();
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-
-      // Optional: clear cached data (just to be safe)
       localStorage.clear();
       sessionStorage.clear();
-
-      // Redirect to login page
       window.location.href = "auth.html";
     } catch (err) {
       console.error("Logout failed:", err.message);
@@ -336,38 +296,20 @@ document.addEventListener("click", async (e) => {
   }
 });
 
-
-// ✅ Show Sell Account link ONLY for Sellers
 async function showSellerAndAdminLinks() {
   try {
-    // Get current logged-in user
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) return;
 
-    if (userError || !user) {
-      console.warn("⚠️ No logged-in user found.");
-      return;
-    }
-
-    // Get user profile and role
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .single();
 
-    if (profileError) {
-      console.error("❌ Error fetching user role:", profileError.message);
-      return;
-    }
+    if (profileError) return;
 
-    // Select the Sell Account menu link
     const sellAccountLink = document.querySelector(".seller-only");
-
-    // Sell Account → ONLY visible for "seller"
-    // This will hide the  link for both "buyer" and "admin"
     if (sellAccountLink) {
       if (profile.role === "seller") {
         sellAccountLink.style.display = "block";
@@ -375,14 +317,8 @@ async function showSellerAndAdminLinks() {
         sellAccountLink.style.display = "none";
       }
     }
-
-
-
   } catch (err) {
     console.error("⚠️ Error checking role:", err);
   }
 }
-
-// Run it once page loads
 showSellerAndAdminLinks();
-
