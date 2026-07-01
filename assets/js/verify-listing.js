@@ -103,24 +103,25 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   if (aiGenerateBtn) {
     aiGenerateBtn.addEventListener("click", async (e) => {
-      e.preventDefault(); // Extra guard against accidental form actions
+      e.preventDefault(); 
 
-      // 1. Grab elements securely
-      const followersEl = document.getElementById("followers");
-      const regionEl = document.getElementById("region");
-      const categoryEl = document.getElementById("category");
-      const usernameEl = document.getElementById("username");
+      // 1. Grab all elements securely
+      const followers = document.getElementById("followers")?.value.trim() || "";
+      const region = document.getElementById("region")?.value.trim() || "";
+      const category = document.getElementById("category")?.value || "";
+      const username = document.getElementById("username")?.value.trim() || "";
+      const price = document.getElementById("price")?.value.trim() || ""; 
 
-      const followers = followersEl ? followersEl.value.trim() : "";
-      const region = regionEl ? regionEl.value.trim() : "";
-      const category = categoryEl ? categoryEl.value : "";
-      const username = usernameEl ? usernameEl.value.trim() : "";
+      // Grab any rough text the user already typed into the description area
+      const userDraft = descriptionTextarea?.value.trim() || "";
 
-      // 2. Debugging Check: Find out exactly which field is failing
+      // 2. CRITICAL STAGE: Prevent empty requests by checking ALL required inputs
       let missingFields = [];
+      if (!username) missingFields.push("Account Handle/Username");
       if (!followers) missingFields.push("Follower Count");
       if (!region) missingFields.push("Account Region");
       if (!category || category === "") missingFields.push("Account Category");
+      if (!price) missingFields.push("Listing Price"); // 🎯 Blocks empty prices instantly!
 
       if (missingFields.length > 0) {
         Swal.fire({
@@ -135,8 +136,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         // 3. Update button to a loading state
         aiGenerateBtn.disabled = true;
         aiGenerateBtn.style.opacity = "0.7";
-        aiGenerateBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Generating...`;
-        descriptionTextarea.placeholder = "AI is currently drafting a high-converting description for you...";
+        aiGenerateBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Upgrading...`;
+        descriptionTextarea.placeholder = "Accmarket AI is upgrading your description using all form details...";
 
         // 4. Invoke your Supabase Edge Function
         const { data, error } = await supabase.functions.invoke('generate-description', {
@@ -145,7 +146,9 @@ document.addEventListener("DOMContentLoaded", async () => {
             username, 
             followers, 
             region, 
-            category 
+            category,
+            price, 
+            userDraft 
           }
         });
 
@@ -163,7 +166,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         Swal.fire({
           icon: "error",
           title: "Generation Failed",
-          text: "We couldn't generate the description automatically. Please write it manually or try again."
+          text: "We couldn't upgrade the description automatically. Please try again."
         });
       } finally {
         // 6. Restore original button state
@@ -174,6 +177,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     });
   }
+
 
   
   // ---------------- FORM LOGIC ----------------
