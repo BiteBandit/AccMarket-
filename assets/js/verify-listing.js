@@ -112,16 +112,18 @@ document.addEventListener("DOMContentLoaded", async () => {
       const username = document.getElementById("username")?.value.trim() || "";
       const price = document.getElementById("price")?.value.trim() || ""; 
 
-      // Grab any rough text the user already typed into the description area
-      const userDraft = descriptionTextarea?.value.trim() || "";
+      // 🎯 Safeguard: Grab user text ONLY if it's their draft, not a full description already there
+      let userDraft = descriptionTextarea?.value.trim() || "";
+      if (userDraft.includes("Accmarket Escrow") || userDraft.includes("•")) {
+        userDraft = ""; // Clear it out so old AI output isn't recycled
+      }
 
-      // 2. CRITICAL STAGE: Prevent empty requests by checking ALL required inputs
+      // 2. CRITICAL STAGE: Validate required fields (Username is now optional)
       let missingFields = [];
-      if (!username) missingFields.push("Account Handle/Username");
       if (!followers) missingFields.push("Follower Count");
       if (!region) missingFields.push("Account Region");
       if (!category || category === "") missingFields.push("Account Category");
-      if (!price) missingFields.push("Listing Price"); // 🎯 Blocks empty prices instantly!
+      if (!price) missingFields.push("Listing Price"); 
 
       if (missingFields.length > 0) {
         Swal.fire({
@@ -140,6 +142,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         descriptionTextarea.placeholder = "Accmarket AI is upgrading your description using all form details...";
 
         // 4. Invoke your Supabase Edge Function
+        // Note: "platform" is globally defined from URLSearchParams above
         const { data, error } = await supabase.functions.invoke('generate-description', {
           body: { 
             platform, 
