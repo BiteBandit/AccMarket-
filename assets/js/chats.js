@@ -437,15 +437,39 @@ function watchPartnerPresence(partner) {
         }
 
         const lastSeen = new Date(lastSeenStr);
-        const diffInSeconds = Math.floor((new Date() - lastSeen) / 1000);
+        const now = new Date();
+        const diffInSeconds = Math.floor((now - lastSeen) / 1000);
 
+        // 1. If active within the last 60 seconds, mark as Online
         if (diffInSeconds < 60) {
             statusLabel.innerText = "Online";
             statusLabel.style.color = "#10b981";
-        } else {
-            statusLabel.innerText = `Last seen at ${lastSeen.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-            statusLabel.style.color = "#9ca3af";
+            return;
         }
+
+        // 2. Build smart calendar layout for historical tracking
+        const todayStr = now.toDateString();
+        const lastSeenStrDate = lastSeen.toDateString();
+
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toDateString();
+
+        const timeString = lastSeen.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        let finalDateLabel = "";
+        if (lastSeenStrDate === todayStr) {
+            finalDateLabel = `at ${timeString}`;
+        } else if (lastSeenStrDate === yesterdayStr) {
+            finalDateLabel = `yesterday at ${timeString}`;
+        } else {
+            // Shows older dates like "on Jul 5, 02:30 PM"
+            const dateOptions = { month: 'short', day: 'numeric' };
+            finalDateLabel = `on ${lastSeen.toLocaleDateString([], dateOptions)}, ${timeString}`;
+        }
+
+        statusLabel.innerText = `Last seen ${finalDateLabel}`;
+        statusLabel.style.color = "#9ca3af";
     };
 
     calculateStatus(partner.last_seen, partner.show_online);
@@ -463,7 +487,7 @@ function watchPartnerPresence(partner) {
         })
         .subscribe();
 }
- 
+
 // --- 7. MESSAGING HELPERS ---
 function subscribeToMessages() {
     if (messageSubscription) supabase.removeChannel(messageSubscription);
@@ -1392,9 +1416,10 @@ window.upgradeToStepThree = async function() {
     if (!confirm.isConfirmed) return;
 
     try {
+        // 1. Fetch conversation details along with product_id
         const { data: chat, error: fetchError } = await supabase
             .from('conversations')
-            .select('product_name, seller_id, product_price, buyer_id')
+            .select('product_name, seller_id, product_price, buyer_id, product_id')
             .eq('id', activeChatId)
             .single();
 
@@ -1404,6 +1429,7 @@ window.upgradeToStepThree = async function() {
         const localTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
         const systemText = "✅ Funds released! Transaction completed successfully.";
 
+        // 2. Original transaction RPC
         const { error: rpcError } = await supabase.rpc('handle_release_funds', {
             target_seller_id: chat.seller_id,
             amount_to_release: parseFloat(chat.product_price),
@@ -1413,6 +1439,44 @@ window.upgradeToStepThree = async function() {
 
         if (rpcError) throw rpcError;
 
+        // ================================================================
+        // UPDATED CODE: Mutate and sync both JSON data & Column Status
+        // ================================================================
+        if (chat.product_id) {
+            try {
+                // Fetch the existing record to get current JSON data properties
+                const { data: verifyRow, error: fetchVerifyError } = await supabase
+                    .from('verifications')
+                    .select('data')
+                    .eq('id', chat.product_id)
+                    .single();
+
+                if (!fetchVerifyError && verifyRow && verifyRow.data) {
+                    // Handle text-encoded JSON vs native object structures safely
+                    let jsonData = typeof verifyRow.data === 'string' 
+                        ? JSON.parse(verifyRow.data) 
+                        : verifyRow.data;
+
+                    // Mutate internal JSON status value
+                    jsonData.status = 'sold'; 
+
+                    // Sync changes back to Supabase
+                    await supabase
+                        .from('verifications')
+                        .update({ 
+                            status: 'sold', 
+                            data: jsonData 
+                        })
+                        .eq('id', chat.product_id);
+                }
+            } catch (err) {
+                // Logged locally so it never breaks the client flow if RLS blocks it
+                console.error("[VERIFICATIONS UPDATE ERROR]", err.message);
+            }
+        }
+        // ================================================================
+
+        // 3. Update conversation tracking details
         await supabase.from('conversations').update({ 
             escrow_step: 3, 
             status: 'completed',
@@ -1465,6 +1529,7 @@ window.upgradeToStepThree = async function() {
         Swal.fire('Error', 'Wallet update failed. Please contact support.', 'error');
     }
 };
+
 
 window.handleDispute = function() {
     const modal = document.getElementById('disputeModal');
