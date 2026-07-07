@@ -8,6 +8,8 @@ let partnerStatusSub = null;       // Handles partner's Online/Offline status
 let conversationSub = null;        // Handles Deal Status (Cancel/Complete/Escrow)
 let heartbeatInterval = null;
 let replyingTo = null; 
+let isReleasingFunds = false; 
+
 
 // --- LINK DETECTION ENGINE ---
 function linkify(text) {
@@ -1209,9 +1211,7 @@ async function refreshMenuVisibility() {
     if (btnRelease) btnRelease.style.display = (isBuyer && step === 2) ? "flex" : "none";
 }
 
-window.upgradeToStepTwo = () => console.log("Button clicked: Confirm Delivery");
-window.upgradeToStepThree = () => console.log("Button clicked: Release Funds");
-window.handleDispute = () => console.log("Button clicked: Dispute");
+
 
 document.addEventListener("click", () => {
     document.getElementById("statusMenu")?.classList.remove("show");
@@ -1415,8 +1415,12 @@ window.upgradeToStepTwo = async function() {
     }
 };
 
+
 window.upgradeToStepThree = async function() {
     if (!activeChatId || !currentUser) return;
+    
+    // 🛑 Rule 1: Prevent concurrent double-clicks early
+    if (isReleasingFunds) return; 
 
     const confirm = await Swal.fire({
         title: 'Release Funds?',
@@ -1429,15 +1433,31 @@ window.upgradeToStepThree = async function() {
 
     if (!confirm.isConfirmed) return;
 
+    // 🔒 Lock down execution and change UI feedback immediately
+    isReleasingFunds = true;
+    
+    // Safely target the button in your DOM menu if it exists to show visual feedback
+    const releaseBtn = document.getElementById("btnReleaseFunds");
+    const originalBtnText = releaseBtn ? releaseBtn.innerHTML : '';
+    if (releaseBtn) {
+        releaseBtn.disabled = true;
+        releaseBtn.innerHTML = '<i class="ph ph-circle-notch animate-spin"></i> Processing...';
+    }
+
     try {
         // 1. Fetch conversation details along with product_id
         const { data: chat, error: fetchError } = await supabase
             .from('conversations')
-            .select('product_name, seller_id, product_price, buyer_id, product_id')
+            .select('product_name, seller_id, product_price, buyer_id, product_id, status')
             .eq('id', activeChatId)
             .single();
 
         if (fetchError || !chat) throw new Error("Deal details not found.");
+        
+        // 🛑 Double check database state right before running the transaction
+        if (chat.status === 'completed') {
+            throw new Error("This transaction has already been completed.");
+        }
 
         const now = new Date();
         const localTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
@@ -1458,7 +1478,6 @@ window.upgradeToStepThree = async function() {
         // ================================================================
         if (chat.product_id) {
             try {
-                // Fetch the existing record to get current JSON data properties
                 const { data: verifyRow, error: fetchVerifyError } = await supabase
                     .from('verifications')
                     .select('data')
@@ -1466,15 +1485,12 @@ window.upgradeToStepThree = async function() {
                     .single();
 
                 if (!fetchVerifyError && verifyRow && verifyRow.data) {
-                    // Handle text-encoded JSON vs native object structures safely
                     let jsonData = typeof verifyRow.data === 'string' 
                         ? JSON.parse(verifyRow.data) 
                         : verifyRow.data;
 
-                    // Mutate internal JSON status value
                     jsonData.status = 'sold'; 
 
-                    // Sync changes back to Supabase
                     await supabase
                         .from('verifications')
                         .update({ 
@@ -1484,7 +1500,6 @@ window.upgradeToStepThree = async function() {
                         .eq('id', chat.product_id);
                 }
             } catch (err) {
-                // Logged locally so it never breaks the client flow if RLS blocks it
                 console.error("[VERIFICATIONS UPDATE ERROR]", err.message);
             }
         }
@@ -1540,9 +1555,19 @@ window.upgradeToStepThree = async function() {
 
     } catch (error) {
         console.error("Release failed:", error);
-        Swal.fire('Error', 'Wallet update failed. Please contact support.', 'error');
+        Swal.fire('Error', error.message || 'Wallet update failed. Please contact support.', 'error');
+        
+        // 🔓 Reset UI elements on failure so they can try again if it actually failed
+        if (releaseBtn) {
+            releaseBtn.disabled = false;
+            releaseBtn.innerHTML = originalBtnText;
+        }
+    } finally {
+        // Always clear the processing lock state when finished
+        isReleasingFunds = false;
     }
 };
+
 
 
 window.handleDispute = function() {
