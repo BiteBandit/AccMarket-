@@ -9,6 +9,16 @@ let conversationSub = null;        // Handles Deal Status (Cancel/Complete/Escro
 let heartbeatInterval = null;
 let replyingTo = null; 
 
+// --- LINK DETECTION ENGINE ---
+function linkify(text) {
+    if (!text) return "";
+    const urlPattern = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
+    return text.replace(urlPattern, function(url) {
+        return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="chat-link">${url}</a>`;
+    });
+}
+
+
 // --- 1. INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', async () => {
     console.log("[INIT] App Starting...");
@@ -824,12 +834,15 @@ function appendMessageUI(msg) {
     }
 
     let contentHTML = '';
-    if (msg.type === 'deleted') contentHTML = `<p class="content deleted-text">${msg.content}</p>`;
-    else if (msg.type === 'image') contentHTML = `<img src="${msg.content}" class="chat-img" loading="lazy" onclick="window.open('${msg.content}', '_blank')">`;
-    else if (msg.type === 'file') {
+    if (msg.type === 'deleted') {
+        contentHTML = `<p class="content deleted-text">${msg.content}</p>`;
+    } else if (msg.type === 'image') {
+        contentHTML = `<img src="${msg.content}" class="chat-img" loading="lazy" onclick="window.open('${msg.content}', '_blank')">`;
+    } else if (msg.type === 'file') {
         contentHTML = `<div class="file-attachment-box" onclick="window.open('${msg.content}', '_blank')"><i class="ph-fill ph-file-text"></i><div class="file-info"><span>${msg.file_name || 'Attachment'}</span><small>Click to view</small></div></div>`;
     } else {
-        contentHTML = `<p class="content">${msg.content}</p>`;
+        // 🔥 Run text through linkify to safely convert raw text URLs to clickable anchor tags
+        contentHTML = `<p class="content">${linkify(msg.content)}</p>`;
     }
 
     const isLocked = ['disputed', 'cancelled', 'completed'].includes(window.activeChatData?.status);
@@ -852,7 +865,7 @@ function appendMessageUI(msg) {
             <div class="msg-status"><span class="time">${time}</span>${isMe ? `<i class="ph ${msg.is_read ? 'ph-checks' : 'ph-check'}" id="icon-${msg.id}"></i>` : ''}</div>
         </div>`;
 
-        const bubble = div.querySelector('.msg-bubble');
+    const bubble = div.querySelector('.msg-bubble');
     let startX = 0, currentX = 0;
     
     // --- Double-click to reply (Works during active chats and disputes) ---
@@ -863,7 +876,7 @@ function appendMessageUI(msg) {
         }
     });
 
-    // Your touch swipe-to-delete logic continues right under it:
+    // Touch swipe-to-delete logic
     bubble.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }, { passive: true });
     bubble.addEventListener('touchmove', (e) => {
         if (isMe && !isLocked) { // Keeps delete locked down for disputes/closed deals
@@ -881,6 +894,7 @@ function appendMessageUI(msg) {
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
 }
+
 
 function scrollToMessage(id) {
     const target = document.getElementById(`msg-${id}`);

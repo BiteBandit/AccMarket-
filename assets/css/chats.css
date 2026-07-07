@@ -307,10 +307,21 @@ body { background: var(--bg-main); height: 100svh; display: flex; align-items: c
     width: 100%; 
     flex-direction: column; 
     position: relative; /* 🎯 This allows the icon to sit behind the bubble */
+    transition: all 0.2s ease;
 }
 
-.incoming { align-items: flex-start; }
-.outgoing { align-items: flex-end; }
+/* 🚀 Maximize the alignment constraints up to 92% so long lines/links show completely */
+.incoming { 
+    align-items: flex-start; 
+    max-width: 92% !important;
+    align-self: flex-start;
+}
+
+.outgoing { 
+    align-items: flex-end; 
+    max-width: 92% !important;
+    align-self: flex-end;
+}
 
 /* 🎯 THE DELETE ICON (No background, just red icon) */
 .swipe-delete-btn {
