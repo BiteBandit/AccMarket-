@@ -343,7 +343,7 @@ body { background: var(--bg-main); height: 100svh; display: flex; align-items: c
 }
 
 .msg-bubble { 
-    max-width: 70%; 
+    max-width: 100%; 
     padding: 12px 16px; 
     border-radius: 15px; 
     font-size: 0.92rem; 
