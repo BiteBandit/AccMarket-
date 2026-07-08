@@ -11,6 +11,19 @@ closeLeft.addEventListener("click", () => {
   leftSidebar.classList.remove("active");
 });
 
+// Sidebar Sub-list Toggle
+document.querySelectorAll(".category-list > li > a").forEach((link) => {
+  link.addEventListener("click", (e) => {
+    const parentLi = link.parentElement;
+    const hasSubmenu = parentLi.querySelector(".sub-list");
+
+    if (hasSubmenu) {
+      e.preventDefault(); // Prevents page from jumping to top on '#' href
+      parentLi.classList.toggle("active");
+    }
+  });
+});
+
 // Sidebar Search Function (Live Search)
 document.addEventListener("DOMContentLoaded", () => {
   const searchInput = document.querySelector(".search-box input");

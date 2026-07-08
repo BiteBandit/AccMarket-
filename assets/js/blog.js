@@ -1,3 +1,17 @@
+// Sidebar Sub-list Toggle
+document.querySelectorAll(".category-list > li > a").forEach((link) => {
+  link.addEventListener("click", (e) => {
+    const parentLi = link.parentElement;
+    const hasSubmenu = parentLi.querySelector(".sub-list");
+
+    if (hasSubmenu) {
+      e.preventDefault(); // Prevents page from jumping to top on '#' href
+      parentLi.classList.toggle("active");
+    }
+  });
+});
+
+
 // blog.js - Initialize Supabase
 import { supabase } from './supabase-config.js';
 
