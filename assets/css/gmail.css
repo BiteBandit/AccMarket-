@@ -1,0 +1,22 @@
+@import url("../../assets/css/facebook.css");
+
+/* Overwrite root theme components specifically to apply Gmail accents */
+:root {
+  --primary: #EA4335;       /* Gmail Core Red Theme UI */
+  --secondary: #c5221f;     /* Darker accent variations */
+  --card-badge: #FEF2F2;    /* Soft red background status fills */
+  --text-badge: #991B1B;
+}
+
+/* Adjust card imagery parameters for standard mail sizes */
+.card-img {
+    background: #FFF5F5 !important;
+}
+
+.total-row .detail-value {
+    color: var(--primary) !important;
+}
+
+.purchase-btn:hover:not(:disabled) {
+    background: var(--secondary) !important;
+}

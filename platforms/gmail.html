@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>
+    (function(w, d, s, l, i) {
+      w[l] = w[l] || [];
+      w[l].push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' });
+      var f = d.getElementsByTagName(s)[0], j = d.createElement(s), dl = l != 'dataLayer' ? '&l=' + l : '';
+      j.async = true; j.src = 'https://www.googletagmanager.com/gtm.js?id=' + i + dl; f.parentNode.insertBefore(j, f);
+    })(window, document, 'script', 'dataLayer', 'GTM-M9WLK8GG');
+  </script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Buy & Sell Premium Gmail Accounts | AccMarket</title>
+  <meta name="description" content="Buy premium, aged, and PV-verified Gmail accounts safely on AccMarket. Ideal for marketing, business, and developer infrastructure tracking." />
+  <meta name="keywords" content="buy gmail accounts, aged gmail accounts, verified gmail, pv verified mail, Nigeria email marketplace" />
+  <meta name="author" content="AccMarket" />
+
+  <meta property="og:title" content="Buy & Sell Gmail Accounts - AccMarket" />
+  <meta property="og:description" content="Secure instant delivery on premium and aged Gmail accounts via secure escrow." />
+  <meta property="og:image" content="../images/logo.png" />
+  <meta property="og:type" content="website" />
+
+  <link rel="icon" href="/images/logo.png" type="image/png" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="stylesheet" href="../assets/css/gmail.css" />
+  <script type="module" src="../assets/js/gmail.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+    <!-- HEADER -->
+    <header class="header container">
+      <div class="header-left">
+        <button id="sidebarToggle" class="hamburger" aria-label="Toggle sidebar"><i class="fas fa-bars"></i></button>
+      </div>
+      <div class="header-center">
+        <a href="#" class="brand"><i class="fas fa-shield-alt"></i> AccMarket</a>
+      </div>
+      <div class="header-right">
+        <button id="profileToggle" class="profile-btn" aria-label="Open profile menu"><i class="fas fa-user-circle"></i></button>
+      </div>
+    </header>
+
+    <!-- SIDEBARS -->
+    <aside id="leftSidebar" class="sidebar left">
+      <button class="close-btn" id="closeLeft">&times;</button>
+      <div class="categories">
+        <h4>Categories</h4>
+        <ul id="categoryList" class="category-list">
+          <li><a href="facebook">FACEBOOK</a></li>
+          <li><a href="tiktok">TIKTOK</a></li>
+          <li><a href="instagram">INSTAGRAM</a></li>
+          <li><a href="twitter">TWITTER </a></li>
+          <li><a href="snapchat">SNAPCHAT</a></li>
+          <li><a href="linkedIn">LINKEDIN</a></li>
+          <li><a href="reddit">REDDIT</a></li>
+          <li><a href="pinterest">PINTEREST</a></li>
+          
+
+          
+          <li><a href="#">TWITCH</a></li>
+<!-- Replace your old MAILS li with this structure -->
+<li class="has-submenu">
+  <a href="#">MAILS</a>
+  <ul class="sub-list">
+    <li><a href="platforms/gmail">GMAIL</a></li>
+    <li><a href="platforms/outlook">OUTLOOK</a></li>
+    <li><a href="platforms/yahoo">YAHOO</a></li>
+    <li><a href="platforms/rambler">RAMBLER</a></li>
+    <li><a href="platforms/hotmail">HOTMAIL</a></li>
+    <li><a href="platforms/protonmail">PROTONMAIL</a></li>
+    <li><a href="platforms/gmx">GMX</a></li>
+    <li><a href="platforms/yandex">YANDEX</a></li>
+ <li><a href="platforms/o2">O2</a></li>
+    <li><a href="platforms/mail.ru">MAIL.RU</a></li>
+    <li><a href="platforms/mail.com">MAIL.COM</a></li>
+    <li><a href="platforms/atomicmail">ATOMICMAIL</a></li>
+    <li><a href="platforms/onet">ONET</a></li>
+    <li><a href="platforms/aol">AOL</a></li>
+    
+  </ul>
+</li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- RIGHT SIDEBAR -->
+    <aside id="rightSidebar" class="sidebar right">
+      <button class="close-btn" id="closeRight">&times;</button>
+      <h2>Quick Access</h2>
+
+      <ul class="quick-list">
+        <li>
+          <a href="../dashboard"><i class="fas fa-home"></i> Dashboard</a>
+        </li>
+
+        <li>
+          <a href="../wallet"><i class="fas fa-wallet"></i> Wallet</a>
+        </li>
+<li class="seller-only hidden-element">
+  <a href="../sell.html"><i class="fas fa-coins"></i> Sell Account</a>
+</li>
+
+<li>
+  <a href="../chats" style="position: relative;">
+    <i class="fas fa-message"></i> My Chats
+    <span id="chat-notification-count" class="chat-count-badge"></span>
+  </a>
+</li>
+
+        <li style="position: relative">
+          <a href="../notification" class="notification-link">
+            <i class="fas fa-bell"></i>
+            <span
+              id="notification-count"
+              class="notification-badge"
+              aria-live="polite"
+              title="Unread notifications"
+              >0</span
+            >
+            Notifications
+          </a>
+        </li>
+        <li>
+          <a href="../support.html"><i class="fas fa-headset"></i> Support</a>
+        </li>
+        <li>
+          <a href="../settings"><i class="fas fa-cog"></i> Settings</a>
+        </li>
+        <li>
+          <a href="#" class="logout"
+            ><i class="fas fa-sign-out-alt"></i> Logout</a
+          >
+        </li>
+      </ul>
+    </aside>
+
+    <!-- MAIN MARKETPLACE CONTROLS -->
+    <main class="container">
+        <header class="inventory-header">
+            <h1>Gmail Marketplace</h1>
+            <i class="fa-solid fa-sliders" style="cursor: pointer;"></i>
+        </header>
+
+        <!-- Dynamic Filter Engine Configurations -->
+        <div id="filterBar" class="filter-bar">
+            <div class="filter-group">
+                <div class="filter-label-row"><label>Max Price</label><span id="priceVal">₦500,000</span></div>
+                <input type="range" id="priceRange" class="filter-slider" min="500" max="500000" step="500" value="500000">
+            </div>
+            <div class="filter-group">
+                <div class="filter-label-row"><label>Min Inbox Size</label><span id="followerVal">0+</span></div>
+                <input type="range" id="followerRange" class="filter-slider" min="0" max="50000" step="50" value="0">
+            </div>
+            <div class="filter-group">
+                <div class="filter-label-row"><label>From Creation Year</label><span id="yearVal">1999+</span></div>
+                <input type="range" id="yearRange" class="filter-slider" min="1999" max="2026" step="1" value="1999">
+            </div>
+        </div>
+
+        <div class="search-area">
+            <div class="search-box">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="assetSearch" placeholder="Search accounts by address or region..." style="border:none; outline:none; width:100%; font-family:inherit; background:transparent;">
+            </div>
+        </div>
+
+        <!-- Render Target Grid -->
+        <div class="grid" id="inventoryGrid">
+            <p style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 40px;">
+                <i class="fas fa-spinner fa-spin"></i> Loading secure listings...
+            </p>
+        </div>
+    </main>
+
+    <!-- DETAIL OVERLAY MODAL -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2>Email Asset Details</h2>
+                <i class="fa-solid fa-xmark" onclick="closeModal()" style="cursor:pointer"></i>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+            <div class="modal-footer">
+                <button class="close-btn" onclick="closeModal()">Close Window</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ESCROW PURCHASE CONFIRMATION MODAL -->
+    <div id="escrowModal" class="modal-overlay" style="display: none;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2>Confirm Secured Purchase</h2>
+                <i class="fa-solid fa-xmark" onclick="closeEscrowModal()" style="cursor:pointer"></i>
+            </div>
+            <div class="modal-body">
+                <div class="detail-item"><span class="detail-label">Asset Price</span><span class="detail-value" id="displayBasePrice">₦0</span></div>
+                <div class="detail-item"><span class="detail-label" id="feeLabel">Escrow Fee (3%)</span><span class="detail-value" id="displayFee">₦0</span></div>
+                <div style="border-top: 1px solid #eee; margin: 10px 0;"></div>
+                <div class="detail-item"><span class="detail-label" style="font-weight: bold;">Total Due</span><span class="detail-value" id="displayTotal" style="color: #EA4335; font-weight: 800;">₦0</span></div>
+                <p style="text-align: center; font-size: 0.8rem; margin-top: 15px;">Your Available Balance: <b id="displayUserBalance">₦0</b></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeEscrowModal()" style="flex: 1;">Cancel</button>
+                <button id="btnContinuePurchase" class="btn" style="flex: 2; margin: 0; background-color: #EA4335;">Continue Purchase</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
