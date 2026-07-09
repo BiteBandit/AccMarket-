@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <script>
+      (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+      new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+      j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+      'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+      })(window,document,'script','dataLayer','GTM-M9WLK8GG');
+    </script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AccMarket - Verify Your Email Listing</title>
+    <meta name="description" content="AccMarket provides verified, ready-made accounts for individuals, influencers, and businesses." />
+    <meta name="author" content="AccMarket Team" />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="AccMarket — Verify Your Email Listing" />
+    <meta property="og:description" content="Buy verified email and social accounts instantly — fast, safe, and trusted." />
+    <meta property="og:image" content="https://accmarket.name.ng/images/logo.png" />
+    <meta property="og:url" content="https://accmarket.name.ng/verify-email.html" />
+    <meta property="og:type" content="website" />
+
+    <!-- Favicons -->
+    <link rel="icon" href="https://accmarket.name.ng/images/logo.png" type="image/png" />
+    <link rel="shortcut icon" href="https://accmarket.name.ng/images/logo.png" type="image/png" />
+    <link rel="apple-touch-icon" href="https://accmarket.name.ng/images/logo.png" />
+    <meta name="theme-color" content="#0b1e5b" />
+
+    <!-- Google Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="assets/css/verify-email.css" />
+
+    <!-- JavaScript -->
+    <script type="module" src="assets/js/verify-email.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  </head>
+  <body>
+    <noscript>
+      <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-M9WLK8GG" height="0" width="0" style="display:none;visibility:hidden"></iframe>
+    </noscript>
+
+    <!-- HEADER -->
+    <header class="header container">
+      <div class="header-left">
+        <button id="sidebarToggle" class="hamburger" aria-label="Toggle sidebar">
+          <i class="fas fa-bars"></i>
+        </button>
+      </div>
+
+      <div class="header-center">
+        <a href="#" class="brand" id="themeToggle">
+          <i class="fas fa-shield-alt"></i> AccMarket
+        </a>
+      </div>
+
+      <div class="header-right">
+        <button id="profileToggle" class="profile-btn" aria-label="Open profile menu">
+          <i class="fas fa-user-circle"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- LEFT SIDEBAR -->
+    <aside id="leftSidebar" class="sidebar left">
+      <button class="close-btn" id="closeLeft">&times;</button>
+      <div class="search-box">
+        <form onsubmit="return false;">
+          <input type="text" placeholder="Search..." />
+          <button type="submit"><i class="fas fa-search"></i></button>
+        </form>
+      </div>
+      <div class="categories">
+        <h4>Categories</h4>
+        <ul id="categoryList" class="category-list">
+          <li><a href="platforms/facebook">FACEBOOK</a></li>
+          <li><a href="platforms/tiktok">TIKTOK</a></li>
+          <li><a href="platforms/instagram">INSTAGRAM</a></li>
+          <li><a href="platforms/twitter">TWITTER </a></li>
+          <li><a href="platforms/snapchat">SNAPCHAT</a></li>
+          <li><a href="platforms/linkedIn">LINKEDIN</a></li>
+          <li><a href="platforms/reddit">REDDIT</a></li>
+          <li><a href="#">MAILS</a></li>
+          <li><a href="platforms/pinterest">PINTEREST</a></li>
+          <li><a href="platforms/discord">DISCORD</a></li>
+          <li><a href="#">TWITCH</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- RIGHT SIDEBAR -->
+    <aside id="rightSidebar" class="sidebar right">
+      <button class="close-btn" id="closeRight">&times;</button>
+      <h2>Quick Access</h2>
+      <ul class="quick-list">
+        <li><a href="dashboard.html"><i class="fas fa-home"></i> Dashboard</a></li>
+        <li><a href="wallet.html"><i class="fas fa-wallet"></i> Wallet</a></li>
+        <li class="seller-only" style="display: none">
+          <a href="sell.html"><i class="fas fa-coins"></i> Sell Account</a>
+        </li>
+        <li>
+          <a href="chats.html" style="position: relative;">
+            <i class="fas fa-message"></i> My Chats
+            <span id="chat-notification-count" class="chat-count-badge"></span>
+          </a>
+        </li>
+        <li style="position: relative">
+          <a href="notification.html" class="notification-link">
+            <i class="fas fa-bell"></i>
+            <span id="notification-count" class="notification-badge" aria-live="polite" title="Unread notifications">0</span>
+            Notifications
+          </a>
+        </li>
+        <li><a href="support.html"><i class="fas fa-headset"></i> Support</a></li>
+        <li><a href="settings.html"><i class="fas fa-cog"></i> Settings</a></li>
+        <li><a href="#" class="logout"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+      </ul>
+    </aside>
+    
+    <!-- MAIN CONTENT -->
+    <main class="verify-main-page">
+      <div class="verify-container">
+
+        <!-- Platform Header -->
+        <div class="platform-header">
+          <img id="platform-logo" src="" alt="Email Provider Logo" class="platform-logo">
+          <h2 id="platform-title">Verify Your Email Account</h2>
+        </div>
+
+        <p class="subtitle">Provide configuration metrics to finalize your listing marketplace values</p>
+
+        <!-- STEP 1: EMAIL SPECIFICATIONS -->
+        <form id="verify-form" class="verify-form">
+          <label for="email-address">Email Address</label>
+          <input type="email" id="email-address" placeholder="example@domain.com" required>
+
+          <label for="creation-year">Account Creation Year</label>
+          <input type="number" id="creation-year" placeholder="e.g. 2018, 2021" min="1990" max="2026" required>
+
+          <label for="unread-count">Unread Inbox Count</label>
+          <input type="number" id="unread-count" placeholder="Approximate number of emails in inbox" required>
+
+          <label for="region">Account Registration Country / Region</label>
+          <input type="text" id="region" placeholder="e.g. Nigeria, USA, UK, Worldwide" required>
+
+          <label>Account Login Format (Select up to 2)</label>
+          <div class="login-options">
+            <label><input type="checkbox" value="email_password"> Email + Password</label>
+            <label><input type="checkbox" value="email_app_password"> Email + App Password</label>
+            <label><input type="checkbox" value="recovery_email_included"> Recovery Email Included</label>
+            <label><input type="checkbox" value="2fa_enabled"> 2FA Active Setup</label>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
+            <label for="description" style="margin-bottom: 0;">Listing Description Summary</label>
+            <button type="button" id="ai-generate-btn" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; border-radius: 8px; font-weight: 600; background: var(--dark-blue); color: #fff; border: none; cursor: pointer; transition: 0.3s;">
+              <i class="fas fa-magic"></i> Generate with AI
+            </button>
+          </div>
+          <textarea id="description" rows="4" placeholder="Describe the profile, registered attachments, clean history status..." required></textarea>
+
+          <label for="price">Price (NGN / USD Value)</label>
+          <input type="number" id="price" placeholder="Enter account price" min="0" required>
+
+          <label for="category">Account Utility Purpose Category</label>
+          <select id="category" required>
+            <option value="">Select Category Use Case</option>
+            <option value="aged_personal">Aged Personal / Bulk Mail</option>
+            <option value="business_domain">Business / Custom Domain Mail</option>
+            <option value="pv_marketing">PV Verified Marketing Account</option>
+          </select>
+
+          <button type="submit">Continue</button>
+        </form>
+
+        <!-- STEP 2: METRIC VALIDATION REVIEW -->
+        <div id="verification-section" class="bio-lock-section" style="display:none;">
+          <h3>Step 2: Authenticity Verification Challenge</h3>
+          <p id="verification-instruction"></p>
+
+          <label>Upload Dashboard Screenshot Confirming Settings or Storage Access Proof</label>
+          <input type="file" id="screenshot" accept="image/*">
+
+          <button id="submit-verification-btn">Submit Verification</button>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- Tawk.to Script -->
+    <script type="text/javascript">
+      var Tawk_API=Tawk_API||{}, Tawk_LoadStart=new Date();
+      (function(){
+      var s1=document.createElement("script"),s0=document.getElementsByTagName("script")[0];
+      s1.async=true;
+      s1.src='https://embed.tawk.to/6a40efeb8719f21d5abdeeb4/1js6qic91';
+      s1.charset='UTF-8';
+      s1.setAttribute('crossorigin','*');
+      s0.parentNode.insertBefore(s1,s0);
+      })();
+    </script>
+  </body>
+</html>

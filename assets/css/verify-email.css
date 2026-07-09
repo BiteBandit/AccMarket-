@@ -380,162 +380,265 @@ body {
 }
 
 
+/* ==========================================================================
+   MAIN CONTENT AREA & CONTAINER
+   ========================================================================== */
 .verify-main-page {
-  padding: 2rem 1rem;
+  padding: 2.5rem 1rem;
   background: var(--milk);
+  min-height: calc(100vh - 80px); /* Centers form vertically on modern screens */
+  display: flex;
+  align-items: center;
 }
 
 .verify-container {
-  max-width: 600px;
-  margin: auto;
-  text-align: center;
+  max-width: 620px;
+  width: 100%;
+  margin: 0 auto;
+  animation: fadeDown 0.5s ease-out;
 }
 
+/* Platform Header Context Branding */
 .platform-header {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+  text-align: center;
 }
 
 .platform-logo {
-  width: 60px;
-  height: 60px;
+  width: 64px;
+  height: 64px;
   object-fit: contain;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.05));
 }
 
 .verify-container h2 {
   color: var(--dark-blue);
+  font-size: 1.75rem;
   font-weight: 700;
+  margin: 0;
+  letter-spacing: -0.5px;
 }
 
 .subtitle {
-  margin-bottom: 1.5rem;
-  color: #555;
+  text-align: center;
+  margin-top: 0.25rem;
+  margin-bottom: 2rem;
+  color: var(--gray);
+  font-size: 0.95rem;
+  line-height: 1.5;
 }
 
-/* FORM CARD */
+/* ==========================================================================
+   FORM CONTAINER CARD
+   ========================================================================== */
 .verify-form,
 .bio-lock-section {
-  background: #fff;
-  padding: 1.5rem;
+  background: #ffffff;
+  padding: 2rem;
   border-radius: 16px;
-  box-shadow: 0 3px 10px rgba(0,0,0,0.07);
+  box-shadow: 0 4px 18px rgba(11, 30, 91, 0.05), 0 1px 3px rgba(0, 0, 0, 0.02);
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.2rem;
   text-align: left;
+  border: 1px solid var(--light-gray);
 }
 
+/* Form Input Element Controls */
 .verify-form label,
 .bio-lock-section label {
   font-weight: 600;
+  font-size: 0.9rem;
   color: var(--dark-blue);
+  margin-bottom: -0.4rem;
+  display: block;
 }
 
-.verify-form input,
+.verify-form input[type="text"],
+.verify-form input[type="email"],
+.verify-form input[type="number"],
 .verify-form select,
-.bio-lock-section input {
-  padding: 0.8rem;
+.verify-form textarea,
+.bio-lock-section input[type="file"] {
+  width: 100%;
+  padding: 0.85rem 1rem;
   border-radius: 12px;
-  border: 1px solid #ddd;
-}
-
-/* Default button style */
-.verify-form button,
-.bio-lock-section button {
-  background: var(--dark-blue); /* stays dark blue */
-  color: #fff;
-  padding: 0.9rem;
-  border: none;
-  border-radius: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: 0.3s;
-  outline: none; /* remove default focus outline */
-}
-
-/* Hover effect */
-.verify-form button:hover,
-.bio-lock-section button:hover {
-  background: #003f8a; /* slightly darker on hover */
-}
-
-/* Keep button dark blue on tap/click/focus */
-.verify-form button:focus,
-.verify-form button:active,
-.bio-lock-section button:focus,
-.bio-lock-section button:active {
-  background: var(--dark-blue);
-  color: #fff;
-  outline: none;
-  box-shadow: none;
-}
-
-.bio-lock-section {
-  margin-top: 2rem;
-}
-
-.verify-form textarea {
-  padding: 0.8rem;
-  border-radius: 12px;
-  border: 1px solid #ddd;
-  resize: vertical;
-  min-height: 100px;
+  border: 1px solid #dcdfe6;
+  background-color: #fcfdfe;
   font-family: inherit;
+  font-size: 0.95rem;
+  color: var(--black);
+  box-sizing: border-box;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, background-color 0.25s ease;
 }
 
+/* Focus States */
+.verify-form input:focus,
+.verify-form select:focus,
+.verify-form textarea:focus {
+  border-color: var(--dark-blue);
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(11, 30, 91, 0.1);
+  outline: none;
+}
+
+/* Textarea Custom Modifications */
+.verify-form textarea {
+  resize: vertical;
+  min-height: 110px;
+  line-height: 1.5;
+}
+
+/* ==========================================================================
+   CHECKBOX & OPTION WRAPPERS
+   ========================================================================== */
 .login-options {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.65rem;
+  background: #f8f9fa;
+  padding: 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--light-gray);
+  margin-top: 0.2rem;
 }
 
 .login-options label {
-  font-weight: normal;
+  font-weight: 500;
+  color: #374151;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
+  cursor: pointer;
+  margin-bottom: 0;
+  font-size: 0.95rem;
+  user-select: none;
 }
 
+.login-options input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--dark-blue);
+  cursor: pointer;
+}
 
-.notification-badge {
-  display: none;
-  background: #ef4444;
-  color: #fff;
-  font-size: 0.7rem;
+/* ==========================================================================
+   BUTTON ARCHITECTURE & ACTIONS
+   ========================================================================== */
+.verify-form button[type="submit"],
+#submit-verification-btn {
+  background: var(--dark-blue);
+  color: #ffffff;
+  padding: 1rem;
+  border: none;
+  border-radius: 12px;
+  font-size: 1rem;
   font-weight: 700;
-  border-radius: 999px;
-  padding: 4px 7px;
-  position: absolute;
-  top: -6px;
-  right: -8px;
-  line-height: 1;
-  transform: scale(1);
-  transition: transform 0.18s ease;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(11, 30, 91, 0.15);
+  transition: background-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+  margin-top: 0.5rem;
+  width: 100%;
+  text-align: center;
 }
 
-.notification-badge.pop {
-  transform: scale(1.3);
+.verify-form button[type="submit"]:hover,
+#submit-verification-btn:hover {
+  background: #06123a; /* Deepened navy gradient hue */
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(11, 30, 91, 0.25);
 }
 
-.chat-count-badge {
-  display: none;
-  background: #ef4444; /* Matches notification red */
-  color: #fff;
-  font-size: 0.65rem;
+.verify-form button[type="submit"]:active,
+#submit-verification-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 6px rgba(11, 30, 91, 0.15);
+}
+
+/* AI Copilot Description Utility Toggle Button */
+#ai-generate-btn {
+  box-shadow: 0 2px 6px rgba(11, 30, 91, 0.1);
+}
+
+#ai-generate-btn:hover {
+  background: #003f8a !important;
+  transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   STEP 2: VERIFICATION CHALLENGE SCREEN
+   ========================================================================== */
+.bio-lock-section {
+  margin-top: 2rem;
+  border-left: 4px solid var(--dark-blue); /* Visual anchor identifier */
+}
+
+.bio-lock-section h3 {
+  margin: 0;
+  font-size: 1.2rem;
   font-weight: 700;
-  border-radius: 999px;
-  padding: 3px 6px;
-  position: absolute;
-  top: -4px;
-  right: -5px;
-  line-height: 1;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-  transition: transform 0.2s ease;
+  color: var(--dark-blue);
 }
 
-.chat-count-badge.pop {
-  transform: scale(1.3);
+#verification-instruction {
+  font-size: 0.95rem;
+  color: #4b5563;
+  line-height: 1.6;
+  background: #f0f4f8;
+  padding: 1rem;
+  border-radius: 10px;
+  border: 1px dashed #cbd5e1;
+  margin: 0.2rem 0;
+}
+
+/* Custom File Upload Styling Override Wrapper */
+.bio-lock-section input[type="file"] {
+  background: #ffffff;
+  cursor: pointer;
+  padding: 0.6rem 0.8rem;
+}
+
+.bio-lock-section input[type="file"]::file-selector-button {
+  background: var(--dark-blue);
+  color: white;
+  border: none;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  margin-right: 0.8rem;
+  transition: background 0.2s;
+}
+
+.bio-lock-section input[type="file"]::file-selector-button:hover {
+  background: #003f8a;
+}
+
+/* ==========================================================================
+   RESPONSIVE DESIGN BREAKPOINTS
+   ========================================================================== */
+@media (max-width: 640px) {
+  .verify-main-page {
+    padding: 1.5rem 0.5rem;
+  }
+  
+  .verify-form,
+  .bio-lock-section {
+    padding: 1.25rem;
+    gap: 1rem;
+    border-radius: 12px;
+  }
+  
+  .verify-container h2 {
+    font-size: 1.4rem;
+  }
+  
+  .platform-logo {
+    width: 52px;
+    height: 52px;
+  }
 }
