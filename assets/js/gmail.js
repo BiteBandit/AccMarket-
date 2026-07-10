@@ -678,7 +678,7 @@ window.initiateBulkSystemPurchase = async (id) => {
         `;
 
         try {
-            // Invoke the PostgreSQL Transaction RPC to shift logs from available to sold on backend safely
+            // Invoke the PostgreSQL Transaction RPC to execute atomic account distribution
             const { data: itemsToDeliver, error: transactionError } = await supabase.rpc('purchase_system_bulk', {
                 target_id: id,
                 buyer_id: cachedCurrentUserId,
@@ -689,8 +689,18 @@ window.initiateBulkSystemPurchase = async (id) => {
             if (transactionError) throw transactionError;
 
             // --- STEP 2: PARSE & RENDER SECURED ACCOUNT DELIVERIES ---
-            let outputLogsHtml = `<div style="text-align: left; max-height: 240px; overflow-y: auto; background: #0f172a; color: #38bdf8; font-family: monospace; padding: 12px; border-radius: 6px; font-size: 0.85rem; margin-top: 14px; border: 1px solid #1e293b;">`;
+            let outputLogsHtml = `<div style="text-align: left; max-height: 200px; overflow-y: auto; background: #0f172a; color: #38bdf8; font-family: monospace; padding: 12px; border-radius: 6px; font-size: 0.85rem; margin-top: 14px; border: 1px solid #1e293b;">`;
+            
+            let rawTxtContent = `=========================================\n`;
+            rawTxtContent += `PURCHASE RECEIPT - INSTANT SYSTEM BULK\n`;
+            rawTxtContent += `Item: Bulk Verified ${targetItem.data.platform.toUpperCase()} (${targetItem.data.category || 'Standard PVA'})\n`;
+            rawTxtContent += `Quantity: ${selectedQty} Units\n`;
+            rawTxtContent += `Total Amount Paid: ₦${totalCost.toLocaleString()}\n`;
+            rawTxtContent += `Date: ${new Date().toLocaleString()}\n`;
+            rawTxtContent += `=========================================\n\n`;
+
             itemsToDeliver.forEach((account, index) => {
+                // Build HTML Display Content for UI viewport
                 outputLogsHtml += `<div style="margin-bottom: 12px; border-bottom: 1px solid #1e293b; padding-bottom: 8px;">`;
                 outputLogsHtml += `<strong style="color: #fbbf24;">[Unit #${index + 1}]</strong><br>`;
                 outputLogsHtml += `📧 Email: <span style="color:#fff;">${account.email || 'N/A'}</span><br>`;
@@ -700,27 +710,66 @@ window.initiateBulkSystemPurchase = async (id) => {
                     outputLogsHtml += `🍪 Cookie Data: <textarea readonly style="width:100%; height:40px; background:#1e293b; color:#10b981; border:none; font-size:0.75rem; margin-top:4px; border-radius:4px; font-family:monospace; resize:none;">${typeof account.cookie === 'object' ? JSON.stringify(account.cookie) : account.cookie}</textarea>`;
                 }
                 outputLogsHtml += `</div>`;
+
+                // Build Plain Text File Structure
+                rawTxtContent += `[Unit #${index + 1}]\n`;
+                rawTxtContent += `Email: ${account.email || 'N/A'}\n`;
+                rawTxtContent += `Password: ${account.password || 'N/A'}\n`;
+                if (account.recovery) rawTxtContent += `Recovery: ${account.recovery}\n`;
+                if (account.cookie) {
+                    rawTxtContent += `Cookie: ${typeof account.cookie === 'object' ? JSON.stringify(account.cookie) : account.cookie}\n`;
+                }
+                rawTxtContent += `\n-----------------------------------------\n\n`;
             });
             outputLogsHtml += `</div>`;
 
-            // Swap out inner contents with the final delivery success panel
+            // Append personal marketplace business appreciation note to file footer string
+            rawTxtContent += `=========================================\n`;
+            rawTxtContent += `Thank you for buying from us! We appreciate\n`;
+            rawTxtContent += `your patronage and look forward to serving\n`;
+            rawTxtContent += `you again soon.\n`;
+            rawTxtContent += `=========================================\n`;
+
+            // Swap out inner modal box layout with complete transaction delivery review screen
             modalBox.innerHTML = `
                 <h3 style="margin-top: 0; color: #10b981; font-size: 1.25rem; text-align: center;"><i class="fa-solid fa-circle-check"></i> Purchase Successful!</h3>
                 <p style="font-size:0.9rem; color: #334155; text-align: center; margin-bottom: 12px;">₦${totalCost.toLocaleString()} successfully processed. Save your units below:</p>
+                
+                <button class="custom-modal-btn" id="modalDownloadTxtBtn" style="background: #0f172a; color: #38bdf8; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; border: 1px solid #1e293b; margin-bottom: 10px;">
+                    <i class="fa-solid fa-file-arrow-down"></i> Download Accounts (.txt File)
+                </button>
+
                 ${outputLogsHtml}
-                <p style="font-size:0.78rem; color:#ef4444; font-weight:700; margin: 12px 0; line-height: 1.4;"><i class="fa-solid fa-triangle-exclamation"></i> Copy and save these credentials right now. They are shown strictly for this session and won't display again.</p>
+                <p style="font-size:0.78rem; color:#ef4444; font-weight:700; margin: 12px 0; line-height: 1.4;"><i class="fa-solid fa-triangle-exclamation"></i> Copy or download these credentials right now. They are shown strictly for this session and won't display again.</p>
                 <button class="custom-modal-btn custom-modal-btn-success" id="modalCloseDeliveryBtn">Done, I Have Saved It</button>
             `;
 
+            // Process dynamic downloading of account credentials context array
+            document.getElementById('modalDownloadTxtBtn').onclick = () => {
+                const blob = new Blob([rawTxtContent], { type: 'text/plain;charset=utf-8;' });
+                const link = document.createElement('a');
+                const filename = `Accmarket_Bulk_${targetItem.data.platform}_${Date.now()}.txt`;
+                
+                if (navigator.msSaveBlob) { 
+                    navigator.msSaveBlob(blob, filename);
+                } else {
+                    link.href = URL.createObjectURL(blob);
+                    link.setAttribute('download', filename);
+                    link.style.visibility = 'hidden';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }
+            };
+
             document.getElementById('modalCloseDeliveryBtn').onclick = () => {
                 modalOverlay.remove();
-                fetchGmailInventory(); // Pull refreshed data down to sync interface
+                fetchGmailInventory(); // Refresh view state counts
             };
 
         } catch (err) {
             console.error("System Transaction Error Context:", err);
             
-            // Render error context seamlessly into your custom UI card structure
             modalBox.innerHTML = `
                 <div style="text-align: center; padding: 10px 0;">
                     <i class="fa-solid fa-circle-xmark" style="font-size: 2.5rem; color: #ef4444; margin-bottom: 12px;"></i>
