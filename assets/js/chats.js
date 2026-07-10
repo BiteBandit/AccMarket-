@@ -370,17 +370,37 @@ async function initChatWindow() {
         const viewBtn = document.querySelector('.view-listing-btn');
 
         const logos = {
-            instagram: "../images/instagram.png",
-            twitter: "../images/twitter.png",
-            tiktok: "../images/tiktok.png",
-            facebook: "../images/facebook.png",
-            snapchat: "../images/snapchat.png",
-            reddit: "../images/reddit.png",
-            twitch: "../images/twitch.png",
-            discord: "../images/discord.png",
-            linkedin: "../images/linkedin.png",
-            pinterest: "../images/pinterest.png"
-        };
+    // --- Social Media Platforms ---
+    instagram: "../images/instagram.png",
+    twitter: "../images/twitter.png",
+    tiktok: "../images/tiktok.png",
+    facebook: "../images/facebook.png",
+    snapchat: "../images/snapchat.png",
+    reddit: "../images/reddit.png",
+    twitch: "../images/twitch.png",
+    discord: "../images/discord.png",
+    linkedin: "../images/linkedin.png",
+    pinterest: "../images/pinterest.png",
+
+    // --- Requested Email Services / Mail Platforms ---
+    gmail: "../images/gmail.png",
+    outlook: "../images/outlook.png",
+    yahoo: "../images/yahoo.png",
+    rambler: "../images/rambler.png",
+    hotmail: "../images/hotmail.png",
+    protonmail: "../images/protonmail.png",
+    gmx: "../images/gmx.png",
+    yandex: "../images/yandex.png",
+    o2: "../images/o2.png",
+    mail_ru: "../images/mail.ru.png", // Keeps your specific dot placement format
+    mail_com: "../images/mail.com.png",
+    atomicmail: "../images/atomicmail.png",
+    onet: "../images/onet.png",
+    aol: "../images/aol.png",
+    
+    // Catch-all Default Profile Asset Fallback
+    default_mail: "../images/default_mail.png"
+};
 
         if (pTitle) pTitle.innerText = chat.product_name || "Unknown Item";
         if (pPrice) pPrice.innerText = `₦${chat.product_price || '0.00'}`;

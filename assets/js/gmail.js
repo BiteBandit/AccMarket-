@@ -272,12 +272,12 @@ function renderGrid(accounts) {
                 </div>
                 <button class="view-details-btn" onclick="openDetails('${row.id}')">View parameters</button>
                 <div class="price-row">
-                    <span class="price" style="color:#EA4335;">₦${parseFloat(meta.price || 0).toLocaleString()}</span>
+                    <span class="price" style="color:#4735ea;">₦${parseFloat(meta.price || 0).toLocaleString()}</span>
                 </div>
                 <div class="card-action-container">
                     <button class="btn purchase-btn ${isOwner ? 'owner-btn' : ''}" 
-                            onclick="${isOwner ? '' : `initiatePurchase('${row.id}')`}" ${isOwner ? 'disabled' : ''} style="background:#EA4335;">
-                        ${isOwner ? 'YOUR LISTING' : 'SECURE THROUGH ESCROW'}
+                            onclick="${isOwner ? '' : `initiatePurchase('${row.id}')`}" ${isOwner ? 'disabled' : ''} style="background:#0b1e5b;">
+                        ${isOwner ? 'YOUR LISTING' : 'PURCHASE'}
                     </button>
                 </div>
             </div>
@@ -317,7 +317,7 @@ window.openDetails = async (id) => {
             <button class="btn-cancel" onclick="closeModal()">Close Window</button>
             <button class="btn purchase-btn ${isOwner ? 'owner-btn' : ''}" 
                 onclick="${isOwner ? '' : `closeModal(); initiatePurchase('${acc.id}')`}" ${isOwner ? 'disabled' : ''}
-                style="flex: 2; margin: 0; background:${isOwner ? '#94a3b8' : '#EA4335'}">
+                style="flex: 2; margin: 0; background:${isOwner ? '#94a3b8' : '#0b1e5b'}">
                 ${isOwner ? 'YOUR LISTING' : 'BUY VIA ESCROW'}
             </button>
         `;
