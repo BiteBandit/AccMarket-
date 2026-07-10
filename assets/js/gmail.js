@@ -9,6 +9,34 @@ let cachedMyFollowingList = [];
 const notificationSound = new Audio("notification.mp3");
 const chatNotificationSound = new Audio("notification.mp3");
 
+const logos = {
+    instagram: "../images/instagram.png",
+    twitter: "../images/twitter.png",
+    tiktok: "../images/tiktok.png",
+    facebook: "../images/facebook.png",
+    snapchat: "../images/snapchat.png",
+    reddit: "../images/reddit.png",
+    twitch: "../images/twitch.png",
+    discord: "../images/discord.png",
+    linkedin: "../images/linkedin.png",
+    pinterest: "../images/pinterest.png",
+    gmail: "../images/gmail.png",
+    outlook: "../images/outlook.png",
+    yahoo: "../images/yahoo.png",
+    rambler: "../images/rambler.png",
+    hotmail: "../images/hotmail.png",
+    protonmail: "../images/protonmail.png",
+    gmx: "../images/gmx.png",
+    yandex: "../images/yandex.png",
+    o2: "../images/o2.png",
+    mail_ru: "../images/mail.ru.png", 
+    mail_com: "../images/mail.com.png",
+    atomicmail: "../images/atomicmail.png",
+    onet: "../images/onet.png",
+    aol: "../images/aol.png",
+    default_mail: "../images/default_mail.png"
+};
+
 // ==========================================
 // 2. SIDEBARS, DROPDOWNS & NAVIGATION UTILITIES
 // ==========================================
@@ -77,7 +105,7 @@ window.closeModal = () => document.getElementById('modalOverlay').style.display 
 window.closeEscrowModal = () => document.getElementById('escrowModal').style.display = 'none';
 
 // ==========================================
-// 3. ⚡ 10x FASTER SYNCHRONOUS FILTERING ENGINE
+// 3. SYNCHRONOUS FILTERING ENGINE
 // ==========================================
 function syncFollowCache() {
     if (cachedCurrentUserId && window.currentGlobalProfiles && Array.isArray(window.currentGlobalProfiles)) {
@@ -108,7 +136,7 @@ const applyFilters = () => {
     syncFollowCache();
 
     const filtered = activeAccounts.filter(row => {
-        if (row.status !== 'approved') return false;
+        if (!row.is_system && row.status !== 'approved') return false;
         const meta = row.data;
         if (!meta) return false;
         
@@ -124,11 +152,11 @@ const applyFilters = () => {
         const emailStr = String(meta.username || "").toLowerCase();
         const regionStr = String(meta.region || "").toLowerCase();
 
-        const matchesSearch = searchTerm === "" || emailStr.includes(searchTerm) || regionStr.includes(searchTerm);
+        const matchesSearch = searchTerm === "" || emailStr.includes(searchTerm) || regionStr.includes(searchTerm) || String(meta.category || "").toLowerCase().includes(searchTerm);
         const matchesPrice = price === 0 || price <= maxPrice;
-        const matchesMails = totalMails >= minMails;
-        const matchesYear = year === 0 || year >= minYear;
-        const matchesFollowingFilter = !followingOnlyChecked || cachedMyFollowingList.includes(row.user_id);
+        const matchesMails = row.is_system || totalMails >= minMails;
+        const matchesYear = row.is_system || year === 0 || year >= minYear;
+        const matchesFollowingFilter = row.is_system || !followingOnlyChecked || cachedMyFollowingList.includes(row.user_id);
 
         return matchesSearch && matchesPrice && matchesMails && matchesYear && matchesFollowingFilter;
     });
@@ -148,29 +176,33 @@ document.addEventListener('change', (e) => {
 });
 
 // ==========================================
-// 4. CORE DATA SOURCE INVENTORY FETCH
+// 4. CORE DATA SOURCE INVENTORY FETCH (MODIFIED FOR HYBRID BULK/ESCROW)
 // ==========================================
 async function fetchGmailInventory() {
     try {
         const urlParams = new URLSearchParams(window.location.search);
         const targetId = urlParams.get('id');
 
-        let query = supabase.from('verifications').select('*');
+        // A. Fetch normal individual seller escrow listings
+        let userQuery = supabase.from('verifications').select('*');
         if (targetId) {
-            query = query.or(`status.eq.approved,id.eq.${targetId}`);
+            userQuery = userQuery.or(`status.eq.approved,id.eq.${targetId}`);
         } else {
-            query = query.eq('status', 'approved');
+            userQuery = userQuery.eq('status', 'approved');
         }
-
-        const { data: inventory, error: invError } = await query;
+        const { data: userInventory, error: invError } = await userQuery;
         if (invError) throw invError;
+
+        // B. Fetch system bulk batch stock rows
+        const { data: systemInventory, error: sysError } = await supabase.from('system_bulk_stock').select('*');
+        if (sysError) throw sysError;
 
         if (!cachedCurrentUserId) {
             const { data: authData } = await supabase.auth.getUser();
             cachedCurrentUserId = authData?.user ? authData.user.id : null;
         }
         
-        const userIds = [...new Set(inventory.map(row => row.user_id))];
+        const userIds = [...new Set(userInventory.map(row => row.user_id))];
         if (cachedCurrentUserId && !userIds.includes(cachedCurrentUserId)) {
             userIds.push(cachedCurrentUserId);
         }
@@ -183,7 +215,8 @@ async function fetchGmailInventory() {
         window.currentGlobalProfiles = profileList || [];
         syncFollowCache();
 
-        activeAccounts = inventory.map(row => {
+        // Process standard escrow accounts
+        const processedUsers = userInventory.map(row => {
             let meta = row.data;
             if (typeof meta === 'string') {
                 try { meta = JSON.parse(meta); } catch(e) { meta = {}; }
@@ -191,12 +224,36 @@ async function fetchGmailInventory() {
             const userProfile = window.currentGlobalProfiles.find(p => p.id === row.user_id);
             return {
                 ...row,
+                is_system: false,
                 data: meta,
                 profiles: userProfile || { username: "anonymous", full_name: "Anonymous Seller" }
             };
-        }).filter(row => {
+        });
+
+        // Process unified system bulk batches
+        const processedSystem = systemInventory.map(row => {
+            const poolArray = Array.isArray(row.available_pool) ? row.available_pool : [];
+            return {
+                id: row.id,
+                user_id: 'system_admin',
+                is_system: true,
+                status: 'approved',
+                available_pool: poolArray,
+                data: {
+                    platform: row.platform,
+                    category: row.category,
+                    price: parseFloat(row.price),
+                    region: row.region || 'Global',
+                    account_age: row.account_age || 'N/A',
+                    description: row.description || '',
+                    stock_left: poolArray.length
+                }
+            };
+        });
+
+        activeAccounts = [...processedSystem, ...processedUsers].filter(row => {
             const platform = row.data?.platform?.toLowerCase();
-            return platform === 'gmail'; // Route strictly to your Gmail listings
+            return platform === 'gmail';
         });
 
         applyFilters();
@@ -206,7 +263,7 @@ async function fetchGmailInventory() {
 }
 
 // ==========================================
-// 5. PURE SYNCHRONOUS DOM GRID RENDERING
+// 5. DOM GRID RENDERING LOGIC (MODIFIED FOR SYSTEM AND ESCROW CARDS)
 // ==========================================
 function renderGrid(accounts) {
     const grid = document.getElementById('inventoryGrid');
@@ -218,13 +275,73 @@ function renderGrid(accounts) {
     }
 
     accounts.sort((a, b) => {
+        if (a.is_system && !b.is_system) return -1;
+        if (!a.is_system && b.is_system) return 1;
         const aFollowed = cachedMyFollowingList.includes(a.user_id) ? 1 : 0;
         const bFollowed = cachedMyFollowingList.includes(b.user_id) ? 1 : 0;
         return bFollowed - aFollowed;
     });
 
     grid.innerHTML = accounts.map(row => {
-        const meta = row.data; 
+        const meta = row.data;
+        let platformKey = String(meta.platform || "gmail").toLowerCase().trim();
+        if (platformKey === "mail.ru") platformKey = "mail_ru";
+        else if (platformKey === "mail.com") platformKey = "mail_com";
+        const platformLogo = logos[platformKey] || logos.default_mail;
+
+        // --- TYPE A: SYSTEM BULK STOCK COMPONENT ---
+        if (row.is_system) {
+            const stockCount = parseInt(meta.stock_left || 0);
+            const isOutOfStock = stockCount <= 0;
+
+            return `
+                <div class="card system-stock-card" style="border: 1.5px dashed #4735ea; background: #fbfbfe; opacity: ${isOutOfStock ? '0.7' : '1'}; position: relative; padding: 14px; min-height: 290px !important; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; box-sizing: border-box;">
+                    <div style="display: flex; flex-direction: column; justify-content: space-between; flex-grow: 1;">
+                        <div>
+                            <div class="card-tag system-tag" style="background: ${isOutOfStock ? '#64748b' : '#4735ea'}; color: #fff; font-weight: 700; font-size: 0.65rem; border-radius: 4px; padding: 2px 6px; position: absolute; top: 10px; left: 10px; display: inline-flex; align-items: center; gap: 3px;">
+                                <i class="fa-solid fa-bolt-lightning" style="color: #ffd700;"></i> SYSTEM INSTANT
+                            </div>
+                            
+                            <div class="card-img" style="margin-top: 18px; height: 42px; display: flex; align-items: center; justify-content: center;">
+                                <img src="${platformLogo}" alt="${meta.platform || 'Email'}" style="max-height: 100%; object-fit: contain;">
+                            </div>
+                            
+                            <p class="title" style="word-break: break-all; font-weight: 700; color: #0b1e5b; font-size: 1.05rem; margin: 4px 0 1px 0; text-align: center; line-height: 1.2;">
+                                Bulk Verified ${meta.platform.toUpperCase()}
+                            </p>
+                            <span style="font-size: 0.75rem; color: var(--text-muted); display: block; text-align: center; margin-bottom: 2px;">${meta.category || 'Standard PVA'}</span>
+                        </div>
+
+                        <div style="margin: auto 0;">
+                            <div class="stock-status-row" style="font-size: 0.8rem; font-weight: 600; color: ${isOutOfStock ? '#ef4444' : '#10b981'}; text-align: center; margin-bottom: 4px;">
+                                <i class="fa-solid fa-boxes-stacked"></i> <span id="stock-count-${row.id}">${stockCount}</span> ${stockCount === 1 ? 'unit left' : 'units left'}
+                            </div>
+
+                            <div class="quantity-selector-container" style="display: flex; align-items: center; justify-content: center; gap: 8px; display: ${isOutOfStock ? 'none' : 'flex'};">
+                                <button type="button" class="qty-btn" onclick="event.stopPropagation(); adjustQty('${row.id}', -1)" style="width:26px; height:26px; background:#fff; border:1px solid #cbd5e1; border-radius:4px; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:0.85rem;">-</button>
+                                <input type="number" id="qty-input-${row.id}" value="1" min="1" max="${stockCount}" readonly style="width: 42px; height: 26px; text-align: center; font-weight: bold; border-radius: 4px; border: 1px solid #cbd5e1; padding: 0; font-size:0.85rem;">
+                                <button type="button" class="qty-btn" onclick="event.stopPropagation(); adjustQty('${row.id}', 1, ${stockCount})" style="width:26px; height:26px; background:#fff; border:1px solid #cbd5e1; border-radius:4px; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:0.85rem;">+</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: auto; display: flex; flex-direction: column; gap: 6px;">
+                        <div class="price-row" style="text-align: center;">
+                            <span style="font-size: 0.75rem; color: var(--text-muted); margin-right: 2px;">Per unit:</span>
+                            <span class="price" style="color:#4735ea; font-weight:800; font-size: 1.1rem;">₦${parseFloat(meta.price || 0).toLocaleString()}</span>
+                        </div>
+
+                        <div class="card-action-container" style="margin: 0; padding: 0;">
+                            <button class="btn purchase-btn" onclick="${isOutOfStock ? '' : `initiateBulkSystemPurchase('${row.id}')`}" ${isOutOfStock ? 'disabled' : ''} style="background: ${isOutOfStock ? '#94a3b8' : '#4735ea'}; width:100%; padding: 9px; font-size: 0.8rem; font-weight: 700; border-radius: 6px;">
+                                ${isOutOfStock ? 'OUT OF STOCK' : 'PURCHASE'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- TYPE B: ORIGINAL SELLER ESCROW CARD ---
         const rawAge = String(meta.account_age || "");
         const yearMatch = rawAge.match(/\d{4}/); 
         const displayYear = yearMatch ? yearMatch[0] : rawAge;
@@ -236,7 +353,7 @@ function renderGrid(accounts) {
         const trustScore = row.profiles?.trust_score || 0;
         const isGoldVerified = trustScore >= 85 && trustScore <= 100;
         const goldBadgeSvg = isGoldVerified ? `
-            <svg class="meta-badge" viewBox="0 0 24 24" fill="none" style="width: 19px; height: 19px; margin-left: 5px; flex-shrink: 0; vertical-align: middle;">
+            <svg class="meta-badge" viewBox="0 0 24 24" fill="none" style="width: 14px; height: 14px; margin-left: 3px; flex-shrink: 0; display: inline-block; vertical-align: middle;">
                 <defs>
                     <linearGradient id="goldGradient-${row.id}" x1="0%" y1="0%" x2="100%" y2="100%">
                         <stop offset="0%" stop-color="#FFF3B0"/><stop offset="40%" stop-color="#FFD700"/><stop offset="100%" stop-color="#D4AF37"/>
@@ -246,39 +363,64 @@ function renderGrid(accounts) {
                 <path d="M9.5 12.5L11 14L15 10" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>` : '';
 
+        let displayEmail = 'Hidden';
+        if (meta.username) {
+            const cleanUsername = meta.username.split('@')[0];
+            if (cleanUsername.length > 3) {
+                displayEmail = cleanUsername.slice(0, 2) + '******' + cleanUsername.slice(-1);
+            } else {
+                displayEmail = '******';
+            }
+        }
+
         return `
-            <div class="card">
-                <div class="options-menu">
-                    <button class="dots-btn" onclick="toggleDropdown(event, '${row.id}')"><i class="fa-solid fa-ellipsis-vertical"></i></button>
-                    <div class="dropdown-content" id="dropdown-${row.id}">
-                        <button onclick="copyMarketplaceUrl(event, '${row.id}')"><i class="fa-solid fa-link"></i> Copy URL</button>
-                        <button onclick="toggleFollowSeller(event, '${row.user_id}', '${sellerUsername}')">
-                            <i class="${isFollowing ? 'fa-solid fa-user-minus' : 'fa-solid fa-user-plus'}"></i> 
-                            ${isFollowing ? 'Unfollow Seller' : 'Follow Seller'}
-                        </button>
+            <div class="card" style="padding: 14px; min-height: 290px !important; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; position: relative; box-sizing: border-box;">
+                <div style="display: flex; flex-direction: column; justify-content: space-between; flex-grow: 1;">
+                    <div>
+                        <div class="options-menu" style="position: absolute; top: 10px; right: 10px; z-index: 10;">
+                            <button class="dots-btn" onclick="toggleDropdown(event, '${row.id}')" style="background: none; border: none; color: #64748b; cursor: pointer; padding: 2px;"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+                            <div class="dropdown-content" id="dropdown-${row.id}">
+                                <button onclick="copyMarketplaceUrl(event, '${row.id}')"><i class="fa-solid fa-link"></i> Copy URL</button>
+                                <button onclick="toggleFollowSeller(event, '${row.user_id}', '${sellerUsername}')">
+                                    <i class="${isFollowing ? 'fa-solid fa-user-minus' : 'fa-solid fa-user-plus'}"></i> 
+                                    ${isFollowing ? 'Unfollow' : 'Follow'}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="card-tag seller-username-tag" style="background: #f1f5f9; color: #334155; font-weight: 600; font-size: 0.65rem; border-radius: 4px; padding: 2px 6px; display: inline-flex; align-items: center; gap: 2px; max-width: 75%;">
+                            <i class="fa-regular fa-user" style="font-size: 0.6rem;"></i> 
+                            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@${sellerUsername}</span> 
+                            ${goldBadgeSvg}
+                        </div>
+
+                        <div class="card-img" style="margin-top: 14px; height: 42px; display: flex; align-items: center; justify-content: center;">
+                            <img src="${platformLogo}" alt="${meta.platform || 'Email'}" style="max-height: 100%; object-fit: contain;">
+                        </div>
+                        
+                        <p class="title" style="word-break: break-all; font-weight: 600; color: var(--dark-blue); font-size: 1.05rem; margin: 4px 0 4px 0; text-align: center; line-height: 1.2;">
+                            ${displayEmail}
+                        </p>
+                    </div>
+
+                    <div class="meta" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 6px; font-size: 0.72rem; color: #64748b; margin: auto 0 4px 0; padding: 0 4px;">
+                        <span style="display: flex; align-items: center; gap: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><i class="fa-solid fa-earth-africa" style="color: #4735ea;"></i> ${meta.region || 'Global'}</span>
+                        <span style="display: flex; align-items: center; gap: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><i class="fa-solid fa-envelope" style="color: #4735ea;"></i> ${(meta.followers || 0)} Mails</span>
+                        <span style="display: flex; align-items: center; gap: 3px;"><i class="fa-regular fa-calendar" style="color: #4735ea;"></i> ${displayYear}</span>
+                        <span onclick="openDetails('${row.id}')" style="display: flex; align-items: center; gap: 3px; color: #4735ea; font-weight: 700; cursor: pointer; white-space: nowrap;"><i class="fa-solid fa-circle-info"></i> Details</span>
                     </div>
                 </div>
-                <div class="card-tag seller-username-tag" style="display: inline-flex; align-items: center; gap: 1px;">
-                    <i class="fa-regular fa-user" style="font-size: 0.7rem;"></i> <span>@${sellerUsername}</span> ${goldBadgeSvg}
-                </div>
-                <div class="card-img">
-                    <img src="https://accmarket.name.ng/images/gmail.png" alt="Gmail" style="filter: hue-rotate(340deg);">
-                </div>
-                <p class="title" style="word-break: break-all;">${meta.username || 'Hidden Address'}</p>
-                <div class="meta">
-                    <span><i class="fa-solid fa-earth-africa"></i> ${meta.region || 'Global'}</span>
-                    <span><i class="fa-solid fa-envelope"></i> ${parseInt(meta.followers || 0).toLocaleString()} Mails</span>
-                    <span><i class="fa-regular fa-calendar"></i> ${displayYear}</span>
-                </div>
-                <button class="view-details-btn" onclick="openDetails('${row.id}')">View parameters</button>
-                <div class="price-row">
-                    <span class="price" style="color:#4735ea;">₦${parseFloat(meta.price || 0).toLocaleString()}</span>
-                </div>
-                <div class="card-action-container">
-                    <button class="btn purchase-btn ${isOwner ? 'owner-btn' : ''}" 
-                            onclick="${isOwner ? '' : `initiatePurchase('${row.id}')`}" ${isOwner ? 'disabled' : ''} style="background:#0b1e5b;">
-                        ${isOwner ? 'YOUR LISTING' : 'PURCHASE'}
-                    </button>
+
+                <div style="margin-top: auto; display: flex; flex-direction: column; gap: 6px;">
+                    <div class="price-row" style="text-align: center;">
+                        <span class="price" style="color:#0b1e5b; font-weight:800; font-size: 1.15rem;">₦${parseFloat(meta.price || 0).toLocaleString()}</span>
+                    </div>
+                    <div class="card-action-container" style="margin: 0; padding: 0;">
+                        <button class="btn purchase-btn ${isOwner ? 'owner-btn' : ''}" 
+                                onclick="${isOwner ? '' : `initiatePurchase('${row.id}')`}" ${isOwner ? 'disabled' : ''} style="background:#0b1e5b; width:100%; padding: 9px; font-size: 0.8rem; font-weight: 700; border-radius: 6px;">
+                            ${isOwner ? 'YOUR LISTING' : 'PURCHASE'}
+                        </button>
+                    </div>
                 </div>
             </div>
         `;
@@ -298,9 +440,15 @@ window.openDetails = async (id) => {
 
     const displayYear = String(meta.account_age || "").match(/\d{4}/)?.[0] || meta.account_age || 'N/A';
     
+    let modalDisplayEmail = 'Hidden Address';
+    if (meta.username && meta.username.includes('@')) {
+        const parts = meta.username.split('@');
+        modalDisplayEmail = `******@${parts[1]}`;
+    }
+
     body.innerHTML = `
-        <div class="detail-item"><span class="detail-label">Asset Address</span><span class="detail-value" style="word-break: break-all;">${meta.username || 'Hidden Address'}</span></div>
-        <div class="detail-item"><span class="detail-label">Verification Token</span><span class="detail-value" style="color:#EA4335; font-weight:bold;">${meta.verification_code || 'N/A'}</span></div>
+        <div class="detail-item"><span class="detail-label">Asset Address</span><span class="detail-value" style="word-break: break-all; font-weight: 600;">${modalDisplayEmail}</span></div>
+        <div class="detail-item"><span class="detail-label">Verification Token</span><span class="detail-value" style="color:#4735ea; font-weight:bold;">${meta.verification_code || 'N/A'}</span></div>
         <div class="detail-item"><span class="detail-label">Region Node</span><span class="detail-value">${meta.region || 'N/A'}</span></div>
         <div class="detail-item"><span class="detail-label">Inbox Content Size</span><span class="detail-value">${(meta.followers || 0).toLocaleString()} Mails</span></div>
         <div class="detail-item"><span class="detail-label">Registration Year</span><span class="detail-value">${displayYear}</span></div>
@@ -474,10 +622,140 @@ async function processTransaction(account, totalWithFee, originalPrice, buyerId)
 }
 
 // ==========================================
+// 6B. AUTOMATED SYSTEM BULK DELIVERY ENGINE
+// ==========================================
+window.initiateBulkSystemPurchase = async (id) => {
+    if (!cachedCurrentUserId) return Swal.fire("Authentication Required", "Please log in to purchase items.", "info");
+    
+    const targetItem = activeAccounts.find(a => a.id === id);
+    if (!targetItem) return;
+
+    const qtyInput = document.getElementById(`qty-input-${id}`);
+    const selectedQty = qtyInput ? parseInt(qtyInput.value) : 1;
+    
+    const unitPrice = parseFloat(targetItem.data.price);
+    const totalCost = unitPrice * selectedQty;
+
+    const confirmContent = `
+        <div style="text-align: left; font-size: 0.95rem; line-height: 1.5;">
+            <p><strong>Item:</strong> Bulk Verified ${targetItem.data.platform.toUpperCase()} (${targetItem.data.category})</p>
+            <p><strong>Quantity:</strong> ${selectedQty} units</p>
+            <p><strong>Price per unit:</strong> ₦${unitPrice.toLocaleString()}</p>
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 10px 0;">
+            <p style="font-size: 1.1rem; color: #4735ea;"><strong>Total Cost:</strong> ₦${totalCost.toLocaleString()}</p>
+            <p style="font-size: 0.8rem; color: #64748b; margin-top: 10px;"><i class="fa-solid fa-circle-info"></i> These items will be deducted from system inventory and delivered instantly to your screen. No escrow required.</p>
+        </div>
+    `;
+
+    const result = await Swal.fire({
+        title: "Confirm Instant Purchase",
+        html: confirmContent,
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonText: "Pay & Deliver Now",
+        cancelButtonText: "Cancel",
+        confirmButtonColor: "#4735ea"
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+        Swal.fire({ title: "Verifying and processing payment...", allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+        const { data: buyerProfile, error: profileErr } = await supabase.from('profiles').select('balance, email').eq('id', cachedCurrentUserId).single();
+        if (profileErr) throw profileErr;
+
+        if (buyerProfile.balance < totalCost) {
+            return Swal.fire("Insufficient Balance", `Your balance (₦${buyerProfile.balance.toLocaleString()}) is not enough to cover this purchase.`, "error");
+        }
+
+        const { data: freshBatch, error: batchErr } = await supabase.from('system_bulk_stock').select('*').eq('id', id).single();
+        if (batchErr) throw batchErr;
+
+        const currentPool = Array.isArray(freshBatch.available_pool) ? freshBatch.available_pool : [];
+        if (currentPool.length < selectedQty) {
+            return Swal.fire("Stock Shortage", `Sorry, only ${currentPool.length} units are left in this batch.`, "warning");
+        }
+
+        const itemsToDeliver = currentPool.slice(0, selectedQty);
+        const updatedAvailablePool = currentPool.slice(selectedQty);
+
+        const historicallySoldEntries = Array.isArray(freshBatch.sold_pool) ? freshBatch.sold_pool : [];
+        const newSoldEntries = itemsToDeliver.map(item => ({
+            buyer_id: cachedCurrentUserId,
+            log: item,
+            sold_at: new Date().toISOString()
+        }));
+        const updatedSoldPool = [...historicallySoldEntries, ...newSoldEntries];
+
+        const finalBalance = buyerProfile.balance - totalCost;
+        
+        const { error: balanceUpdateErr } = await supabase.from('profiles').update({ balance: finalBalance }).eq('id', cachedCurrentUserId);
+        if (balanceUpdateErr) throw balanceUpdateErr;
+
+        await supabase.from('wallet').insert([{
+            user_id: cachedCurrentUserId,
+            type: 'Payment',
+            amount: `-${totalCost.toFixed(2)}`,
+            note: `Instant System Bulk Purchase: ${selectedQty}x ${targetItem.data.platform.toUpperCase()}`,
+            status: 'success',
+            reference: `SYS_${id.slice(0,8)}_${Date.now()}`
+        }]);
+
+        const { error: poolUpdateErr } = await supabase.from('system_bulk_stock').update({
+            available_pool: updatedAvailablePool,
+            sold_pool: updatedSoldPool
+        }).eq('id', id);
+
+        if (poolUpdateErr) throw poolUpdateErr;
+
+        let outputLogsHtml = `<div style="text-align: left; max-height: 250px; overflow-y: auto; background: #0f172a; color: #38bdf8; font-family: monospace; padding: 12px; border-radius: 6px; font-size: 0.85rem; margin-top: 15px; border: 1px solid #1e293b;">`;
+        itemsToDeliver.forEach((account, index) => {
+            outputLogsHtml += `<div style="margin-bottom: 10px; border-bottom: 1px solid #1e293b; padding-bottom: 5px;">`;
+            outputLogsHtml += `<strong>[Unit #${index + 1}]</strong><br>`;
+            outputLogsHtml += `📧 Email: <span style="color:#fff;">${account.email || 'N/A'}</span><br>`;
+            outputLogsHtml += `🔑 Pass: <span style="color:#fff;">${account.password || 'N/A'}</span><br>`;
+            if(account.recovery) outputLogsHtml += `🛡️ Recovery: <span style="color:#fff;">${account.recovery}</span><br>`;
+            if(account.cookie) outputLogsHtml += `🍪 Cookie Data: <textarea readonly style="width:100%; height:40px; background:#1e293b; color:#10b981; border:none; font-size:0.75rem; margin-top:4px; border-radius:4px; font-family:monospace; resize:none;">${typeof account.cookie === 'object' ? JSON.stringify(account.cookie) : account.cookie}</textarea>`;
+            outputLogsHtml += `</div>`;
+        });
+        outputLogsHtml += `</div>`;
+
+        await Swal.fire({
+            title: "Purchase Successful! 🎉",
+            html: `
+                <p style="font-size:0.95rem;">₦${totalCost.toLocaleString()} successfully processed. Your accounts have been delivered below:</p>
+                ${outputLogsHtml}
+                <p style="font-size:0.8rem; color:#ef4444; font-weight:bold; margin-top:12px;"><i class="fa-solid fa-triangle-exclamation"></i> Copy and save these credentials right now. They will not be shown again.</p>
+            `,
+            icon: "success",
+            confirmButtonText: "Done, Saved",
+            confirmButtonColor: "#10b981"
+        });
+
+        fetchGmailInventory();
+    } catch(err) {
+        console.error("System Transaction Error Context:", err);
+        Swal.fire("Transaction Crash", "An explicit error happened updating data. Balance preserved if failed. Contact admins.", "error");
+    }
+};
+
+window.adjustQty = (id, direction, maxStock) => {
+    const input = document.getElementById(`qty-input-${id}`);
+    if (!input) return;
+    let currentVal = parseInt(input.value) || 1;
+    currentVal += direction;
+    if (currentVal < 1) currentVal = 1;
+    if (maxStock && currentVal > maxStock) currentVal = maxStock;
+    input.value = currentVal;
+};
+
+// ==========================================
 // 7. INTERACTIVE SELLER FOLLOWING SUBSYSTEM
 // ==========================================
 window.toggleFollowSeller = async (event, sellerId, sellerUsername) => {
     event.stopPropagation(); 
+    if(sellerId === 'system_admin') return;
     try {
         if (!cachedCurrentUserId) return Swal.fire("Authentication Required", "Please log in to follow sellers.", "info");
         if (cachedCurrentUserId === sellerId) return Swal.fire("Action Denied", "You cannot follow your own profile listing.", "warning");
@@ -641,10 +919,9 @@ async function setupGlobalChatRealtime() {
 }
 
 // ==========================================
-// 10. REVOLUTION INITIALIZATION PIPELINE
+// 10. INITIALIZATION PIPELINE
 // ==========================================
 async function init() {
-    // Security Access Checker
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
         cachedCurrentUserId = user.id;
@@ -665,7 +942,6 @@ async function init() {
         }
     }
 
-    // Load Metrics
     showSellerAndAdminLinks();
     loadNotificationCount();
     setupNotificationRealtime();
@@ -673,10 +949,8 @@ async function init() {
     setupGlobalChatRealtime();
     setInterval(loadNotificationCount, 30000);
 
-    // Initial Inventory Pull
     await fetchGmailInventory(); 
 
-    // Handle Direct Deep Linking
     const urlParams = new URLSearchParams(window.location.search);
     const targetId = urlParams.get('id');
     if (targetId) {
@@ -686,11 +960,17 @@ async function init() {
         }, 500); 
     }
 
-    // Real-time UI inventory updates
+    // Real-time standard user verification updates
     supabase.channel('public:verifications')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'verifications' }, () => {
             fetchGmailInventory(); 
         }).subscribe();
+
+    // Real-time system bulk table changes
+    supabase.channel('public:system_bulk_stock')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'system_bulk_stock' }, () => {
+            fetchGmailInventory();
+        }).subscribe();
 }
 
-init(); 
+init();
