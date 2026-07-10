@@ -625,7 +625,10 @@ async function processTransaction(account, totalWithFee, originalPrice, buyerId)
 // 6B. AUTOMATED SYSTEM BULK DELIVERY ENGINE
 // ==========================================
 window.initiateBulkSystemPurchase = async (id) => {
-    if (!cachedCurrentUserId) return Swal.fire("Authentication Required", "Please log in to purchase items.", "info");
+    if (!cachedCurrentUserId) {
+        alert("Authentication Required: Please log in to purchase items.");
+        return;
+    }
     
     const targetItem = activeAccounts.find(a => a.id === id);
     if (!targetItem) return;
@@ -636,108 +639,99 @@ window.initiateBulkSystemPurchase = async (id) => {
     const unitPrice = parseFloat(targetItem.data.price);
     const totalCost = unitPrice * selectedQty;
 
-    const confirmContent = `
-        <div style="text-align: left; font-size: 0.95rem; line-height: 1.5;">
-            <p><strong>Item:</strong> Bulk Verified ${targetItem.data.platform.toUpperCase()} (${targetItem.data.category})</p>
-            <p><strong>Quantity:</strong> ${selectedQty} units</p>
-            <p><strong>Price per unit:</strong> ₦${unitPrice.toLocaleString()}</p>
-            <hr style="border: 0; border-top: 1px solid #eee; margin: 10px 0;">
-            <p style="font-size: 1.1rem; color: #4735ea;"><strong>Total Cost:</strong> ₦${totalCost.toLocaleString()}</p>
-            <p style="font-size: 0.8rem; color: #64748b; margin-top: 10px;"><i class="fa-solid fa-circle-info"></i> These items will be deducted from system inventory and delivered instantly to your screen. No escrow required.</p>
+    // --- STEP 1: CREATE AND SHOW CUSTOM DOM OVERLAY MODAL ---
+    const modalOverlay = document.createElement('div');
+    modalOverlay.className = 'custom-modal-overlay';
+    
+    modalOverlay.innerHTML = `
+        <div class="custom-modal-card">
+            <h3 style="margin-top: 0; color: #0b1e5b; font-size: 1.25rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 16px;">Confirm Instant Purchase</h3>
+            <div style="font-size: 0.95rem; line-height: 1.6; color: #334155; margin-bottom: 20px;">
+                <p style="margin: 4px 0;"><strong>Item:</strong> Bulk Verified ${targetItem.data.platform.toUpperCase()} (${targetItem.data.category || 'Standard PVA'})</p>
+                <p style="margin: 4px 0;"><strong>Quantity:</strong> ${selectedQty} units</p>
+                <p style="margin: 4px 0;"><strong>Price per unit:</strong> ₦${unitPrice.toLocaleString()}</p>
+                <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 12px 0;">
+                <p style="font-size: 1.15rem; color: #4735ea; margin: 0;"><strong>Total Cost:</strong> ₦${totalCost.toLocaleString()}</p>
+                <p style="font-size: 0.8rem; color: #64748b; margin-top: 12px; line-height: 1.4;"><i class="fa-solid fa-circle-info"></i> Funds will be deducted immediately from your balance. Credentials deliver straight to this window session.</p>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button class="custom-modal-btn custom-modal-btn-secondary" id="modalCancelBtn">Cancel</button>
+                <button class="custom-modal-btn custom-modal-btn-primary" id="modalConfirmBtn">Pay & Deliver Now</button>
+            </div>
         </div>
     `;
+    
+    document.body.appendChild(modalOverlay);
 
-    const result = await Swal.fire({
-        title: "Confirm Instant Purchase",
-        html: confirmContent,
-        icon: "question",
-        showCancelButton: true,
-        confirmButtonText: "Pay & Deliver Now",
-        cancelButtonText: "Cancel",
-        confirmButtonColor: "#4735ea"
-    });
+    // Bind Close Actions
+    document.getElementById('modalCancelBtn').onclick = () => modalOverlay.remove();
+    
+    document.getElementById('modalConfirmBtn').onclick = async () => {
+        // Transition card into Loading state dynamically
+        const modalBox = modalOverlay.querySelector('.custom-modal-card');
+        modalBox.innerHTML = `
+            <div style="text-align: center; padding: 20px 0;">
+                <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 2.5rem; color: #4735ea; margin-bottom: 16px;"></i>
+                <h4 style="margin: 0 0 8px 0; color: #0b1e5b; font-size: 1.1rem;">Processing Secure Transaction...</h4>
+                <p style="margin: 0; font-size: 0.85rem; color: #64748b;">Verifying balances and building delivery packages.</p>
+            </div>
+        `;
 
-    if (!result.isConfirmed) return;
+        try {
+            // Invoke the PostgreSQL Transaction RPC to shift logs from available to sold on backend safely
+            const { data: itemsToDeliver, error: transactionError } = await supabase.rpc('purchase_system_bulk', {
+                target_id: id,
+                buyer_id: cachedCurrentUserId,
+                qty: selectedQty,
+                total_cost: totalCost
+            });
 
-    try {
-        Swal.fire({ title: "Verifying and processing payment...", allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            if (transactionError) throw transactionError;
 
-        const { data: buyerProfile, error: profileErr } = await supabase.from('profiles').select('balance, email').eq('id', cachedCurrentUserId).single();
-        if (profileErr) throw profileErr;
-
-        if (buyerProfile.balance < totalCost) {
-            return Swal.fire("Insufficient Balance", `Your balance (₦${buyerProfile.balance.toLocaleString()}) is not enough to cover this purchase.`, "error");
-        }
-
-        const { data: freshBatch, error: batchErr } = await supabase.from('system_bulk_stock').select('*').eq('id', id).single();
-        if (batchErr) throw batchErr;
-
-        const currentPool = Array.isArray(freshBatch.available_pool) ? freshBatch.available_pool : [];
-        if (currentPool.length < selectedQty) {
-            return Swal.fire("Stock Shortage", `Sorry, only ${currentPool.length} units are left in this batch.`, "warning");
-        }
-
-        const itemsToDeliver = currentPool.slice(0, selectedQty);
-        const updatedAvailablePool = currentPool.slice(selectedQty);
-
-        const historicallySoldEntries = Array.isArray(freshBatch.sold_pool) ? freshBatch.sold_pool : [];
-        const newSoldEntries = itemsToDeliver.map(item => ({
-            buyer_id: cachedCurrentUserId,
-            log: item,
-            sold_at: new Date().toISOString()
-        }));
-        const updatedSoldPool = [...historicallySoldEntries, ...newSoldEntries];
-
-        const finalBalance = buyerProfile.balance - totalCost;
-        
-        const { error: balanceUpdateErr } = await supabase.from('profiles').update({ balance: finalBalance }).eq('id', cachedCurrentUserId);
-        if (balanceUpdateErr) throw balanceUpdateErr;
-
-        await supabase.from('wallet').insert([{
-            user_id: cachedCurrentUserId,
-            type: 'Payment',
-            amount: `-${totalCost.toFixed(2)}`,
-            note: `Instant System Bulk Purchase: ${selectedQty}x ${targetItem.data.platform.toUpperCase()}`,
-            status: 'success',
-            reference: `SYS_${id.slice(0,8)}_${Date.now()}`
-        }]);
-
-        const { error: poolUpdateErr } = await supabase.from('system_bulk_stock').update({
-            available_pool: updatedAvailablePool,
-            sold_pool: updatedSoldPool
-        }).eq('id', id);
-
-        if (poolUpdateErr) throw poolUpdateErr;
-
-        let outputLogsHtml = `<div style="text-align: left; max-height: 250px; overflow-y: auto; background: #0f172a; color: #38bdf8; font-family: monospace; padding: 12px; border-radius: 6px; font-size: 0.85rem; margin-top: 15px; border: 1px solid #1e293b;">`;
-        itemsToDeliver.forEach((account, index) => {
-            outputLogsHtml += `<div style="margin-bottom: 10px; border-bottom: 1px solid #1e293b; padding-bottom: 5px;">`;
-            outputLogsHtml += `<strong>[Unit #${index + 1}]</strong><br>`;
-            outputLogsHtml += `📧 Email: <span style="color:#fff;">${account.email || 'N/A'}</span><br>`;
-            outputLogsHtml += `🔑 Pass: <span style="color:#fff;">${account.password || 'N/A'}</span><br>`;
-            if(account.recovery) outputLogsHtml += `🛡️ Recovery: <span style="color:#fff;">${account.recovery}</span><br>`;
-            if(account.cookie) outputLogsHtml += `🍪 Cookie Data: <textarea readonly style="width:100%; height:40px; background:#1e293b; color:#10b981; border:none; font-size:0.75rem; margin-top:4px; border-radius:4px; font-family:monospace; resize:none;">${typeof account.cookie === 'object' ? JSON.stringify(account.cookie) : account.cookie}</textarea>`;
+            // --- STEP 2: PARSE & RENDER SECURED ACCOUNT DELIVERIES ---
+            let outputLogsHtml = `<div style="text-align: left; max-height: 240px; overflow-y: auto; background: #0f172a; color: #38bdf8; font-family: monospace; padding: 12px; border-radius: 6px; font-size: 0.85rem; margin-top: 14px; border: 1px solid #1e293b;">`;
+            itemsToDeliver.forEach((account, index) => {
+                outputLogsHtml += `<div style="margin-bottom: 12px; border-bottom: 1px solid #1e293b; padding-bottom: 8px;">`;
+                outputLogsHtml += `<strong style="color: #fbbf24;">[Unit #${index + 1}]</strong><br>`;
+                outputLogsHtml += `📧 Email: <span style="color:#fff;">${account.email || 'N/A'}</span><br>`;
+                outputLogsHtml += `🔑 Pass: <span style="color:#fff;">${account.password || 'N/A'}</span><br>`;
+                if (account.recovery) outputLogsHtml += `🛡️ Recovery: <span style="color:#fff;">${account.recovery}</span><br>`;
+                if (account.cookie) {
+                    outputLogsHtml += `🍪 Cookie Data: <textarea readonly style="width:100%; height:40px; background:#1e293b; color:#10b981; border:none; font-size:0.75rem; margin-top:4px; border-radius:4px; font-family:monospace; resize:none;">${typeof account.cookie === 'object' ? JSON.stringify(account.cookie) : account.cookie}</textarea>`;
+                }
+                outputLogsHtml += `</div>`;
+            });
             outputLogsHtml += `</div>`;
-        });
-        outputLogsHtml += `</div>`;
 
-        await Swal.fire({
-            title: "Purchase Successful! 🎉",
-            html: `
-                <p style="font-size:0.95rem;">₦${totalCost.toLocaleString()} successfully processed. Your accounts have been delivered below:</p>
+            // Swap out inner contents with the final delivery success panel
+            modalBox.innerHTML = `
+                <h3 style="margin-top: 0; color: #10b981; font-size: 1.25rem; text-align: center;"><i class="fa-solid fa-circle-check"></i> Purchase Successful!</h3>
+                <p style="font-size:0.9rem; color: #334155; text-align: center; margin-bottom: 12px;">₦${totalCost.toLocaleString()} successfully processed. Save your units below:</p>
                 ${outputLogsHtml}
-                <p style="font-size:0.8rem; color:#ef4444; font-weight:bold; margin-top:12px;"><i class="fa-solid fa-triangle-exclamation"></i> Copy and save these credentials right now. They will not be shown again.</p>
-            `,
-            icon: "success",
-            confirmButtonText: "Done, Saved",
-            confirmButtonColor: "#10b981"
-        });
+                <p style="font-size:0.78rem; color:#ef4444; font-weight:700; margin: 12px 0; line-height: 1.4;"><i class="fa-solid fa-triangle-exclamation"></i> Copy and save these credentials right now. They are shown strictly for this session and won't display again.</p>
+                <button class="custom-modal-btn custom-modal-btn-success" id="modalCloseDeliveryBtn">Done, I Have Saved It</button>
+            `;
 
-        fetchGmailInventory();
-    } catch(err) {
-        console.error("System Transaction Error Context:", err);
-        Swal.fire("Transaction Crash", "An explicit error happened updating data. Balance preserved if failed. Contact admins.", "error");
-    }
+            document.getElementById('modalCloseDeliveryBtn').onclick = () => {
+                modalOverlay.remove();
+                fetchGmailInventory(); // Pull refreshed data down to sync interface
+            };
+
+        } catch (err) {
+            console.error("System Transaction Error Context:", err);
+            
+            // Render error context seamlessly into your custom UI card structure
+            modalBox.innerHTML = `
+                <div style="text-align: center; padding: 10px 0;">
+                    <i class="fa-solid fa-circle-xmark" style="font-size: 2.5rem; color: #ef4444; margin-bottom: 12px;"></i>
+                    <h4 style="margin: 0 0 8px 0; color: #0b1e5b; font-size: 1.1rem;">Transaction Failed</h4>
+                    <p style="margin: 0 0 16px 0; font-size: 0.88rem; color: #64748b; line-height: 1.4;">${err.message || 'An unexpected database writing error occurred.'}</p>
+                    <button class="custom-modal-btn custom-modal-btn-secondary" id="modalErrorCloseBtn" style="width: 100%;">Close Window</button>
+                </div>
+            `;
+            document.getElementById('modalErrorCloseBtn').onclick = () => modalOverlay.remove();
+        }
+    };
 };
 
 window.adjustQty = (id, direction, maxStock) => {
