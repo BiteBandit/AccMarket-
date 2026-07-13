@@ -308,7 +308,7 @@ function renderGrid(accounts) {
                             </div>
                             
                             <p class="title" style="word-break: break-all; font-weight: 700; color: #0b1e5b; font-size: 1.05rem; margin: 4px 0 1px 0; text-align: center; line-height: 1.2;">
-                                Bulk Verified ${meta.platform.toUpperCase()}
+                                 ${meta.platform.toUpperCase()}
                             </p>
                             <span style="font-size: 0.75rem; color: var(--text-muted); display: block; text-align: center; margin-bottom: 2px;">${meta.category || 'Standard PVA'}</span>
                         </div>
@@ -626,7 +626,7 @@ async function processTransaction(account, totalWithFee, originalPrice, buyerId)
 // ==========================================
 window.initiateBulkSystemPurchase = async (id) => {
     if (!cachedCurrentUserId) {
-        alert("Authentication Required: Please log in to purchase items.");
+        Swal.fire("Authentication Required", "Please log in to purchase items.", "info");
         return;
     }
     
@@ -644,22 +644,31 @@ window.initiateBulkSystemPurchase = async (id) => {
     modalOverlay.className = 'custom-modal-overlay';
     
     modalOverlay.innerHTML = `
-        <div class="custom-modal-card">
-            <h3 style="margin-top: 0; color: #0b1e5b; font-size: 1.25rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 16px;">Confirm Instant Purchase</h3>
-            <div style="font-size: 0.95rem; line-height: 1.6; color: #334155; margin-bottom: 20px;">
-                <p style="margin: 4px 0;"><strong>Item:</strong> Bulk Verified ${targetItem.data.platform.toUpperCase()} (${targetItem.data.category || 'Standard PVA'})</p>
-                <p style="margin: 4px 0;"><strong>Quantity:</strong> ${selectedQty} units</p>
-                <p style="margin: 4px 0;"><strong>Price per unit:</strong> ₦${unitPrice.toLocaleString()}</p>
-                <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 12px 0;">
-                <p style="font-size: 1.15rem; color: #6001D2; margin: 0;"><strong>Total Cost:</strong> ₦${totalCost.toLocaleString()}</p>
-                <p style="font-size: 0.8rem; color: #64748b; margin-top: 12px; line-height: 1.4;"><i class="fa-solid fa-circle-info"></i> Funds will be deducted immediately from your balance. Credentials deliver straight to this window session.</p>
+    <div class="custom-modal-card">
+        <h3 style="margin-top: 0; color: #0b1e5b; font-size: 1.25rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 16px;">Confirm Instant Purchase</h3>
+        <div style="font-size: 0.95rem; line-height: 1.6; color: #334155; margin-bottom: 20px;">
+            <p style="margin: 4px 0;"><strong>Item:</strong> Bulk Verified Hotmail (${targetItem.data.category || 'Standard PVA'})</p>
+            <p style="margin: 4px 0;"><strong>Quantity:</strong> ${selectedQty} units</p>
+            <p style="margin: 4px 0;"><strong>Price per unit:</strong> ₦${unitPrice.toLocaleString()}</p>
+            
+            <!-- Professional Description Container -->
+            <div style="margin: 16px 0; padding: 12px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
+                <p style="margin: 0; font-size: 0.85rem; color: #475569;">
+                    <strong style="color: #0b1e5b;">Description:</strong> ${targetItem.data.description || 'No specific product notes provided.'}
+                </p>
             </div>
-            <div style="display: flex; justify-content: flex-end; gap: 10px;">
-                <button class="custom-modal-btn custom-modal-btn-secondary" id="modalCancelBtn">Cancel</button>
-                <button class="custom-modal-btn custom-modal-btn-primary" id="modalConfirmBtn">Pay & Deliver Now</button>
-            </div>
+            
+            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 12px 0;">
+            <p style="font-size: 1.15rem; color: #6001D2; margin: 0;"><strong>Total Cost:</strong> ₦${totalCost.toLocaleString()}</p>
+            <p style="font-size: 0.8rem; color: #64748b; margin-top: 12px; line-height: 1.4;"><i class="fa-solid fa-circle-info"></i> Funds will be deducted immediately from your balance. Credentials deliver straight to this window session.</p>
         </div>
-    `;
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button class="custom-modal-btn custom-modal-btn-secondary" id="modalCancelBtn">Cancel</button>
+            <button class="custom-modal-btn custom-modal-btn-primary" id="modalConfirmBtn">Pay & Deliver Now</button>
+        </div>
+    </div>
+`;
+
     
     document.body.appendChild(modalOverlay);
 
@@ -671,7 +680,7 @@ window.initiateBulkSystemPurchase = async (id) => {
         const modalBox = modalOverlay.querySelector('.custom-modal-card');
         modalBox.innerHTML = `
             <div style="text-align: center; padding: 20px 0;">
-                <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 2.5rem; color: #6001D2; margin-bottom: 16px;"></i>
+                <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 2.5rem; color: #4735ea; margin-bottom: 16px;"></i>
                 <h4 style="margin: 0 0 8px 0; color: #0b1e5b; font-size: 1.1rem;">Processing Secure Transaction...</h4>
                 <p style="margin: 0; font-size: 0.85rem; color: #64748b;">Verifying balances and building delivery packages.</p>
             </div>
@@ -699,7 +708,7 @@ window.initiateBulkSystemPurchase = async (id) => {
             rawTxtContent += `Date: ${new Date().toLocaleString()}\n`;
             rawTxtContent += `=========================================\n\n`;
 
-          itemsToDeliver.forEach((account, index) => {
+            itemsToDeliver.forEach((account, index) => {
                 // Build HTML Display Content for UI viewport
                 outputLogsHtml += `<div style="margin-bottom: 12px; border-bottom: 1px solid #1e293b; padding-bottom: 8px;">`;
                 outputLogsHtml += `<strong style="color: #fbbf24;">[Unit #${index + 1}]</strong><br>`;
@@ -764,7 +773,7 @@ window.initiateBulkSystemPurchase = async (id) => {
 
             document.getElementById('modalCloseDeliveryBtn').onclick = () => {
                 modalOverlay.remove();
-                fetchYahooInventory(); // Refresh view state counts
+                fetchGmailInventory(); // Refresh view state counts
             };
 
         } catch (err) {

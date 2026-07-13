@@ -137,18 +137,19 @@ modifyRowForm?.addEventListener('submit', async (e) => {
     const targetRowRecord = rowCache.find(r => r.id === selectedRowId);
     if (!targetRowRecord) return;
 
-    // Build safety arrays of current assets inside inventory
+    // 1. Correctly parse existing pool
     let baseStockPool = [];
     try {
-        baseStockPool = typeof targetRowRecord.available_pool === 'string' ? JSON.parse(targetRowRecord.available_pool) : targetRowRecord.available_pool;
-        if (!Array.isArray(baseStockPool)) baseStockPool = [];
+        const pool = targetRowRecord.available_pool;
+        // If it's a string (double-serialized), parse it. If it's an object/array, use it.
+        baseStockPool = typeof pool === 'string' ? JSON.parse(pool) : (pool || []);
+        if (typeof baseStockPool === 'string') baseStockPool = JSON.parse(baseStockPool);
     } catch(err) {
         baseStockPool = [];
     }
 
-    // Split inputs safely by vertical lines
+    // 2. Parse new items from textarea
     const rawLinesToInject = txtStockAppend.value.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-    
     const structuredNewItems = rawLinesToInject.map(line => {
         const parts = line.split('|');
         return {
@@ -159,28 +160,28 @@ modifyRowForm?.addEventListener('submit', async (e) => {
         };
     }).filter(acc => acc.email !== '' && acc.password !== '');
 
-    // Append batch additions onto base models
+    // 3. Create the clean, combined array
     const combinedUpdatedPool = [...baseStockPool, ...structuredNewItems];
 
-    const updatePayload = {
-        price: document.getElementById('editPrice').value.trim(),
-        description: document.getElementById('editDescription').value.trim(),
-        available_pool: JSON.stringify(combinedUpdatedPool) // Stringified back to database specifications
-    };
-
+    // 4. Update Database
     try {
         Swal.fire({ title: 'Applying row changes...', didOpen: () => Swal.showLoading() });
         
-        // Updated to target your system_bulk_stock table
         const { error } = await supabase
             .from('system_bulk_stock') 
-            .update(updatePayload)
+            .update({
+                price: document.getElementById('editPrice').value.trim(),
+                description: document.getElementById('editDescription').value.trim(),
+                // FIX: Send the ARRAY directly. 
+                // Do NOT use JSON.stringify() for jsonb columns.
+                available_pool: combinedUpdatedPool 
+            })
             .eq('id', selectedRowId);
 
         if (error) throw error;
 
-        Swal.fire("Updated Successfully", `Changes saved. Injected ${structuredNewItems.length} accounts into the row's available pool.`, "success");
-        txtStockAppend.value = ''; // Clean input workspace area context out
+        Swal.fire("Updated Successfully", `Injected ${structuredNewItems.length} accounts.`, "success");
+        txtStockAppend.value = '';
         loadInventoryRows();
     } catch (err) {
         Swal.fire("Transaction Error", err.message, "error");
