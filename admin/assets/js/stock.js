@@ -153,9 +153,9 @@ modifyRowForm?.addEventListener('submit', async (e) => {
         const parts = line.split('|');
         return {
             email: parts[0] ? parts[0].trim() : '',
-            cookie: null, // Ready if cookie session objects are supplied downstream
             password: parts[1] ? parts[1].trim() : '',
-            recovery: parts[2] ? parts[2].trim() : null
+            recovery: parts[2] && parts[2].trim() !== '' ? parts[2].trim() : null,
+            cookie: parts[3] && parts[3].trim() !== '' ? parts[3].trim() : null 
         };
     }).filter(acc => acc.email !== '' && acc.password !== '');
 
@@ -180,6 +180,7 @@ modifyRowForm?.addEventListener('submit', async (e) => {
         if (error) throw error;
 
         Swal.fire("Updated Successfully", `Changes saved. Injected ${structuredNewItems.length} accounts into the row's available pool.`, "success");
+        txtStockAppend.value = ''; // Clean input workspace area context out
         loadInventoryRows();
     } catch (err) {
         Swal.fire("Transaction Error", err.message, "error");
