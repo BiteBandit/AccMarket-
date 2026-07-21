@@ -79,11 +79,18 @@ const applyFilters = () => {
     syncFollowCache();
 
     // 3. High-speed programmatic array filter matrix
-    const filtered = activeAccounts.filter(row => {
-        if (row.status !== 'approved') return false;
+        const filtered = activeAccounts.filter(row => {
+        const topStatus = row.status;
+        const jsonStatus = row.data?.status;
+
+        // Block anything that isn't strictly 'approved' or is marked 'sold'/'in_progress'
+        if (topStatus !== 'approved' || jsonStatus === 'sold' || jsonStatus === 'in_progress') {
+            return false;
+        }
 
         const meta = row.data;
         if (!meta) return false;
+
         
         const price = meta.price !== undefined ? parseFloat(meta.price) : 0;
         
@@ -254,9 +261,25 @@ function renderGrid(accounts) {
         const yearMatch = rawAge.match(/\d{4}/); 
         const displayYear = yearMatch ? yearMatch[0] : rawAge;
 
-        const isOwner = row.user_id === currentUserId;
+                const isOwner = row.user_id === currentUserId;
         const sellerUsername = row.profiles?.username || row.profiles?.full_name || `User_${String(row.user_id).slice(0, 5)}`;
         const isFollowing = cachedMyFollowingList.includes(row.user_id);
+
+        // 🛑 Check availability status
+        const isSold = row.status === 'sold' || meta.status === 'sold';
+        const isInProgress = row.status === 'in_progress' || meta.status === 'in_progress';
+
+        let buttonText = 'PURCHASE';
+        let isDisabled = isOwner || isSold || isInProgress;
+
+        if (isOwner) {
+            buttonText = 'YOUR LISTING';
+        } else if (isSold) {
+            buttonText = 'SOLD';
+        } else if (isInProgress) {
+            buttonText = 'IN TRANSACTION';
+        }
+
 
         // Gold Verified Badge Logic
         const trustScore = row.profiles?.trust_score || 0;
@@ -321,13 +344,14 @@ function renderGrid(accounts) {
                     <span class="price">₦${parseFloat(meta.price || 0).toLocaleString()}</span>
                 </div>
                 
-                <div class="card-action-container">
-                    <button class="btn purchase-btn ${isOwner ? 'owner-btn' : ''}" 
-                            onclick="${isOwner ? '' : `initiatePurchase('${row.id}')`}"
-                            ${isOwner ? 'disabled' : ''}>
-                        ${isOwner ? 'YOUR LISTING' : 'PURCHASE'}
+                                <div class="card-action-container">
+                    <button class="btn purchase-btn ${isDisabled ? 'owner-btn' : ''}" 
+                            onclick="${isDisabled ? '' : `initiatePurchase('${row.id}')`}"
+                            ${isDisabled ? 'disabled' : ''}>
+                        ${buttonText}
                     </button>
                 </div>
+
             </div>
         `;
     }).join('');
@@ -366,28 +390,48 @@ window.openDetails = async (id) => {
         </div>
     `;
 
+        // 🛑 Check availability status inside details modal
+    const isSold = acc.status === 'sold' || meta.status === 'sold';
+    const isInProgress = acc.status === 'in_progress' || meta.status === 'in_progress';
+    const isDisabled = isOwner || isSold || isInProgress;
+
+    let buttonText = 'PROCEED TO PURCHASE';
+    if (isOwner) buttonText = 'YOUR LISTING';
+    else if (isSold) buttonText = 'SOLD';
+    else if (isInProgress) buttonText = 'IN TRANSACTION';
+
     const footer = document.querySelector('#modalOverlay .modal-footer');
     if (footer) {
         footer.innerHTML = `
             <button class="btn-cancel" onclick="closeModal()">Close Window</button>
-            <button class="btn purchase-btn ${isOwner ? 'owner-btn' : ''}" 
-                onclick="${isOwner ? '' : `closeModal(); initiatePurchase('${acc.id}')`}"
-                ${isOwner ? 'disabled' : ''}
-                style="flex: 2; margin: 0; ${isOwner ? 'background: #94a3b8; cursor: not-allowed;' : ''}">
-                ${isOwner ? 'YOUR LISTING' : 'PROCEED TO PURCHASE'}
+            <button class="btn purchase-btn ${isDisabled ? 'owner-btn' : ''}" 
+                onclick="${isDisabled ? '' : `closeModal(); initiatePurchase('${acc.id}')`}"
+                ${isDisabled ? 'disabled' : ''}
+                style="flex: 2; margin: 0; ${isDisabled ? 'background: #94a3b8; cursor: not-allowed;' : ''}">
+                ${buttonText}
             </button>
         `;
     }
+
     
     document.getElementById('modalOverlay').style.display = 'flex';
 };
 
-// Purchase Initialization Flow
+  // Purchase Initialization Flow
 window.initiatePurchase = async (id) => {
     const acc = activeAccounts.find(a => a.id === id);
     if (!acc) return;
 
+    // 🛑 Block purchase if status is sold or in progress
+    if (acc.status === 'sold' || acc.data?.status === 'sold') {
+        return Swal.fire("Item Sold", "This account has already been sold.", "warning");
+    }
+    if (acc.status === 'in_progress' || acc.data?.status === 'in_progress') {
+        return Swal.fire("Unavailable", "This account is currently in an active transaction.", "info");
+    }
+
     const basePrice = parseFloat(acc.data.price) || 0;
+
     const feeRate = (basePrice === 1500) ? 0.05 : 0.03;
     const fee = basePrice * feeRate;
     const total = basePrice + fee;
