@@ -84,6 +84,22 @@ body { background: var(--bg-main); height: 100svh; display: flex; align-items: c
     box-shadow: 0 0 5px rgba(11, 30, 91, 0.3);
 }
 
+.unread-count-badge {
+    background-color: #10b981;
+    color: #ffffff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-left: 6px;
+}
+
 /* --- MAIN CHAT WINDOW --- */
 .chat-window { 
     flex: 1; 
@@ -308,6 +324,11 @@ body { background: var(--bg-main); height: 100svh; display: flex; align-items: c
     flex-direction: column; 
     position: relative; /* 🎯 This allows the icon to sit behind the bubble */
     transition: all 0.2s ease;
+}
+/* Add this to your CSS file */
+.message .content {
+    white-space: pre-wrap;
+    word-break: break-word;
 }
 
 /* 🚀 Maximize the alignment constraints up to 92% so long lines/links show completely */

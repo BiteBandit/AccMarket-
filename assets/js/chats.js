@@ -10,13 +10,109 @@ let heartbeatInterval = null;
 let replyingTo = null; 
 let isReleasingFunds = false; 
 
+// --- AUTOMATED OFFLINE DELIVERY ENGINE ---
+// --- AUTOMATED OFFLINE DELIVERY ENGINE ---
+async function handleOfflineAutoDelivery(chat) {
+    if (!chat || chat.escrow_step !== 1) return;
+
+    const seller = chat.seller;
+    const now = new Date();
+    const lastSeen = seller?.last_seen ? new Date(seller.last_seen) : null;
+    const diffInSeconds = lastSeen ? Math.floor((now - lastSeen) / 1000) : 9999;
+    
+    // Determine if seller is offline (last active > 60 seconds ago or show_online disabled)
+    const isSellerOnline = seller?.show_online && diffInSeconds < 60;
+
+    if (!isSellerOnline) {
+        console.log("[AUTO-DELIVERY] Seller is offline. Attempting atomic credential claim...");
+
+        // 1. Atomically fetch and lock available credential via Database RPC
+        const { data: creds, error: credErr } = await supabase.rpc('claim_offline_credential', {
+            p_listing_id: chat.product_id,
+            p_buyer_id: chat.buyer_id
+        });
+
+        if (credErr || !creds || creds.length === 0) {
+            console.log("[AUTO-DELIVERY] No pre-loaded credentials available or claim failed for product ID:", chat.product_id);
+            return;
+        }
+
+        // RPC returns an array; extract claimed record
+        const cred = creds[0];
+        const BOT_USER_ID = "3c6a749a-b38d-488a-ae4e-0bba719df83e";
+        const payload = cred.credentials_payload || {};
+        
+        // 2. Format credentials message with structured Markdown and clean breaks
+        const credMsg = `🤖 **AUTOMATED DELIVERY (Seller Offline)**
+
+🔐 **Account Credentials**
+• **Type:** ${cred.login_type || 'Account Details'}
+• **Username/Email:** ${payload.username || payload.email || 'N/A'}
+• **Password:** ${payload.password || 'N/A'}
+• **Extra Info / 2FA:** ${payload.extra || 'N/A'}
+
+⚠️ **Buyer Notice:**
+Please verify these login details immediately. Once confirmed, click **Release Funds** to complete the deal.`;
+
+        // 3. Send credentials as AI Bot user
+        await supabase.from('messages').insert([{
+            conversation_id: chat.id,
+            sender_id: BOT_USER_ID,
+            content: credMsg,
+            type: 'text'
+        }]);
+
+        const systemNotice = "📦 System auto-delivered account credentials while seller was offline. Escrow updated to Step 2.";
+
+        // 4. Upgrade conversation step to 2
+        await supabase.from('conversations').update({
+            escrow_step: 2,
+            last_message: systemNotice,
+            updated_at: now.toISOString()
+        }).eq('id', chat.id);
+
+        // SAFE STATE MUTATION: Update step and last message without overriding seller/buyer profile objects
+        if (window.activeChatData && window.activeChatData.id === chat.id) {
+            window.activeChatData.escrow_step = 2;
+            window.activeChatData.last_message = systemNotice;
+        }
+
+        // 5. Post system status message
+        await supabase.from('messages').insert([{
+            conversation_id: chat.id,
+            sender_id: currentUser?.id || BOT_USER_ID,
+            content: systemNotice,
+            type: 'system'
+        }]);
+
+        // 6. Refresh UI to step 2
+        updateEscrowUI(2);
+        await loadSidebar();
+    }
+}
+
 
 // --- LINK DETECTION ENGINE ---
 function linkify(text) {
     if (!text) return "";
-    const urlPattern = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
-    return text.replace(urlPattern, function(url) {
-        return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="chat-link">${url}</a>`;
+
+    // 1. Escape raw HTML to prevent XSS attacks
+    let formatted = text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+
+    // 2. Convert **bold text** to HTML <b> tags
+    formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+
+    // 3. Convert URLs (http, https, ftp, file, www) to clickable <a> tags
+    const urlPattern = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])|(\bwww\.[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
+
+    return formatted.replace(urlPattern, function(match, fullUrl) {
+        const href = fullUrl ? match : `https://${match}`;
+        return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="chat-link">${match}</a>`;
     });
 }
 
@@ -240,13 +336,16 @@ async function loadSidebar(filter = "") {
         if (!otherUser) return;
         if (filter && !otherUser.username.toLowerCase().includes(filter.toLowerCase())) return;
 
-        const hasUnread = chat.messages.some(m => 
+        // Calculate exact unread message count
+        const unreadCount = chat.messages.filter(m => 
             m && 
             m.is_read === false && 
             m.sender_id && 
             m.sender_id !== currentUser.id &&
             chat.id !== activeChatId
-        );
+        ).length;
+
+        const hasUnread = unreadCount > 0;
         const isActive = chat.id === activeChatId ? 'active' : '';
 
         const msgDate = new Date(chat.updated_at);
@@ -264,6 +363,7 @@ async function loadSidebar(filter = "") {
         item.className = `chat-item ${isActive} ${hasUnread ? 'unread-item' : ''}`;
         
         const adminBadge = isMeAdmin ? `<span style="font-size:10px; background:#e0e7ff; color:#4338ca; padding:2px 5px; border-radius:4px; margin-left:5px;">Admin</span>` : '';
+        const displayCount = unreadCount > 99 ? '99+' : unreadCount;
 
         item.innerHTML = `
             <img src="${otherUser.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUser.username}`}">
@@ -276,7 +376,7 @@ async function loadSidebar(filter = "") {
                 </div>
                 <div class="chat-bottom">
                     <p class="last-msg">${chat.last_message || 'New Deal Started'}</p>
-                    ${hasUnread ? '<span class="unread-dot"></span>' : ''}
+                    ${hasUnread ? `<span class="unread-count-badge">${displayCount}</span>` : ''}
                 </div>
             </div>`;
 
@@ -355,11 +455,17 @@ async function initChatWindow() {
             headerAvatar.src = otherUser.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUser.username}`;
         }
 
+        // --- ESCROW STEP CHECK & OFFLINE DELIVERY TRIGGER ---
         if (chat.escrow_step === 0) {
             console.log("[ESCROW] Initializing Step 1...");
             await upgradeToStepOne(); 
         } else {
             updateEscrowUI(chat.escrow_step);
+        }
+
+        // Auto-deliver credentials if seller is offline and active step is 1
+        if (chat.escrow_step === 1) {
+            await handleOfflineAutoDelivery(chat);
         }
 
         syncLockdownUI(chat.status, chat.admin_id);
@@ -370,37 +476,37 @@ async function initChatWindow() {
         const viewBtn = document.querySelector('.view-listing-btn');
 
         const logos = {
-    // --- Social Media Platforms ---
-    instagram: "../images/instagram.png",
-    twitter: "../images/twitter.png",
-    tiktok: "../images/tiktok.png",
-    facebook: "../images/facebook.png",
-    snapchat: "../images/snapchat.png",
-    reddit: "../images/reddit.png",
-    twitch: "../images/twitch.png",
-    discord: "../images/discord.png",
-    linkedin: "../images/linkedin.png",
-    pinterest: "../images/pinterest.png",
+            // --- Social Media Platforms ---
+            instagram: "../images/instagram.png",
+            twitter: "../images/twitter.png",
+            tiktok: "../images/tiktok.png",
+            facebook: "../images/facebook.png",
+            snapchat: "../images/snapchat.png",
+            reddit: "../images/reddit.png",
+            twitch: "../images/twitch.png",
+            discord: "../images/discord.png",
+            linkedin: "../images/linkedin.png",
+            pinterest: "../images/pinterest.png",
 
-    // --- Requested Email Services / Mail Platforms ---
-    gmail: "../images/gmail.png",
-    outlook: "../images/outlook.png",
-    yahoo: "../images/yahoo.png",
-    rambler: "../images/rambler.png",
-    hotmail: "../images/hotmail.png",
-    protonmail: "../images/protonmail.png",
-    gmx: "../images/gmx.png",
-    yandex: "../images/yandex.png",
-    o2: "../images/o2.png",
-    mail_ru: "../images/mail.ru.png", // Keeps your specific dot placement format
-    mail_com: "../images/mail.com.png",
-    atomicmail: "../images/atomicmail.png",
-    onet: "../images/onet.png",
-    aol: "../images/aol.png",
-    
-    // Catch-all Default Profile Asset Fallback
-    default_mail: "../images/default_mail.png"
-};
+            // --- Requested Email Services / Mail Platforms ---
+            gmail: "../images/gmail.png",
+            outlook: "../images/outlook.png",
+            yahoo: "../images/yahoo.png",
+            rambler: "../images/rambler.png",
+            hotmail: "../images/hotmail.png",
+            protonmail: "../images/protonmail.png",
+            gmx: "../images/gmx.png",
+            yandex: "../images/yandex.png",
+            o2: "../images/o2.png",
+            mail_ru: "../images/mail.ru.png",
+            mail_com: "../images/mail.com.png",
+            atomicmail: "../images/atomicmail.png",
+            onet: "../images/onet.png",
+            aol: "../images/aol.png",
+            
+            // Catch-all Default Profile Asset Fallback
+            default_mail: "../images/default_mail.png"
+        };
 
         if (pTitle) pTitle.innerText = chat.product_name || "Unknown Item";
         if (pPrice) pPrice.innerText = `₦${chat.product_price || '0.00'}`;
@@ -455,6 +561,7 @@ async function initChatWindow() {
 
     if (messages) messages.forEach(msg => appendMessageUI(msg));
 }
+
 
 // --- 6. PARTNER STATUS WATCHER ---
 function watchPartnerPresence(partner) {
@@ -516,9 +623,22 @@ function watchPartnerPresence(partner) {
             filter: `id=eq.${partner.id}` 
         }, (payload) => {
             calculateStatus(payload.new.last_seen, payload.new.show_online);
+
+            // Sync realtime database state into global chat state
+            if (window.activeChatData) {
+                if (window.activeChatData.seller?.id === payload.new.id) {
+                    window.activeChatData.seller.last_seen = payload.new.last_seen;
+                    window.activeChatData.seller.show_online = payload.new.show_online;
+                }
+                if (window.activeChatData.buyer?.id === payload.new.id) {
+                    window.activeChatData.buyer.last_seen = payload.new.last_seen;
+                    window.activeChatData.buyer.show_online = payload.new.show_online;
+                }
+            }
         })
         .subscribe();
 }
+
 
 // --- 7. MESSAGING HELPERS ---
 function subscribeToMessages() {
@@ -875,7 +995,9 @@ function appendMessageUI(msg) {
         const goldBadgeSvg = generateGoldBadge(cachedAdmin?.trust_score || msg.sender?.trust_score || 0, `msg-${msg.id}`);
         senderHeaderNameHTML = `<span class="sender-name" style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.75rem; margin-bottom: 4px; color: #1e3a8a; font-weight: bold; width: 100%; justify-content: ${isMe ? 'flex-end' : 'flex-start'}; padding-${isMe ? 'right' : 'left'}: 4px;">${isMe ? '' : '<i class="ph-fill ph-shield-check"></i>'} ${adminName} (Staff) ${goldBadgeSvg} ${isMe ? '<i class="ph-fill ph-shield-check"></i>' : ''}</span>`;
     } else if (!isMe && msg.sender?.username) {
-        senderHeaderNameHTML = `<span class="sender-name" style="display: inline-flex; align-items: center; gap: 1px; font-size: 0.75rem; margin-bottom: 2px; color: #475569; font-weight: 500;">${msg.sender.username} ${generateGoldBadge(msg.sender?.trust_score || 0, `msg-${msg.id}`)}</span>`;
+        const senderName = msg.sender.username;
+        const goldBadgeSvg = generateGoldBadge(msg.sender?.trust_score || 0, `msg-${msg.id}`);
+        senderHeaderNameHTML = `<span class="sender-name" style="display: inline-flex; align-items: center; gap: 1px; font-size: 0.75rem; margin-bottom: 2px; color: #475569; font-weight: 500;">${senderName} ${goldBadgeSvg}</span>`;
     }
 
     div.innerHTML = `
@@ -918,6 +1040,7 @@ function appendMessageUI(msg) {
 }
 
 
+
 function scrollToMessage(id) {
     const target = document.getElementById(`msg-${id}`);
     if (target) {
@@ -928,15 +1051,42 @@ function scrollToMessage(id) {
 }
 window.scrollToMessage = scrollToMessage;
 
+
+// =========================================================================
+// --- TRIGGER AI SUPPORT EDGE FUNCTION ---
+// =========================================================================
+async function triggerAiSupport(content, activeChatId) {
+    try {
+        const session = (await supabase.auth.getSession()).data.session;
+        
+        // Asynchronous call — does not block buyer's UI
+        fetch("https://qihzvglznpkytolxkuxz.supabase.co/functions/v1/ai-support", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${session?.access_token || ''}`
+            },
+            body: JSON.stringify({ 
+                question: content,
+                conversation_id: activeChatId 
+            })
+        });
+    } catch (err) {
+        console.error("Failed to reach ai-support edge function:", err);
+    }
+}
+
 async function handleSendMessage() {
     const input = document.getElementById('messageInput');
-    const content = input.value.trim();
+    const content = input?.value.trim();
     if (!content || !activeChatId) return;
+
+    // Preserve original UI state for recovery
+    const originalPlaceholder = input.placeholder || "Type a message...";
 
     // =========================================================================
     // --- LAYER 1: ULTRA-RELAXED LOCAL FILTERS (Only Catches Blatant Evasion Phrases) ---
     // =========================================================================
-    // Only intercept locally if they explicitly text explicit redirection phrases
     const SOCIAL_HANDLE_REDIRECTION = /(?:my|hit\s*me\s*up\s*on|message\s*me\s*on|add\s*me\s*on|dm\s*me|contact\s*me|text\s*me|whatsapp\s*me|chat\s*on)\s*(?:ig|instagram|snap|snapchat|tg|telegram|whatsapp|wa|twitter|x|phone|number)/gi;
 
     // --- STRUCTURAL BYPASSES (Fast-track technical data to save AI credits completely) ---
@@ -948,14 +1098,12 @@ async function handleSendMessage() {
 
     let isScamAttempt = false;
 
-    // Frontend only flags blatant redirection commands. Raw links/numbers pass through safely to the AI.
     if (SOCIAL_HANDLE_REDIRECTION.test(content)) {
         if (!IS_STRUCTURED_COMBO && !IS_BACKTICK_CODE) {
             isScamAttempt = true;
         }
     }
 
-    // Reset regex index state
     SOCIAL_HANDLE_REDIRECTION.lastIndex = 0;
 
     if (isScamAttempt) {
@@ -963,71 +1111,109 @@ async function handleSendMessage() {
         return;
     }
 
-    // =========================================================================
-    // --- LAYER 2: SUPABASE EDGE FUNCTION AI CONTEXT INTERPRETATION ---
-    // =========================================================================
-    // Technical assets, accounts logs, and PINs skip the network request entirely for speed
-    const skipAiCheck = isShortNumericCode || IS_STRUCTURED_COMBO || IS_MULTILINE_LOG || IS_BACKTICK_CODE;
-
-    if (!skipAiCheck) {
+    try {
+        // Disable input while processing security layer
         input.disabled = true;
-        const originalPlaceholder = input.placeholder || "Type a message...";
-        input.placeholder = "Verifying security... 🛡️";
 
-        try {
-            const response = await fetch("https://qihzvglznpkytolxkuxz.supabase.co/functions/v1/moderate-message", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}`
-                },
-                body: JSON.stringify({ 
-                    text: content,
-                    conversation_id: activeChatId 
-                })
-            });
+        // =========================================================================
+        // --- LAYER 2: SUPABASE EDGE FUNCTION AI CONTEXT INTERPRETATION ---
+        // =========================================================================
+        const skipAiCheck = isShortNumericCode || IS_STRUCTURED_COMBO || IS_MULTILINE_LOG || IS_BACKTICK_CODE;
 
-            const data = await response.json();
+        if (!skipAiCheck) {
+            input.placeholder = "Verifying security... 🛡️";
 
-            if (data && data.blocked === true) {
-                console.warn(`[AI SECURITY BLOCK]: ${data.reason}`);
-                showSecurityAlert();
-                
-                input.disabled = false;
-                input.placeholder = originalPlaceholder;
-                return; // Blocks database insertion entirely
+            try {
+                const sessionRes = await supabase.auth.getSession();
+                const accessToken = sessionRes.data.session?.access_token || '';
+
+                const response = await fetch("https://qihzvglznpkytolxkuxz.supabase.co/functions/v1/moderate-message", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${accessToken}`
+                    },
+                    body: JSON.stringify({ 
+                        text: content,
+                        conversation_id: activeChatId 
+                    })
+                });
+
+                const data = await response.json().catch(() => ({}));
+
+                if (data && data.blocked === true) {
+                    console.warn(`[AI SECURITY BLOCK]: ${data.reason}`);
+                    showSecurityAlert();
+                    return; // Blocks database insertion entirely
+                }
+
+            } catch (err) {
+                console.error("Supabase Edge Function AI offline. Defaulting to local validation:", err);
             }
-
-        } catch (err) {
-            console.error("Supabase Edge Function AI offline. Defaulting to local validation:", err);
         }
 
+        // =========================================================================
+        // --- LAYER 3: PRESERVED ORIGINAL CHAT SUBMISSION & AI SUPPORT TRIGGER ---
+        // =========================================================================
+        const replyId = replyingTo ? replyingTo.id : null;
+        
+        // Clear input field on valid submission attempt
+        input.value = '';
+        cancelReplyUI();
+
+        const { error: msgError } = await supabase.from('messages').insert([{
+            conversation_id: activeChatId,
+            sender_id: currentUser.id,
+            content: content,
+            type: 'text',
+            is_read: false,
+            reply_to_id: replyId
+        }]);
+
+        if (!msgError) {
+            await supabase.from('conversations')
+                .update({ last_message: content, updated_at: new Date().toISOString() })
+                .eq('id', activeChatId);
+
+            // --- TRIGGER AI ASSISTANT IF SELLER IS OFFLINE ---
+            const chat = window.activeChatData;
+            
+            if (chat && chat.seller) {
+                const seller = chat.seller;
+                
+                // Check online visibility settings and availability
+                if (!seller.show_online || !seller.last_seen) {
+                    console.log("[AI CHECK] Seller has offline visibility disabled or missing last_seen.");
+                    if (currentUser?.id === chat.buyer_id) {
+                        triggerAiSupport(content, activeChatId);
+                    }
+                } else {
+                    const lastSeen = new Date(seller.last_seen);
+                    const diffInSeconds = Math.floor((new Date() - lastSeen) / 1000);
+                    const isSellerOnline = diffInSeconds < 60;
+
+                    console.log(`[AI CHECK] Seller Online: ${isSellerOnline} | Diff: ${diffInSeconds}s`);
+
+                    if (!isSellerOnline && currentUser?.id === chat.buyer_id) {
+                        console.log("[AI CHECK] Seller is offline. Invoking AI support...");
+                        triggerAiSupport(content, activeChatId);
+                    }
+                }
+            }
+        } else {
+            console.error("Failed to insert message:", msgError);
+        }
+
+    } finally {
+        // Guaranteed execution: always restore input field state regardless of errors or blocks
         input.disabled = false;
         input.placeholder = originalPlaceholder;
-    }
-
-    // =========================================================================
-    // --- LAYER 3: PRESERVED ORIGINAL CHAT SUBMISSION ---
-    // =========================================================================
-    const replyId = replyingTo ? replyingTo.id : null;
-    input.value = '';
-    cancelReplyUI();
-
-    const { error: msgError } = await supabase.from('messages').insert([{
-        conversation_id: activeChatId,
-        sender_id: currentUser.id,
-        content: content,
-        type: 'text',
-        is_read: false,
-        reply_to_id: replyId
-    }]);
-
-    if (!msgError) {
-        await supabase.from('conversations')
-            .update({ last_message: content, updated_at: new Date().toISOString() })
-            .eq('id', activeChatId);
+        input.focus();
     }
 }
+
+
+
 
 function showSecurityAlert() {
     Swal.fire({
@@ -1063,7 +1249,7 @@ async function initSettingsToggle() {
 async function upgradeToStepOne() {
     if (!activeChatId || !currentUser) return;
 
-    const systemText= "💰 Payment confirmed. Funds are now held in Escrow. Seller, please send the login details here so the buyer can verify the account.";
+    const systemText = "💰 Payment confirmed. Funds are now held in Escrow. Seller, please send the login details here so the buyer can verify the account.";
 
     await supabase.from('conversations')
         .update({ 
@@ -1084,7 +1270,13 @@ async function upgradeToStepOne() {
 
     updateEscrowUI(1);
     await loadSidebar();
+
+    // Trigger auto-delivery check immediately after advancing to Step 1
+    if (window.activeChatData) {
+        await handleOfflineAutoDelivery(window.activeChatData);
+    }
 }
+
 
 function updateEscrowUI(step) {
     const stepPaid = document.querySelector('.status-step:nth-child(1)');
