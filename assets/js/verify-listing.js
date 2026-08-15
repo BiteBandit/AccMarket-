@@ -398,7 +398,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       // 5. Insert into `Listing_credentials` table
       const { error: credentialsError } = await supabase
-        .from("Listing_credentials")
+        .from("listing_credentials")
         .insert([
           {
             listing_id: verificationData.id,
