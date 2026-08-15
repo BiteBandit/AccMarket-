@@ -260,7 +260,7 @@
   <label for="region">Account Region</label>
   <input type="text" id="region" placeholder="e.g. USA, UK, Canada" required>
 
-<label>Account Login Format (Select up to 2)</label>
+<label>Account Login Format (Select up to 3)</label>
 
 <div class="login-options">
   <label><input type="checkbox" value="email_password"> Email + Password</label>
@@ -287,6 +287,18 @@
     <option value="creator">Creator</option>
     <option value="business">Business</option>
   </select>
+
+  <!-- DYNAMIC CREDENTIALS CONTAINER -->
+  <div id="dynamic-credentials-container" style="margin-top: 1rem;">
+    <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">
+      Account Credentials / Login Details
+    </label>
+    <div id="dynamic-fields-wrapper">
+      <p style="font-size: 0.85rem; color: #666; font-style: italic;">
+        Please select at least one login format above to display input fields.
+      </p>
+    </div>
+  </div>
 
   <button type="submit">Continue</button>
 

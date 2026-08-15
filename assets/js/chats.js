@@ -62,7 +62,7 @@ Please verify these login details immediately. Once confirmed, click **Release F
             type: 'text'
         }]);
 
-        const systemNotice = "📦 System auto-delivered account credentials while seller was offline. Escrow updated to Step 2.";
+        const systemNotice = "📦 System auto-delivered account credentials while seller was offline. Verify and release funds.";
 
         // 4. Upgrade conversation step to 2
         await supabase.from('conversations').update({
@@ -1175,28 +1175,35 @@ async function handleSendMessage() {
                 .update({ last_message: content, updated_at: new Date().toISOString() })
                 .eq('id', activeChatId);
 
-            // --- TRIGGER AI ASSISTANT IF SELLER IS OFFLINE ---
-            const chat = window.activeChatData;
-            
-            if (chat && chat.seller) {
-                const seller = chat.seller;
-                
-                // Check online visibility settings and availability
-                if (!seller.show_online || !seller.last_seen) {
-                    console.log("[AI CHECK] Seller has offline visibility disabled or missing last_seen.");
-                    if (currentUser?.id === chat.buyer_id) {
-                        triggerAiSupport(content, activeChatId);
-                    }
-                } else {
-                    const lastSeen = new Date(seller.last_seen);
-                    const diffInSeconds = Math.floor((new Date() - lastSeen) / 1000);
-                    const isSellerOnline = diffInSeconds < 60;
+            // --- REALTIME CHECK FOR AI ASSISTANT TRIGGER ---
+            const { data: currentChat } = await supabase
+                .from('conversations')
+                .select(`
+                    buyer_id, 
+                    seller:profiles!conversations_seller_id_fkey(id, last_seen, show_online)
+                `)
+                .eq('id', activeChatId)
+                .single();
 
-                    console.log(`[AI CHECK] Seller Online: ${isSellerOnline} | Diff: ${diffInSeconds}s`);
+            if (currentChat && currentChat.seller) {
+                const seller = currentChat.seller;
+                const isBuyer = currentUser?.id === currentChat.buyer_id;
 
-                    if (!isSellerOnline && currentUser?.id === chat.buyer_id) {
-                        console.log("[AI CHECK] Seller is offline. Invoking AI support...");
+                if (isBuyer) {
+                    if (!seller.show_online || !seller.last_seen) {
+                        console.log("[AI CHECK] Seller has offline visibility disabled or missing last_seen.");
                         triggerAiSupport(content, activeChatId);
+                    } else {
+                        const lastSeen = new Date(seller.last_seen);
+                        const diffInSeconds = Math.floor((new Date() - lastSeen) / 1000);
+                        const isSellerOnline = diffInSeconds < 60;
+
+                        console.log(`[AI CHECK] Live Seller Status: ${isSellerOnline ? 'Online' : 'Offline'} | ${diffInSeconds}s ago`);
+
+                        if (!isSellerOnline) {
+                            console.log("[AI CHECK] Seller is confirmed offline. Invoking AI support...");
+                            triggerAiSupport(content, activeChatId);
+                        }
                     }
                 }
             }
@@ -1211,9 +1218,6 @@ async function handleSendMessage() {
         input.focus();
     }
 }
-
-
-
 
 function showSecurityAlert() {
     Swal.fire({

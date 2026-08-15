@@ -42,7 +42,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
 import { supabase } from "./supabase-config.js";
 
-
 document.addEventListener("DOMContentLoaded", async () => {
 
   // ---------------- AUTH & ROLE CHECK ----------------
@@ -97,6 +96,92 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
   platformLogo.src = platformLogos[platform.toLowerCase()] || "../images/default.png";
 
+  // ---------------- DYNAMIC CREDENTIAL FIELDS GENERATOR ----------------
+  const loginCheckboxes = document.querySelectorAll(".login-options input");
+  const fieldsWrapper = document.getElementById("dynamic-fields-wrapper");
+
+  function renderCredentialFields() {
+    if (!fieldsWrapper) return;
+
+    const selectedValues = Array.from(loginCheckboxes)
+      .filter(cb => cb.checked)
+      .map(cb => cb.value);
+
+    if (selectedValues.length === 0) {
+      fieldsWrapper.innerHTML = `
+        <p style="font-size: 0.85rem; color: #666; font-style: italic;">
+          Please select at least one login format above to display input fields.
+        </p>`;
+      return;
+    }
+
+    let html = "";
+
+    // Email + Password
+    if (selectedValues.includes("email_password")) {
+      html += `
+        <div class="cred-group" style="margin-bottom: 0.75rem;">
+          <label for="cred_email">Email Address</label>
+          <input type="email" id="cred_email" placeholder="e.g., account@gmail.com" required>
+          <label for="cred_email_pass" style="margin-top:0.4rem;">Email Password</label>
+          <input type="password" id="cred_email_pass" placeholder="Enter email password" required>
+        </div>`;
+    }
+
+    // Username + Password
+    if (selectedValues.includes("username_password")) {
+      html += `
+        <div class="cred-group" style="margin-bottom: 0.75rem;">
+          <label for="cred_username">Account Username / Handle</label>
+          <input type="text" id="cred_username" placeholder="e.g., @john_doe" required>
+          <label for="cred_account_pass" style="margin-top:0.4rem;">Account Password</label>
+          <input type="password" id="cred_account_pass" placeholder="Enter account password" required>
+        </div>`;
+    }
+
+    // Phone + Password
+    if (selectedValues.includes("phone_password")) {
+      html += `
+        <div class="cred-group" style="margin-bottom: 0.75rem;">
+          <label for="cred_phone">Phone Number</label>
+          <input type="tel" id="cred_phone" placeholder="e.g., +1234567890" required>
+          <label for="cred_phone_pass" style="margin-top:0.4rem;">Password</label>
+          <input type="password" id="cred_phone_pass" placeholder="Enter password" required>
+        </div>`;
+    }
+
+    // 2FA Enabled
+    if (selectedValues.includes("2fa_enabled")) {
+      html += `
+        <div class="cred-group" style="margin-bottom: 0.75rem;">
+          <label for="cred_2fa">2FA Secret Key / Backup Codes</label>
+          <input type="text" id="cred_2fa" placeholder="e.g., JBSWY3DPEHPK3PXP or 8-digit codes" required>
+        </div>`;
+    }
+
+    // Optional Extra / Recovery Details
+    html += `
+      <div class="cred-group" style="margin-bottom: 0.75rem;">
+        <label for="cred_extra">Recovery Email / Additional Notes (Optional)</label>
+        <input type="text" id="cred_extra" placeholder="e.g., Recovery email, original creation year, etc.">
+      </div>`;
+
+    fieldsWrapper.innerHTML = html;
+  }
+
+  // Checkbox Selection Listener (Limit to 3 & trigger dynamic render)
+  loginCheckboxes.forEach(box => {
+    box.addEventListener("change", () => {
+      const checked = document.querySelectorAll(".login-options input:checked");
+      if (checked.length > 3) {
+        box.checked = false;
+        Swal.fire("Limit Reached", "You can select a maximum of 3 login formats.", "warning");
+        return;
+      }
+      renderCredentialFields();
+    });
+  });
+
   // ---------------- AI DESCRIPTION GENERATION ----------------
   const aiGenerateBtn = document.getElementById("ai-generate-btn");
   const descriptionTextarea = document.getElementById("description");
@@ -105,20 +190,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     aiGenerateBtn.addEventListener("click", async (e) => {
       e.preventDefault(); 
 
-      // 1. Grab all elements securely
       const followers = document.getElementById("followers")?.value.trim() || "";
       const region = document.getElementById("region")?.value.trim() || "";
       const category = document.getElementById("category")?.value || "";
       const username = document.getElementById("username")?.value.trim() || "";
       const price = document.getElementById("price")?.value.trim() || ""; 
 
-      // 🎯 Safeguard: Grab user text ONLY if it's their draft, not a full description already there
       let userDraft = descriptionTextarea?.value.trim() || "";
       if (userDraft.includes("Accmarket Escrow") || userDraft.includes("•")) {
-        userDraft = ""; // Clear it out so old AI output isn't recycled
+        userDraft = ""; 
       }
 
-      // 2. CRITICAL STAGE: Validate required fields (Username is now optional)
       let missingFields = [];
       if (!followers) missingFields.push("Follower Count");
       if (!region) missingFields.push("Account Region");
@@ -135,14 +217,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       try {
-        // 3. Update button to a loading state
         aiGenerateBtn.disabled = true;
         aiGenerateBtn.style.opacity = "0.7";
         aiGenerateBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Upgrading...`;
         descriptionTextarea.placeholder = "Accmarket AI is upgrading your description using all form details...";
 
-        // 4. Invoke your Supabase Edge Function
-        // Note: "platform" is globally defined from URLSearchParams above
         const { data, error } = await supabase.functions.invoke('generate-description', {
           body: { 
             platform, 
@@ -157,7 +236,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         if (error) throw error;
 
-        // 5. Inject generated copy into the textarea
         if (data && data.description) {
           descriptionTextarea.value = data.description;
         } else {
@@ -172,7 +250,6 @@ document.addEventListener("DOMContentLoaded", async () => {
           text: "We couldn't upgrade the description automatically. Please try again."
         });
       } finally {
-        // 6. Restore original button state
         aiGenerateBtn.disabled = false;
         aiGenerateBtn.style.opacity = "1";
         aiGenerateBtn.innerHTML = `<i class="fas fa-magic"></i> Generate with AI`;
@@ -181,8 +258,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-
-  
   // ---------------- FORM LOGIC ----------------
   const verifyForm = document.getElementById("verify-form");
   const bioLockSection = document.getElementById("bio-lock-section");
@@ -205,23 +280,23 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
-    if (selectedFormats.length > 2) {
-      Swal.fire("Too Many Selected", "You can select a maximum of 2 login formats.", "warning");
+    if (selectedFormats.length > 3) {
+      Swal.fire("Too Many Selected", "You can select a maximum of 3 login formats.", "warning");
       return;
     }
     
-    // ---------------- PRICE VALIDATION ----------------
-  const priceInput = document.getElementById("price").value.trim();
-  const price = parseFloat(priceInput);
+    // PRICE VALIDATION
+    const priceInput = document.getElementById("price").value.trim();
+    const price = parseFloat(priceInput);
 
-  if (!priceInput || isNaN(price) || price < 0) {
-    Swal.fire(
-      "Invalid Price",
-      "Please enter a valid price (0 or greater).",
-      "warning"
-    );
-    return;
-  }
+    if (!priceInput || isNaN(price) || price < 0) {
+      Swal.fire(
+        "Invalid Price",
+        "Please enter a valid price (0 or greater).",
+        "warning"
+      );
+      return;
+    }
 
     verificationCode = "ACCMARKET-" + Math.random().toString(36).substring(2, 8).toUpperCase();
 
@@ -249,7 +324,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     bioLockSection.style.display = "flex";
     Array.from(verifyForm.elements).forEach(el => el.disabled = true);
   });
-
+  
   // STEP 2: Upload Screenshot & Save to DB
   submitBtn.addEventListener("click", async () => {
     const file = document.getElementById("screenshot").files[0];
@@ -263,7 +338,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("User not logged in.");
 
-      // Upload screenshot
+      // 1. Upload screenshot
       const filePath = `verification_screenshots/${user.id}-${Date.now()}.png`;
       const { error: uploadError } = await supabase.storage
         .from("verification-screenshots")
@@ -271,7 +346,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
+      // 2. Get public URL
       const { data: publicUrlData, error: urlError } = supabase.storage
         .from("verification-screenshots")
         .getPublicUrl(filePath);
@@ -279,26 +354,73 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (urlError) throw urlError;
       const screenshotUrl = publicUrlData.publicUrl;
 
-      // Insert into table
-      const { error: insertError } = await supabase
-        .from("verifications") // table must exist
+      // 3. Insert into `verifications` table
+      const { data: verificationData, error: insertError } = await supabase
+        .from("verifications")
         .insert([
           {
             user_id: user.id,
             data: initialData,
             screenshot_url: screenshotUrl
           }
-        ]);
+        ])
+        .select()
+        .single();
 
       if (insertError) throw insertError;
 
+      // 4. Gather credential values from dynamic input fields
+      const primaryUser = document.getElementById("cred_email")?.value.trim() 
+        || document.getElementById("cred_username")?.value.trim() 
+        || document.getElementById("cred_phone")?.value.trim() 
+        || "";
+
+      const primaryPass = document.getElementById("cred_account_pass")?.value.trim() 
+        || document.getElementById("cred_email_pass")?.value.trim() 
+        || document.getElementById("cred_phone_pass")?.value.trim() 
+        || "";
+
+      const extra2FA = document.getElementById("cred_2fa")?.value.trim() || "";
+      const extraNotes = document.getElementById("cred_extra")?.value.trim() || "";
+
+      const parsedPayload = {
+        username: primaryUser,
+        password: primaryPass,
+        extra: [
+          extra2FA ? `2FA: ${extra2FA}` : "",
+          extraNotes ? `Notes: ${extraNotes}` : ""
+        ].filter(Boolean).join(" | ")
+      };
+
+      const primaryLoginType = initialData.login_formats && initialData.login_formats.length > 0 
+        ? initialData.login_formats[0] 
+        : "email_password";
+
+      // 5. Insert into `Listing_credentials` table
+      const { error: credentialsError } = await supabase
+        .from("Listing_credentials")
+        .insert([
+          {
+            listing_id: verificationData.id,
+            seller_id: user.id,
+            login_type: primaryLoginType,
+            credentials_payload: JSON.stringify(parsedPayload),
+            status: "pending",
+            claimed_by_buyer_id: null,
+            claimed_at: null
+          }
+        ]);
+
+      if (credentialsError) throw credentialsError;
+
       Swal.fire(
         "Submitted!",
-        "Your verification request is now pending review.",
+        "Your verification request and credentials have been submitted.",
         "success"
       );
 
       verifyForm.reset();
+      renderCredentialFields(); // Resets dynamic credential inputs
       bioLockSection.style.display = "none";
       Array.from(verifyForm.elements).forEach(el => el.disabled = false);
 
@@ -308,43 +430,27 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
-  // Limit login format selection to 2
-  const loginCheckboxes = document.querySelectorAll(".login-options input");
-  loginCheckboxes.forEach(box => {
-    box.addEventListener("change", () => {
-      const checked = document.querySelectorAll(".login-options input:checked");
-      if (checked.length > 2) {
-        box.checked = false;
-        Swal.fire(
-          "Limit Reached",
-          "You can select a maximum of 2 login formats.",
-          "warning"
-        );
-      }
-    });
-  });
-
 });
 
 (async () => {
-  // 1. Check if user is logged in
+  // Check if user is logged in
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return; // Now valid because it's inside a function
+  if (!user) return; 
 
-  // 2. Fetch the is_active status
+  // Fetch the is_active status
   const { data: profile } = await supabase
     .from("profiles")
     .select("is_active")
     .eq("id", user.id)
     .single();
 
-  // 3. Professional Account Status Check
+  // Account Status Check
   if (profile && profile.is_active === false) {
     Swal.fire({
       title: "Account Deactivated",
       text: "Your account has been deactivated. Please contact support for assistance.",
       icon: "error",
-      confirmButtonColor: "#0b1e5b", // Matches your dark blue theme
+      confirmButtonColor: "#0b1e5b",
       confirmButtonText: "Close",
       allowOutsideClick: false,
       allowEscapeKey: false
@@ -352,10 +458,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       await supabase.auth.signOut();
       window.location.href = "auth.html";
     });
-    return; // Exit the IIFE
+    return;
   }
 })();
-
 
 async function loadNotificationCount() {
   try {
@@ -396,16 +501,16 @@ async function loadNotificationCount() {
   }
 }
 
-// ✅ Run when page loads
+// Run when page loads
 loadNotificationCount();
 
-// ✅ Refresh every 30 seconds
+// Refresh every 30 seconds
 setInterval(loadNotificationCount, 30000);
 
-// ✅ Preload notification sound
+// Preload notification sound
 const notificationSound = new Audio("notification.mp3");
 
-// ✅ Real-time updates
+// Real-time updates
 async function setupNotificationRealtime() {
   try {
     const {
@@ -439,13 +544,13 @@ async function setupNotificationRealtime() {
   }
 }
 
-// ✅ Activate real-time listener
+// Activate real-time listener
 setupNotificationRealtime();
 
-// ✅ 1. Preload the notification sound
+// Preload the notification sound
 const chatNotificationSound = new Audio("notification.mp3");
 
-// ✅ 2. Get total unread messages
+// Get total unread messages
 async function loadTotalChatCount() {
   try {
     const { data: { user } } = await supabase.auth.getUser();
@@ -475,7 +580,7 @@ async function loadTotalChatCount() {
   }
 }
 
-// ✅ 3. Real-time listener WITH SOUND
+// Real-time listener WITH SOUND
 async function setupGlobalChatRealtime() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
@@ -490,10 +595,8 @@ async function setupGlobalChatRealtime() {
         table: "messages",
       },
       async (payload) => {
-        // Refresh the count regardless of event type
         await loadTotalChatCount();
         
-        // 🎯 PLAY SOUND: Only on NEW messages sent by someone else
         if (payload.eventType === "INSERT" && payload.new.sender_id !== user.id) {
             chatNotificationSound.play().catch((e) => console.warn("Sound blocked by browser:", e));
         }
@@ -502,25 +605,22 @@ async function setupGlobalChatRealtime() {
     .subscribe();
 }
 
-// ✅ 4. Initialize
+// Initialize chat counts
 loadTotalChatCount();
 setupGlobalChatRealtime();
 
-
-// ---- LOGOUT FUNCTIONALITY ----
+// LOGOUT FUNCTIONALITY
 document.addEventListener("click", async (e) => {
   if (e.target.closest(".logout")) {
-    e.preventDefault(); // stop redirect
+    e.preventDefault();
 
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
 
-      // Optional: clear cached data (just to be safe)
       localStorage.clear();
       sessionStorage.clear();
 
-      // Redirect to login page
       window.location.href = "auth.html";
     } catch (err) {
       console.error("Logout failed:", err.message);
@@ -529,11 +629,9 @@ document.addEventListener("click", async (e) => {
   }
 });
 
-
-// ✅ Show Sell Account link ONLY for Sellers
+// Show Sell Account link ONLY for Sellers
 async function showSellerAndAdminLinks() {
   try {
-    // Get current logged-in user
     const {
       data: { user },
       error: userError,
@@ -544,7 +642,6 @@ async function showSellerAndAdminLinks() {
       return;
     }
 
-    // Get user profile and role
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("role")
@@ -556,11 +653,8 @@ async function showSellerAndAdminLinks() {
       return;
     }
 
-    // Select the Sell Account menu link
     const sellAccountLink = document.querySelector(".seller-only");
 
-    // Sell Account → ONLY visible for "seller"
-    // This will hide the  link for both "buyer" and "admin"
     if (sellAccountLink) {
       if (profile.role === "seller") {
         sellAccountLink.style.display = "block";
@@ -569,12 +663,9 @@ async function showSellerAndAdminLinks() {
       }
     }
 
-
-
   } catch (err) {
     console.error("⚠️ Error checking role:", err);
   }
 }
 
-// Run it once page loads
 showSellerAndAdminLinks();
