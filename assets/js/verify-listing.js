@@ -405,7 +405,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             seller_id: user.id,
             login_type: primaryLoginType,
             credentials_payload: JSON.stringify(parsedPayload),
-            status: "pending",
+            status: "available",
             claimed_by_buyer_id: null,
             claimed_at: null
           }

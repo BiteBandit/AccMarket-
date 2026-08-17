@@ -40,16 +40,44 @@ async function handleOfflineAutoDelivery(chat) {
         // RPC returns an array; extract claimed record
         const cred = creds[0];
         const BOT_USER_ID = "3c6a749a-b38d-488a-ae4e-0bba719df83e";
-        const payload = cred.credentials_payload || {};
+
+        // Safe recursive JSON parser
+        let payload = cred.credentials_payload;
+        while (typeof payload === 'string') {
+            try {
+                payload = JSON.parse(payload);
+            } catch (e) {
+                break;
+            }
+        }
+        payload = payload || {};
         
-        // 2. Format credentials message with structured Markdown and clean breaks
+        // --- DYNAMIC CREDENTIAL FORMATTER ---
+        // Dynamically pushes available fields and excludes empty/missing ones
+        const credLines = [];
+
+        if (cred.login_type) {
+            credLines.push(`• **Type:** ${cred.login_type}`);
+        }
+
+        const username = payload.username || payload.email;
+        if (username) {
+            credLines.push(`• **Username/Email:** ${username}`);
+        }
+
+        if (payload.password) {
+            credLines.push(`• **Password:** ${payload.password}`);
+        }
+
+        if (payload.extra && payload.extra.toString().trim() !== '' && payload.extra !== 'N/A') {
+            credLines.push(`• **Extra Info / 2FA:** ${payload.extra}`);
+        }
+
+        // 2. Format credentials message with structured Markdown
         const credMsg = `🤖 **AUTOMATED DELIVERY (Seller Offline)**
 
 🔐 **Account Credentials**
-• **Type:** ${cred.login_type || 'Account Details'}
-• **Username/Email:** ${payload.username || payload.email || 'N/A'}
-• **Password:** ${payload.password || 'N/A'}
-• **Extra Info / 2FA:** ${payload.extra || 'N/A'}
+${credLines.join('\n')}
 
 ⚠️ **Buyer Notice:**
 Please verify these login details immediately. Once confirmed, click **Release Funds** to complete the deal.`;
@@ -90,6 +118,8 @@ Please verify these login details immediately. Once confirmed, click **Release F
         await loadSidebar();
     }
 }
+
+
 
 
 // --- LINK DETECTION ENGINE ---
@@ -380,7 +410,99 @@ async function loadSidebar(filter = "") {
                 </div>
             </div>`;
 
+        // --- LONG PRESS DELETE LOGIC ---
+        let pressTimer = null;
+        let isLongPress = false;
+
+        const startPress = () => {
+            isLongPress = false;
+            pressTimer = setTimeout(async () => {
+                isLongPress = true;
+
+                // Restrict deletion to cancelled or completed status
+                const allowedStatuses = ['cancelled', 'completed'];
+                if (!allowedStatuses.includes(chat.status)) {
+                    Swal.fire({
+                        title: 'Action Restricted',
+                        text: 'Only cancelled or completed conversations can be deleted.',
+                        icon: 'info',
+                        confirmButtonColor: '#0b1e5b'
+                    });
+                    return;
+                }
+
+                const confirmDelete = await Swal.fire({
+                    title: 'Delete Conversation?',
+                    text: 'This will remove the conversation from your chat list.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#ef4444',
+                    confirmButtonText: 'Yes, Delete'
+                });
+
+                if (confirmDelete.isConfirmed) {
+                    try {
+                        // 1. Delete linked messages first to avoid FK errors
+                        await supabase
+                            .from('messages')
+                            .delete()
+                            .eq('conversation_id', chat.id);
+
+                        // 2. Delete the conversation record
+                        const { data: deletedRows, error: delError } = await supabase
+                            .from('conversations')
+                            .delete()
+                            .eq('id', chat.id)
+                            .select();
+
+                        if (delError) throw delError;
+
+                        // 3. Check if RLS blocked the deletion
+                        if (!deletedRows || deletedRows.length === 0) {
+                            Swal.fire({
+                                title: 'Deletion Blocked',
+                                text: 'Supabase permissions (RLS) prevented deleting this conversation.',
+                                icon: 'error',
+                                confirmButtonColor: '#0b1e5b'
+                            });
+                            return;
+                        }
+
+                        // 4. Close chat window if open and reload sidebar
+                        if (activeChatId === chat.id) {
+                            document.querySelector('.app-container')?.classList.remove('chat-open');
+                            activeChatId = null;
+                        }
+
+                        await loadSidebar(filter);
+                        Swal.fire('Deleted', 'Conversation deleted successfully.', 'success');
+
+                    } catch (err) {
+                        console.error("[DELETE CHAT ERROR]", err);
+                        Swal.fire('Error', err.message || 'Could not delete conversation.', 'error');
+                    }
+                }
+            }, 700); // 700ms long-press threshold
+        };
+
+        const cancelPress = () => {
+            if (pressTimer) {
+                clearTimeout(pressTimer);
+                pressTimer = null;
+            }
+        };
+
+        // Event Listeners for Touch (Mobile) and Mouse (Desktop)
+        item.addEventListener('touchstart', startPress, { passive: true });
+        item.addEventListener('touchend', cancelPress);
+        item.addEventListener('touchmove', cancelPress);
+        item.addEventListener('mousedown', startPress);
+        item.addEventListener('mouseup', cancelPress);
+        item.addEventListener('mouseleave', cancelPress);
+
+        // Click Handler (Navigates only if long press was NOT triggered)
         item.onclick = async () => {
+            if (isLongPress) return;
             activeChatId = chat.id;
             window.history.pushState({}, '', `?id=${chat.id}`);
             document.querySelector('.app-container').classList.add('chat-open');
@@ -392,6 +514,7 @@ async function loadSidebar(filter = "") {
         chatList.appendChild(item);
     });
 }
+
 
 // --- 5. CHAT WINDOW ---
 async function initChatWindow() {
