@@ -6,38 +6,43 @@ const closeLeft = document.getElementById("closeLeft");
 const closeRight = document.getElementById("closeRight");
 
 // Left sidebar
-sidebarToggle.addEventListener("click", () => {
-  leftSidebar.classList.add("active");
-});
-closeLeft.addEventListener("click", () => {
-  leftSidebar.classList.remove("active");
-});
+if (sidebarToggle && leftSidebar && closeLeft) {
+  sidebarToggle.addEventListener("click", () => {
+    leftSidebar.classList.add("active");
+  });
+  closeLeft.addEventListener("click", () => {
+    leftSidebar.classList.remove("active");
+  });
+}
 
 // Right sidebar
-profileToggle.addEventListener("click", () => {
-  rightSidebar.classList.add("active");
-});
-closeRight.addEventListener("click", () => {
-  rightSidebar.classList.remove("active");
-});
+if (profileToggle && rightSidebar && closeRight) {
+  profileToggle.addEventListener("click", () => {
+    rightSidebar.classList.add("active");
+  });
+  closeRight.addEventListener("click", () => {
+    rightSidebar.classList.remove("active");
+  });
+}
 
 // Sidebar Search Function (Live Search)
 document.addEventListener("DOMContentLoaded", () => {
   const searchInput = document.querySelector(".search-box input");
   const items = document.querySelectorAll("#categoryList li a");
 
-  // Live filter while typing
-  searchInput.addEventListener("keyup", () => {
-    let input = searchInput.value.toLowerCase().trim();
+  if (searchInput) {
+    searchInput.addEventListener("keyup", () => {
+      let input = searchInput.value.toLowerCase().trim();
 
-    items.forEach((item) => {
-      if (item.textContent.toLowerCase().includes(input)) {
-        item.parentElement.style.display = "block";
-      } else {
-        item.parentElement.style.display = "none";
-      }
+      items.forEach((item) => {
+        if (item.textContent.toLowerCase().includes(input)) {
+          item.parentElement.style.display = "block";
+        } else {
+          item.parentElement.style.display = "none";
+        }
+      });
     });
-  });
+  }
 });
 
 import { supabase } from "./supabase-config.js";
@@ -79,22 +84,26 @@ document.addEventListener("DOMContentLoaded", async () => {
   const platform = params.get("platform") || "Platform";
 
   const platformTitle = document.getElementById("platform-title");
-  platformTitle.textContent = `Verify Your ${platform.charAt(0).toUpperCase() + platform.slice(1)} Account`;
+  if (platformTitle) {
+    platformTitle.textContent = `Verify Your ${platform.charAt(0).toUpperCase() + platform.slice(1)} Account`;
+  }
 
   const platformLogo = document.getElementById("platform-logo");
-  const platformLogos = {
-    instagram: "../images/instagram.png",
-    twitter: "../images/twitter.png",
-    tiktok: "../images/tiktok.png",
-    facebook: "../images/facebook.png",
-    snapchat: "../images/snapchat.png",
-    reddit: "../images/reddit.png",
-    twitch: "../images/twitch.png",
-    discord: "../images/discord.png",
-    linkedin: "../images/linkedin.png",
-    pinterest: "../images/pinterest.png"
-  };
-  platformLogo.src = platformLogos[platform.toLowerCase()] || "../images/default.png";
+  if (platformLogo) {
+    const platformLogos = {
+      instagram: "../images/instagram.png",
+      twitter: "../images/twitter.png",
+      tiktok: "../images/tiktok.png",
+      facebook: "../images/facebook.png",
+      snapchat: "../images/snapchat.png",
+      reddit: "../images/reddit.png",
+      twitch: "../images/twitch.png",
+      discord: "../images/discord.png",
+      linkedin: "../images/linkedin.png",
+      pinterest: "../images/pinterest.png"
+    };
+    platformLogo.src = platformLogos[platform.toLowerCase()] || "../images/default.png";
+  }
 
   // ---------------- DYNAMIC CREDENTIAL FIELDS GENERATOR ----------------
   const loginCheckboxes = document.querySelectorAll(".login-options input");
@@ -268,183 +277,193 @@ document.addEventListener("DOMContentLoaded", async () => {
   let initialData = {};
 
   // STEP 1: Generate Bio-Lock Code
-  verifyForm.addEventListener("submit", (e) => {
-    e.preventDefault();
+  if (verifyForm) {
+    verifyForm.addEventListener("submit", (e) => {
+      e.preventDefault();
 
-    const selectedFormats = Array.from(
-      document.querySelectorAll(".login-options input:checked")
-    ).map(cb => cb.value);
+      const selectedFormats = Array.from(
+        document.querySelectorAll(".login-options input:checked")
+      ).map(cb => cb.value);
 
-    if (selectedFormats.length === 0) {
-      Swal.fire("Select Login Format", "Please select at least one login format.", "warning");
-      return;
-    }
+      if (selectedFormats.length === 0) {
+        Swal.fire("Select Login Format", "Please select at least one login format.", "warning");
+        return;
+      }
 
-    if (selectedFormats.length > 3) {
-      Swal.fire("Too Many Selected", "You can select a maximum of 3 login formats.", "warning");
-      return;
-    }
-    
-    // PRICE VALIDATION
-    const priceInput = document.getElementById("price").value.trim();
-    const price = parseFloat(priceInput);
+      if (selectedFormats.length > 3) {
+        Swal.fire("Too Many Selected", "You can select a maximum of 3 login formats.", "warning");
+        return;
+      }
+      
+      // PRICE VALIDATION
+      const priceInput = document.getElementById("price").value.trim();
+      const price = parseFloat(priceInput);
 
-    if (!priceInput || isNaN(price) || price < 0) {
-      Swal.fire(
-        "Invalid Price",
-        "Please enter a valid price (0 or greater).",
-        "warning"
-      );
-      return;
-    }
+      if (!priceInput || isNaN(price) || price < 0) {
+        Swal.fire(
+          "Invalid Price",
+          "Please enter a valid price (0 or greater).",
+          "warning"
+        );
+        return;
+      }
 
-    verificationCode = "ACCMARKET-" + Math.random().toString(36).substring(2, 8).toUpperCase();
+      verificationCode = "ACCMARKET-" + Math.random().toString(36).substring(2, 8).toUpperCase();
 
-    initialData = {
-      platform,
-      username: document.getElementById("username").value.trim(),
-      profile_link: document.getElementById("profile-link").value.trim(),
-      account_age: document.getElementById("account-age").value.trim(),
-      followers: parseInt(document.getElementById("followers").value),
-      region: document.getElementById("region").value.trim(),
-      login_formats: selectedFormats,
-      description: document.getElementById("description").value.trim(),
-      price: parseFloat(document.getElementById("price").value),
-      category: document.getElementById("category").value,
-      status: "pending",
-      verification_code: verificationCode,
-      submitted_at: new Date().toISOString()
-    };
-
-    instruction.innerHTML = `
-      Copy this code into your bio temporarily:<br><br>
-      <strong style="font-size:18px;">${verificationCode}</strong>
-    `;
-
-    bioLockSection.style.display = "flex";
-    Array.from(verifyForm.elements).forEach(el => el.disabled = true);
-  });
-  
-  // STEP 2: Upload Screenshot & Save to DB
-  submitBtn.addEventListener("click", async () => {
-    const file = document.getElementById("screenshot").files[0];
-
-    if (!file) {
-      Swal.fire("Screenshot Required", "Please upload your screenshot.", "warning");
-      return;
-    }
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("User not logged in.");
-
-      // 1. Upload screenshot
-      const filePath = `verification_screenshots/${user.id}-${Date.now()}.png`;
-      const { error: uploadError } = await supabase.storage
-        .from("verification-screenshots")
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      // 2. Get public URL
-      const { data: publicUrlData, error: urlError } = supabase.storage
-        .from("verification-screenshots")
-        .getPublicUrl(filePath);
-
-      if (urlError) throw urlError;
-      const screenshotUrl = publicUrlData.publicUrl;
-
-      // 3. Insert into `verifications` table
-      const { data: verificationData, error: insertError } = await supabase
-        .from("verifications")
-        .insert([
-          {
-            user_id: user.id,
-            data: initialData,
-            screenshot_url: screenshotUrl
-          }
-        ])
-        .select()
-        .single();
-
-      if (insertError) throw insertError;
-
-      // 4. Gather credential values from dynamic input fields
-      const primaryUser = document.getElementById("cred_email")?.value.trim() 
-        || document.getElementById("cred_username")?.value.trim() 
-        || document.getElementById("cred_phone")?.value.trim() 
-        || "";
-
-      const primaryPass = document.getElementById("cred_account_pass")?.value.trim() 
-        || document.getElementById("cred_email_pass")?.value.trim() 
-        || document.getElementById("cred_phone_pass")?.value.trim() 
-        || "";
-
-      const extra2FA = document.getElementById("cred_2fa")?.value.trim() || "";
-      const extraNotes = document.getElementById("cred_extra")?.value.trim() || "";
-
-      const parsedPayload = {
-        username: primaryUser,
-        password: primaryPass,
-        extra: [
-          extra2FA ? `2FA: ${extra2FA}` : "",
-          extraNotes ? `Notes: ${extraNotes}` : ""
-        ].filter(Boolean).join(" | ")
+      initialData = {
+        platform,
+        username: document.getElementById("username").value.trim(),
+        profile_link: document.getElementById("profile-link").value.trim(),
+        account_age: document.getElementById("account-age").value.trim(),
+        followers: parseInt(document.getElementById("followers").value),
+        region: document.getElementById("region").value.trim(),
+        login_formats: selectedFormats,
+        description: document.getElementById("description").value.trim(),
+        price: parseFloat(document.getElementById("price").value),
+        category: document.getElementById("category").value,
+        status: "pending",
+        verification_code: verificationCode,
+        submitted_at: new Date().toISOString()
       };
 
-      const primaryLoginType = initialData.login_formats && initialData.login_formats.length > 0 
-        ? initialData.login_formats[0] 
-        : "email_password";
+      if (instruction) {
+        instruction.innerHTML = `
+          Copy this code into your bio temporarily:<br><br>
+          <strong style="font-size:18px;">${verificationCode}</strong>
+        `;
+      }
 
-      // 5. Insert into `Listing_credentials` table
-      const { error: credentialsError } = await supabase
-        .from("listing_credentials")
-        .insert([
-          {
-            listing_id: verificationData.id,
-            seller_id: user.id,
-            login_type: primaryLoginType,
-            credentials_payload: JSON.stringify(parsedPayload),
-            status: "available",
-            claimed_by_buyer_id: null,
-            claimed_at: null
-          }
-        ]);
+      if (bioLockSection) bioLockSection.style.display = "flex";
+      Array.from(verifyForm.elements).forEach(el => el.disabled = true);
+    });
+  }
+  
+  // STEP 2: Upload Screenshot & Save to DB
+  if (submitBtn) {
+    submitBtn.addEventListener("click", async () => {
+      const fileInput = document.getElementById("screenshot");
+      const file = fileInput ? fileInput.files[0] : null;
 
-      if (credentialsError) throw credentialsError;
+      if (!file) {
+        Swal.fire("Screenshot Required", "Please upload your screenshot.", "warning");
+        return;
+      }
 
-      Swal.fire(
-        "Submitted!",
-        "Your verification request and credentials have been submitted.",
-        "success"
-      );
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("User not logged in.");
 
-      verifyForm.reset();
-      renderCredentialFields(); // Resets dynamic credential inputs
-      bioLockSection.style.display = "none";
-      Array.from(verifyForm.elements).forEach(el => el.disabled = false);
+        // 1. Upload screenshot
+        const filePath = `verification_screenshots/${user.id}-${Date.now()}.png`;
+        const { error: uploadError } = await supabase.storage
+          .from("verification-screenshots")
+          .upload(filePath, file);
 
-    } catch (err) {
-      console.error("Verification Error:", err);
-      Swal.fire("Error", "Something went wrong. Check console.", "error");
-    }
-  });
+        if (uploadError) throw uploadError;
+
+        // 2. Get public URL
+        const { data: publicUrlData, error: urlError } = supabase.storage
+          .from("verification-screenshots")
+          .getPublicUrl(filePath);
+
+        if (urlError) throw urlError;
+        const screenshotUrl = publicUrlData.publicUrl;
+
+        // 3. Insert into `verifications` table
+        const { data: verificationData, error: insertError } = await supabase
+          .from("verifications")
+          .insert([
+            {
+              user_id: user.id,
+              data: initialData,
+              screenshot_url: screenshotUrl
+            }
+          ])
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
+
+        // 4. Construct SQL row payload using individual table columns
+        const selectedFormats = initialData.login_formats || [];
+        const primaryLoginType = selectedFormats[0] || "email_password";
+
+        const credentialsRecord = {
+          listing_id: verificationData.id,
+          seller_id: user.id,
+          login_type: primaryLoginType,
+          status: "available",
+          claimed_by_buyer_id: null,
+          claimed_at: null
+        };
+
+        // Email + Password
+        if (selectedFormats.includes("email_password")) {
+          credentialsRecord.email = document.getElementById("cred_email")?.value.trim() || null;
+          credentialsRecord.email_password = document.getElementById("cred_email_pass")?.value.trim() || null;
+        }
+
+        // Username + Password
+        if (selectedFormats.includes("username_password")) {
+          credentialsRecord.account_username = document.getElementById("cred_username")?.value.trim() || null;
+          credentialsRecord.account_password = document.getElementById("cred_account_pass")?.value.trim() || null;
+        }
+
+        // Phone + Password
+        if (selectedFormats.includes("phone_password")) {
+          credentialsRecord.phone = document.getElementById("cred_phone")?.value.trim() || null;
+          credentialsRecord.phone_password = document.getElementById("cred_phone_pass")?.value.trim() || null;
+        }
+
+        // 2FA Enabled
+        if (selectedFormats.includes("2fa_enabled")) {
+          credentialsRecord.two_factor = document.getElementById("cred_2fa")?.value.trim() || null;
+        }
+
+        // Recovery / Extra notes (Optional)
+        const extraVal = document.getElementById("cred_extra")?.value.trim();
+        if (extraVal) {
+          credentialsRecord.extra = extraVal;
+        }
+
+        // 5. Insert directly into `listing_credentials` table columns
+        const { error: credentialsError } = await supabase
+          .from("listing_credentials")
+          .insert([credentialsRecord]);
+
+        if (credentialsError) throw credentialsError;
+
+        Swal.fire(
+          "Submitted!",
+          "Your verification request and credentials have been submitted.",
+          "success"
+        );
+
+        if (verifyForm) verifyForm.reset();
+        renderCredentialFields();
+        if (bioLockSection) bioLockSection.style.display = "none";
+        if (verifyForm) Array.from(verifyForm.elements).forEach(el => el.disabled = false);
+
+      } catch (err) {
+        console.error("Verification Error:", err);
+        Swal.fire("Error", "Something went wrong. Check console.", "error");
+      }
+    });
+  }
 
 });
 
+// Account Status Listener
 (async () => {
-  // Check if user is logged in
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return; 
 
-  // Fetch the is_active status
   const { data: profile } = await supabase
     .from("profiles")
     .select("is_active")
     .eq("id", user.id)
     .single();
 
-  // Account Status Check
   if (profile && profile.is_active === false) {
     Swal.fire({
       title: "Account Deactivated",
@@ -458,21 +477,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       await supabase.auth.signOut();
       window.location.href = "auth.html";
     });
-    return;
   }
 })();
 
+// Notifications Loader
 async function loadNotificationCount() {
   try {
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      console.warn("No logged-in user, skipping notification count.");
-      return;
-    }
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) return;
 
     const { count, error } = await supabase
       .from("notifications")
@@ -480,14 +492,12 @@ async function loadNotificationCount() {
       .eq("user_id", user.id)
       .eq("is_read", false);
 
-    if (error) {
-      console.error("Error loading notification count:", error.message);
-      return;
-    }
+    if (error) return;
 
     const badge = document.getElementById("notification-count");
-    const unreadCount = count || 0;
+    if (!badge) return;
 
+    const unreadCount = count || 0;
     if (unreadCount > 0) {
       badge.textContent = unreadCount;
       badge.style.display = "inline-block";
@@ -501,23 +511,14 @@ async function loadNotificationCount() {
   }
 }
 
-// Run when page loads
 loadNotificationCount();
-
-// Refresh every 30 seconds
 setInterval(loadNotificationCount, 30000);
 
-// Preload notification sound
 const notificationSound = new Audio("notification.mp3");
 
-// Real-time updates
 async function setupNotificationRealtime() {
   try {
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) return;
 
     supabase
@@ -531,7 +532,6 @@ async function setupNotificationRealtime() {
           filter: `user_id=eq.${user.id}`,
         },
         async (payload) => {
-          console.log("🔔 Realtime notification event:", payload.eventType);
           await loadNotificationCount();
           if (payload.eventType === "INSERT") {
             notificationSound.play().catch((e) => console.warn(e));
@@ -544,13 +544,10 @@ async function setupNotificationRealtime() {
   }
 }
 
-// Activate real-time listener
 setupNotificationRealtime();
 
-// Preload the notification sound
 const chatNotificationSound = new Audio("notification.mp3");
 
-// Get total unread messages
 async function loadTotalChatCount() {
   try {
     const { data: { user } } = await supabase.auth.getUser();
@@ -580,7 +577,6 @@ async function loadTotalChatCount() {
   }
 }
 
-// Real-time listener WITH SOUND
 async function setupGlobalChatRealtime() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
@@ -605,11 +601,9 @@ async function setupGlobalChatRealtime() {
     .subscribe();
 }
 
-// Initialize chat counts
 loadTotalChatCount();
 setupGlobalChatRealtime();
 
-// LOGOUT FUNCTIONALITY
 document.addEventListener("click", async (e) => {
   if (e.target.closest(".logout")) {
     e.preventDefault();
@@ -629,18 +623,10 @@ document.addEventListener("click", async (e) => {
   }
 });
 
-// Show Sell Account link ONLY for Sellers
 async function showSellerAndAdminLinks() {
   try {
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      console.warn("⚠️ No logged-in user found.");
-      return;
-    }
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) return;
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
@@ -648,19 +634,12 @@ async function showSellerAndAdminLinks() {
       .eq("id", user.id)
       .single();
 
-    if (profileError) {
-      console.error("❌ Error fetching user role:", profileError.message);
-      return;
-    }
+    if (profileError) return;
 
     const sellAccountLink = document.querySelector(".seller-only");
 
     if (sellAccountLink) {
-      if (profile.role === "seller") {
-        sellAccountLink.style.display = "block";
-      } else {
-        sellAccountLink.style.display = "none";
-      }
+      sellAccountLink.style.display = profile.role === "seller" ? "block" : "none";
     }
 
   } catch (err) {

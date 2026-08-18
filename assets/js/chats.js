@@ -41,36 +41,51 @@ async function handleOfflineAutoDelivery(chat) {
         const cred = creds[0];
         const BOT_USER_ID = "3c6a749a-b38d-488a-ae4e-0bba719df83e";
 
-        // Safe recursive JSON parser
+        // --- FIX: Robust Multi-Depth JSON Parser ---
         let payload = cred.credentials_payload;
+        
         while (typeof payload === 'string') {
             try {
-                payload = JSON.parse(payload);
+                const parsed = JSON.parse(payload);
+                payload = parsed;
             } catch (e) {
-                break;
+                break; // Stop parsing when string is no longer JSON-encoded
             }
         }
-        payload = payload || {};
-        
+
+        if (typeof payload !== 'object' || payload === null) {
+            payload = {};
+        }
+
+        // --- EXTRACT & NORMALIZE KEYS ---
+        const username = payload.username || payload.email || payload.login || payload.user;
+        const password = payload.password || payload.pass;
+        const extra = payload.extra || payload.additional || payload['2fa'] || payload.two_factor;
+
+        // --- VALIDATION GUARD ---
+        // Stop execution before updating chat/sending messages if payload parsing completely failed
+        if (!username && !password) {
+            console.error("[AUTO-DELIVERY] Failed to parse credentials from payload:", cred.credentials_payload);
+            return;
+        }
+
         // --- DYNAMIC CREDENTIAL FORMATTER ---
-        // Dynamically pushes available fields and excludes empty/missing ones
         const credLines = [];
 
         if (cred.login_type) {
             credLines.push(`• **Type:** ${cred.login_type}`);
         }
 
-        const username = payload.username || payload.email;
         if (username) {
             credLines.push(`• **Username/Email:** ${username}`);
         }
 
-        if (payload.password) {
-            credLines.push(`• **Password:** ${payload.password}`);
+        if (password) {
+            credLines.push(`• **Password:** ${password}`);
         }
 
-        if (payload.extra && payload.extra.toString().trim() !== '' && payload.extra !== 'N/A') {
-            credLines.push(`• **Extra Info / 2FA:** ${payload.extra}`);
+        if (extra && extra.toString().trim() !== '' && extra.toString().trim() !== 'N/A') {
+            credLines.push(`• **Extra Info / 2FA:** ${extra}`);
         }
 
         // 2. Format credentials message with structured Markdown
@@ -118,9 +133,6 @@ Please verify these login details immediately. Once confirmed, click **Release F
         await loadSidebar();
     }
 }
-
-
-
 
 // --- LINK DETECTION ENGINE ---
 function linkify(text) {
