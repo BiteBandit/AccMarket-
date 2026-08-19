@@ -2,6 +2,7 @@ import { supabase } from './supabase-config.js';
 
 // State Management
 let activeChatId = new URLSearchParams(window.location.search).get('id'); 
+let isDeliveringAutoCreds = false;
 let currentUser = null;
 let messageSubscription = null;    // Handles new chat messages
 let partnerStatusSub = null;       // Handles partner's Online/Offline status
@@ -9,128 +10,214 @@ let conversationSub = null;        // Handles Deal Status (Cancel/Complete/Escro
 let heartbeatInterval = null;
 let replyingTo = null; 
 let isReleasingFunds = false; 
+let isSelectMode = false;
+let selectedChatIds = new Set();
+
+
+async function deleteSelectedConversations(filter = "") {
+    if (selectedChatIds.size === 0) return;
+
+    const confirmDelete = await Swal.fire({
+        title: `Delete ${selectedChatIds.size} Conversation(s)?`,
+        text: 'This will permanently remove the selected chats from your list.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: 'Yes, Delete All'
+    });
+
+    if (!confirmDelete.isConfirmed) return;
+
+    try {
+        const idsArray = Array.from(selectedChatIds);
+
+        // 1. Delete associated messages first
+        await supabase
+            .from('messages')
+            .delete()
+            .in('conversation_id', idsArray);
+
+        // 2. Delete conversations from Supabase
+        const { data: deletedRows, error: delError } = await supabase
+            .from('conversations')
+            .delete()
+            .in('id', idsArray)
+            .select();
+
+        if (delError) throw delError;
+
+        if (!deletedRows || deletedRows.length === 0) {
+            Swal.fire({
+                title: 'Deletion Blocked',
+                text: 'Supabase policies prevented deleting the selected conversations.',
+                icon: 'error',
+                confirmButtonColor: '#0b1e5b'
+            });
+            return;
+        }
+
+        // 3. Clear active chat if it was deleted
+        if (selectedChatIds.has(activeChatId)) {
+            document.querySelector('.app-container')?.classList.remove('chat-open');
+            activeChatId = null;
+        }
+
+        // Reset mode and update sidebar
+        isSelectMode = false;
+        selectedChatIds.clear();
+
+        await loadSidebar(filter);
+        Swal.fire('Deleted', `${deletedRows.length} conversation(s) deleted successfully.`, 'success');
+
+    } catch (err) {
+        console.error("[BATCH DELETE ERROR]", err);
+        Swal.fire('Error', err.message || 'Could not delete conversations.', 'error');
+    }
+}
 
 // --- AUTOMATED OFFLINE DELIVERY ENGINE ---
 // --- AUTOMATED OFFLINE DELIVERY ENGINE ---
 async function handleOfflineAutoDelivery(chat) {
-    if (!chat || chat.escrow_step !== 1) return;
+    // 1. Guard against double execution or invalid chat state
+    if (!chat || chat.escrow_step !== 1 || isDeliveringAutoCreds) return;
 
-    const seller = chat.seller;
-    const now = new Date();
-    const lastSeen = seller?.last_seen ? new Date(seller.last_seen) : null;
-    const diffInSeconds = lastSeen ? Math.floor((now - lastSeen) / 1000) : 9999;
-    
-    // Determine if seller is offline (last active > 60 seconds ago or show_online disabled)
-    const isSellerOnline = seller?.show_online && diffInSeconds < 60;
+    isDeliveringAutoCreds = true; // Lock execution
 
-    if (!isSellerOnline) {
-        console.log("[AUTO-DELIVERY] Seller is offline. Attempting atomic credential claim...");
-
-        // 1. Atomically fetch and lock available credential via Database RPC
-        const { data: creds, error: credErr } = await supabase.rpc('claim_offline_credential', {
-            p_listing_id: chat.product_id,
-            p_buyer_id: chat.buyer_id
-        });
-
-        if (credErr || !creds || creds.length === 0) {
-            console.log("[AUTO-DELIVERY] No pre-loaded credentials available or claim failed for product ID:", chat.product_id);
-            return;
-        }
-
-        // RPC returns an array; extract claimed record
-        const cred = creds[0];
-        const BOT_USER_ID = "3c6a749a-b38d-488a-ae4e-0bba719df83e";
-
-        // --- FIX: Robust Multi-Depth JSON Parser ---
-        let payload = cred.credentials_payload;
+    try {
+        const seller = chat.seller;
+        const now = new Date();
+        const lastSeen = seller?.last_seen ? new Date(seller.last_seen) : null;
+        const diffInSeconds = lastSeen ? Math.floor((now - lastSeen) / 1000) : 9999;
         
-        while (typeof payload === 'string') {
-            try {
-                const parsed = JSON.parse(payload);
-                payload = parsed;
-            } catch (e) {
-                break; // Stop parsing when string is no longer JSON-encoded
+        // Determine if seller is offline (last active > 60 seconds ago or show_online disabled)
+        const isSellerOnline = seller?.show_online && diffInSeconds < 60;
+
+        if (!isSellerOnline) {
+            console.log("[AUTO-DELIVERY] Seller is offline. Attempting atomic credential claim...");
+
+            // 1. Atomically fetch and lock available credential via Database RPC
+            const { data: creds, error: credErr } = await supabase.rpc('claim_offline_credential', {
+                p_listing_id: chat.product_id,
+                p_buyer_id: chat.buyer_id
+            });
+
+            if (credErr || !creds || creds.length === 0) {
+                console.log("[AUTO-DELIVERY] No pre-loaded credentials available or claim failed for product ID:", chat.product_id);
+                return;
             }
+
+            // RPC returns an array; extract claimed record
+            const cred = creds[0];
+            const BOT_USER_ID = "3c6a749a-b38d-488a-ae4e-0bba719df83e";
+
+            // --- EXTRACT FIELDS DIRECTLY FROM COLUMNS ---
+            const email = cred.email?.trim() || null;
+            const emailPass = cred.email_password?.trim() || null;
+            const accountUsername = cred.account_username?.trim() || null;
+            const accountPass = cred.account_password?.trim() || null;
+            const phone = cred.phone?.trim() || null;
+            const phonePass = cred.phone_password?.trim() || null;
+            const twoFactor = cred.two_factor?.trim() || null;
+            const extra = cred.extra?.trim() || null;
+
+            // --- VALIDATION GUARD ---
+            const hasCredentials = email || accountUsername || phone || accountPass || emailPass || phonePass;
+            if (!hasCredentials) {
+                console.error("[AUTO-DELIVERY] No credential values found in table columns for claim ID:", cred.id);
+                return;
+            }
+
+            // --- DYNAMIC CREDENTIAL FORMATTER ---
+            const credLines = [];
+
+            if (cred.login_type) {
+                credLines.push(`• **Format:** ${cred.login_type}`);
+            }
+
+            // Account / Handle Details
+            if (accountUsername) credLines.push(`• **Username:** ${accountUsername}`);
+            if (accountPass) credLines.push(`• **Account Password:** ${accountPass}`);
+
+            // Email Details
+            if (email) credLines.push(`• **Email:** ${email}`);
+            if (emailPass) credLines.push(`• **Email Password:** ${emailPass}`);
+
+            // Phone Details
+            if (phone) credLines.push(`• **Phone:** ${phone}`);
+            if (phonePass) credLines.push(`• **Phone Password:** ${phonePass}`);
+
+            // 2FA / Backup Keys
+            if (twoFactor) credLines.push(`• **2FA / Backup Codes:** ${twoFactor}`);
+
+            // Extra Notes / Recovery
+            if (extra && extra !== 'N/A') credLines.push(`• **Additional Info:** ${extra}`);
+
+            // 2. Format credentials message with structured Markdown
+            const credMsg = `🤖 **AUTOMATED DELIVERY (Seller Offline)**\n\n🔐 **Account Credentials**\n${credLines.join('\n')}\n\n⚠️ **Buyer Notice:**\nPlease verify these login details immediately. Once confirmed, click **Release Funds** to complete the deal.`;
+
+            // 3. Send credentials as AI Bot user & retrieve inserted object
+            const { data: insertedCredMsg, error: credMsgErr } = await supabase
+                .from('messages')
+                .insert([{
+                    conversation_id: chat.id,
+                    sender_id: BOT_USER_ID,
+                    content: credMsg,
+                    type: 'text'
+                }])
+                .select()
+                .single();
+
+            if (credMsgErr) {
+                console.error("[AUTO-DELIVERY] Failed to insert credential message:", credMsgErr);
+                return;
+            }
+
+            // Immediately append credentials message to DOM
+            if (insertedCredMsg && typeof appendMessageUI === 'function') {
+                appendMessageUI(insertedCredMsg);
+            }
+
+            const systemNotice = "📦 System auto-delivered account credentials while seller was offline. Verify and release funds.";
+
+            // 4. Upgrade conversation step to 2
+            await supabase.from('conversations').update({
+                escrow_step: 2,
+                last_message: systemNotice,
+                updated_at: now.toISOString()
+            }).eq('id', chat.id);
+
+            // SAFE STATE MUTATION: Update step and last message without overriding seller/buyer profile objects
+            if (window.activeChatData && window.activeChatData.id === chat.id) {
+                window.activeChatData.escrow_step = 2;
+                window.activeChatData.last_message = systemNotice;
+            }
+
+            // 5. Post system status message & retrieve inserted object
+            const { data: insertedSysMsg } = await supabase
+                .from('messages')
+                .insert([{
+                    conversation_id: chat.id,
+                    sender_id: currentUser?.id || BOT_USER_ID,
+                    content: systemNotice,
+                    type: 'system'
+                }])
+                .select()
+                .single();
+
+            // Immediately append system notice message to DOM
+            if (insertedSysMsg && typeof appendMessageUI === 'function') {
+                appendMessageUI(insertedSysMsg);
+            }
+
+            // 6. Refresh UI step components
+            if (typeof updateEscrowUI === 'function') updateEscrowUI(2);
+            if (typeof loadSidebar === 'function') await loadSidebar();
         }
-
-        if (typeof payload !== 'object' || payload === null) {
-            payload = {};
-        }
-
-        // --- EXTRACT & NORMALIZE KEYS ---
-        const username = payload.username || payload.email || payload.login || payload.user;
-        const password = payload.password || payload.pass;
-        const extra = payload.extra || payload.additional || payload['2fa'] || payload.two_factor;
-
-        // --- VALIDATION GUARD ---
-        // Stop execution before updating chat/sending messages if payload parsing completely failed
-        if (!username && !password) {
-            console.error("[AUTO-DELIVERY] Failed to parse credentials from payload:", cred.credentials_payload);
-            return;
-        }
-
-        // --- DYNAMIC CREDENTIAL FORMATTER ---
-        const credLines = [];
-
-        if (cred.login_type) {
-            credLines.push(`• **Type:** ${cred.login_type}`);
-        }
-
-        if (username) {
-            credLines.push(`• **Username/Email:** ${username}`);
-        }
-
-        if (password) {
-            credLines.push(`• **Password:** ${password}`);
-        }
-
-        if (extra && extra.toString().trim() !== '' && extra.toString().trim() !== 'N/A') {
-            credLines.push(`• **Extra Info / 2FA:** ${extra}`);
-        }
-
-        // 2. Format credentials message with structured Markdown
-        const credMsg = `🤖 **AUTOMATED DELIVERY (Seller Offline)**
-
-🔐 **Account Credentials**
-${credLines.join('\n')}
-
-⚠️ **Buyer Notice:**
-Please verify these login details immediately. Once confirmed, click **Release Funds** to complete the deal.`;
-
-        // 3. Send credentials as AI Bot user
-        await supabase.from('messages').insert([{
-            conversation_id: chat.id,
-            sender_id: BOT_USER_ID,
-            content: credMsg,
-            type: 'text'
-        }]);
-
-        const systemNotice = "📦 System auto-delivered account credentials while seller was offline. Verify and release funds.";
-
-        // 4. Upgrade conversation step to 2
-        await supabase.from('conversations').update({
-            escrow_step: 2,
-            last_message: systemNotice,
-            updated_at: now.toISOString()
-        }).eq('id', chat.id);
-
-        // SAFE STATE MUTATION: Update step and last message without overriding seller/buyer profile objects
-        if (window.activeChatData && window.activeChatData.id === chat.id) {
-            window.activeChatData.escrow_step = 2;
-            window.activeChatData.last_message = systemNotice;
-        }
-
-        // 5. Post system status message
-        await supabase.from('messages').insert([{
-            conversation_id: chat.id,
-            sender_id: currentUser?.id || BOT_USER_ID,
-            content: systemNotice,
-            type: 'system'
-        }]);
-
-        // 6. Refresh UI to step 2
-        updateEscrowUI(2);
-        await loadSidebar();
+    } catch (err) {
+        console.error("[AUTO-DELIVERY ERROR]", err);
+    } finally {
+        // Reset lock flag regardless of success or error
+        isDeliveringAutoCreds = false;
     }
 }
 
@@ -364,6 +451,33 @@ async function loadSidebar(filter = "") {
     if (error) return;
 
     chatList.innerHTML = '';
+
+    // --- MULTI-SELECT BAR HEADER ---
+    if (isSelectMode) {
+        const selectBar = document.createElement('div');
+        selectBar.className = 'multi-select-bar';
+        selectBar.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #f1f5f9; border-bottom: 1px solid #cbd5e1; font-size: 13px; font-weight: 600; color: #334155;';
+        selectBar.innerHTML = `
+            <span>${selectedChatIds.size} Selected</span>
+            <div style="display: flex; gap: 8px;">
+                <button id="btn-cancel-select" style="padding: 4px 10px; background: #e2e8f0; color: #475569; border: none; border-radius: 4px; cursor: pointer;">Cancel</button>
+                <button id="btn-delete-batch" style="padding: 4px 10px; background: #ef4444; color: #fff; border: none; border-radius: 4px; cursor: pointer;" ${selectedChatIds.size === 0 ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}>Delete (${selectedChatIds.size})</button>
+            </div>
+        `;
+        chatList.appendChild(selectBar);
+
+        // Header event listeners
+        selectBar.querySelector('#btn-cancel-select').onclick = () => {
+            isSelectMode = false;
+            selectedChatIds.clear();
+            loadSidebar(filter);
+        };
+
+        selectBar.querySelector('#btn-delete-batch').onclick = () => {
+            deleteSelectedConversations(filter);
+        };
+    }
+
     conversations.forEach(chat => {
         const isMeBuyer = chat.buyer_id === currentUser.id;
         const isMeAdmin = chat.admin_id === currentUser.id;
@@ -389,6 +503,8 @@ async function loadSidebar(filter = "") {
 
         const hasUnread = unreadCount > 0;
         const isActive = chat.id === activeChatId ? 'active' : '';
+        const isSelected = selectedChatIds.has(chat.id);
+        const isDeletable = ['cancelled', 'completed'].includes(chat.status);
 
         const msgDate = new Date(chat.updated_at);
         const today = new Date();
@@ -402,14 +518,22 @@ async function loadSidebar(filter = "") {
         const goldBadgeSvg = generateGoldBadge(otherUser?.trust_score || 0, `sidebar-${chat.id}`);
 
         const item = document.createElement('div');
-        item.className = `chat-item ${isActive} ${hasUnread ? 'unread-item' : ''}`;
+        item.className = `chat-item ${isActive} ${hasUnread ? 'unread-item' : ''} ${isSelected ? 'selected-item' : ''}`;
         
         const adminBadge = isMeAdmin ? `<span style="font-size:10px; background:#e0e7ff; color:#4338ca; padding:2px 5px; border-radius:4px; margin-left:5px;">Admin</span>` : '';
         const displayCount = unreadCount > 99 ? '99+' : unreadCount;
 
+        // Multi-select checkbox HTML
+        const checkboxHtml = isSelectMode ? `
+            <div style="margin-right: 10px; display: flex; align-items: center;">
+                <input type="checkbox" ${isSelected ? 'checked' : ''} ${!isDeletable ? 'disabled' : ''} style="width: 18px; height: 18px; cursor: pointer;">
+            </div>
+        ` : '';
+
         item.innerHTML = `
+            ${checkboxHtml}
             <img src="${otherUser.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUser.username}`}">
-            <div class="chat-info">
+            <div class="chat-info" style="${isSelectMode && !isDeletable ? 'opacity: 0.5;' : ''}">
                 <div class="chat-top">
                     <span class="user-name" style="display: inline-flex; align-items: center; gap: 1px;">
                         ${otherUser.username} ${goldBadgeSvg} ${adminBadge}
@@ -418,22 +542,21 @@ async function loadSidebar(filter = "") {
                 </div>
                 <div class="chat-bottom">
                     <p class="last-msg">${chat.last_message || 'New Deal Started'}</p>
-                    ${hasUnread ? `<span class="unread-count-badge">${displayCount}</span>` : ''}
+                    ${hasUnread && !isSelectMode ? `<span class="unread-count-badge">${displayCount}</span>` : ''}
                 </div>
             </div>`;
 
-        // --- LONG PRESS DELETE LOGIC ---
+        // --- LONG PRESS & CLICK HANDLERS ---
         let pressTimer = null;
         let isLongPress = false;
 
         const startPress = () => {
+            if (isSelectMode) return; // Disable long-press timer during multi-select mode
             isLongPress = false;
             pressTimer = setTimeout(async () => {
                 isLongPress = true;
 
-                // Restrict deletion to cancelled or completed status
-                const allowedStatuses = ['cancelled', 'completed'];
-                if (!allowedStatuses.includes(chat.status)) {
+                if (!isDeletable) {
                     Swal.fire({
                         title: 'Action Restricted',
                         text: 'Only cancelled or completed conversations can be deleted.',
@@ -443,58 +566,33 @@ async function loadSidebar(filter = "") {
                     return;
                 }
 
-                const confirmDelete = await Swal.fire({
-                    title: 'Delete Conversation?',
-                    text: 'This will remove the conversation from your chat list.',
-                    icon: 'warning',
+                // Show Action Choice Menu on Long Press
+                const choice = await Swal.fire({
+                    title: 'Conversation Options',
+                    text: 'Select an action for this conversation:',
+                    icon: 'question',
                     showCancelButton: true,
+                    showDenyButton: true,
+                    confirmButtonText: 'Delete Conversation',
+                    denyButtonText: 'Select Multiple',
+                    cancelButtonText: 'Cancel',
                     confirmButtonColor: '#ef4444',
-                    confirmButtonText: 'Yes, Delete'
+                    denyButtonColor: '#3b82f6'
                 });
 
-                if (confirmDelete.isConfirmed) {
-                    try {
-                        // 1. Delete linked messages first to avoid FK errors
-                        await supabase
-                            .from('messages')
-                            .delete()
-                            .eq('conversation_id', chat.id);
-
-                        // 2. Delete the conversation record
-                        const { data: deletedRows, error: delError } = await supabase
-                            .from('conversations')
-                            .delete()
-                            .eq('id', chat.id)
-                            .select();
-
-                        if (delError) throw delError;
-
-                        // 3. Check if RLS blocked the deletion
-                        if (!deletedRows || deletedRows.length === 0) {
-                            Swal.fire({
-                                title: 'Deletion Blocked',
-                                text: 'Supabase permissions (RLS) prevented deleting this conversation.',
-                                icon: 'error',
-                                confirmButtonColor: '#0b1e5b'
-                            });
-                            return;
-                        }
-
-                        // 4. Close chat window if open and reload sidebar
-                        if (activeChatId === chat.id) {
-                            document.querySelector('.app-container')?.classList.remove('chat-open');
-                            activeChatId = null;
-                        }
-
-                        await loadSidebar(filter);
-                        Swal.fire('Deleted', 'Conversation deleted successfully.', 'success');
-
-                    } catch (err) {
-                        console.error("[DELETE CHAT ERROR]", err);
-                        Swal.fire('Error', err.message || 'Could not delete conversation.', 'error');
-                    }
+                if (choice.isConfirmed) {
+                    // Direct single deletion
+                    selectedChatIds.clear();
+                    selectedChatIds.add(chat.id);
+                    await deleteSelectedConversations(filter);
+                } else if (choice.isDenied) {
+                    // Enter multi-select mode and select current item
+                    isSelectMode = true;
+                    selectedChatIds.clear();
+                    selectedChatIds.add(chat.id);
+                    await loadSidebar(filter);
                 }
-            }, 700); // 700ms long-press threshold
+            }, 700);
         };
 
         const cancelPress = () => {
@@ -504,7 +602,6 @@ async function loadSidebar(filter = "") {
             }
         };
 
-        // Event Listeners for Touch (Mobile) and Mouse (Desktop)
         item.addEventListener('touchstart', startPress, { passive: true });
         item.addEventListener('touchend', cancelPress);
         item.addEventListener('touchmove', cancelPress);
@@ -512,9 +609,33 @@ async function loadSidebar(filter = "") {
         item.addEventListener('mouseup', cancelPress);
         item.addEventListener('mouseleave', cancelPress);
 
-        // Click Handler (Navigates only if long press was NOT triggered)
+        // Item Click Handler
         item.onclick = async () => {
             if (isLongPress) return;
+
+            if (isSelectMode) {
+                if (!isDeletable) {
+                    Swal.fire({
+                        title: 'Cannot Select',
+                        text: 'Only cancelled or completed conversations can be deleted.',
+                        icon: 'info',
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+                    return;
+                }
+
+                // Toggle selection state
+                if (selectedChatIds.has(chat.id)) {
+                    selectedChatIds.delete(chat.id);
+                } else {
+                    selectedChatIds.add(chat.id);
+                }
+                await loadSidebar(filter);
+                return;
+            }
+
+            // Normal navigation click
             activeChatId = chat.id;
             window.history.pushState({}, '', `?id=${chat.id}`);
             document.querySelector('.app-container').classList.add('chat-open');
@@ -528,6 +649,7 @@ async function loadSidebar(filter = "") {
 }
 
 
+
 // --- 5. CHAT WINDOW ---
 async function initChatWindow() {
     const container = document.querySelector('.message-container');
@@ -536,6 +658,7 @@ async function initChatWindow() {
 
     if (!container || !activeChatId) return;
 
+    // 1. Cache admin profiles if not already present
     if (!window.adminProfilesCache) {
         window.adminProfilesCache = {};
         try {
@@ -555,9 +678,12 @@ async function initChatWindow() {
     }
 
     console.log("[CHAT] Refreshing view for:", activeChatId);
+
+    // 2. Subscribe to realtime updates FIRST
     subscribeToMessages();
     subscribeToConversationChanges();
 
+    // 3. Fetch conversation details
     const { data: chat } = await supabase
         .from('conversations')
         .select(`*, 
@@ -579,39 +705,27 @@ async function initChatWindow() {
         
         const goldBadgeSvg = generateGoldBadge(otherUser?.trust_score || 0, `header-${chat.id}`);
 
-        if(headerName) {
+        if (headerName) {
             headerName.style.display = "inline-flex";
             headerName.style.alignItems = "center";
             headerName.style.gap = "1px";
-            headerName.innerHTML = `${otherUser.username} ${goldBadgeSvg}`;
+            headerName.innerHTML = `${otherUser?.username || 'User'} ${goldBadgeSvg}`;
         }
 
-        if(headerAvatar) {
-            headerAvatar.src = otherUser.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUser.username}`;
-        }
-
-        // --- ESCROW STEP CHECK & OFFLINE DELIVERY TRIGGER ---
-        if (chat.escrow_step === 0) {
-            console.log("[ESCROW] Initializing Step 1...");
-            await upgradeToStepOne(); 
-        } else {
-            updateEscrowUI(chat.escrow_step);
-        }
-
-        // Auto-deliver credentials if seller is offline and active step is 1
-        if (chat.escrow_step === 1) {
-            await handleOfflineAutoDelivery(chat);
+        if (headerAvatar) {
+            headerAvatar.src = otherUser?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUser?.username || 'default'}`;
         }
 
         syncLockdownUI(chat.status, chat.admin_id);
 
+        // --- PRODUCT DETAILS UI SETUP ---
         const pTitle = document.getElementById('productTitle');
         const pPrice = document.getElementById('productPrice');
         const pImg = document.getElementById('productImg');
         const viewBtn = document.querySelector('.view-listing-btn');
 
         const logos = {
-            // --- Social Media Platforms ---
+            // Social Media Platforms
             instagram: "../images/instagram.png",
             twitter: "../images/twitter.png",
             tiktok: "../images/tiktok.png",
@@ -623,7 +737,7 @@ async function initChatWindow() {
             linkedin: "../images/linkedin.png",
             pinterest: "../images/pinterest.png",
 
-            // --- Requested Email Services / Mail Platforms ---
+            // Email Platforms
             gmail: "../images/gmail.png",
             outlook: "../images/outlook.png",
             yahoo: "../images/yahoo.png",
@@ -639,7 +753,6 @@ async function initChatWindow() {
             onet: "../images/onet.png",
             aol: "../images/aol.png",
             
-            // Catch-all Default Profile Asset Fallback
             default_mail: "../images/default_mail.png"
         };
 
@@ -666,6 +779,7 @@ async function initChatWindow() {
         watchPartnerPresence(otherUser);
     }
 
+    // 4. FETCH AND RENDER EXISTING MESSAGES BEFORE AUTO-DELIVERY
     const { data: messages } = await supabase
         .from('messages')
         .select(`*, sender:profiles(username, avatar_url, role, trust_score), reply_to:messages!reply_to_id(id, content, type, sender_id, sender:profiles(username))`)
@@ -674,6 +788,7 @@ async function initChatWindow() {
 
     container.innerHTML = ''; 
 
+    // Render Safety Warning Box
     if (chat && chat.status === 'active') {
         const warningDiv = document.createElement('div');
         warningDiv.className = 'system-pill-container'; 
@@ -694,7 +809,23 @@ async function initChatWindow() {
         container.appendChild(warningDiv);
     }
 
+    // Append fetched historical messages to DOM
     if (messages) messages.forEach(msg => appendMessageUI(msg));
+
+    // 5. ESCROW STEP CHECK & AUTO-DELIVERY (Executed AFTER messages are rendered)
+    if (chat) {
+        if (chat.escrow_step === 0) {
+            console.log("[ESCROW] Initializing Step 1...");
+            await upgradeToStepOne(); 
+        } else {
+            updateEscrowUI(chat.escrow_step);
+        }
+
+        // Trigger Auto-delivery safely now that the chat DOM is fully populated
+        if (chat.escrow_step === 1) {
+            await handleOfflineAutoDelivery(chat);
+        }
+    }
 }
 
 

@@ -48,6 +48,14 @@ body { background: var(--bg-main); height: 100svh; display: flex; align-items: c
 .chat-item.active { background: #f0f2f8; border-left: 4px solid var(--dark-blue); }
 .chat-item img { width: 48px; height: 48px; border-radius: 50%; background: var(--light-gray); object-fit: cover; }
 
+.chat-item {
+    -webkit-user-select: none; /* Safari */
+    -ms-user-select: none; /* IE 10+ */
+    user-select: none; /* Standard syntax */
+    -webkit-touch-callout: none; /* Disable iOS callout menu on long touch */
+}
+
+
 .chat-info { flex: 1; overflow: hidden; display: flex; flex-direction: column; gap: 4px; }
 
 /* 🎯 TOP ROW: NAME & TIME */
@@ -153,6 +161,8 @@ body { background: var(--bg-main); height: 100svh; display: flex; align-items: c
     background: white; 
     min-height: 70px;
 }
+
+
 
 /* REUSABLE UI ELEMENTS */
 .icon-btn { background: none; border: none; font-size: 1.4rem; cursor: pointer; color: var(--gray); display: flex; align-items: center; transition: 0.2s; }
