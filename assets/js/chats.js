@@ -75,152 +75,6 @@ async function deleteSelectedConversations(filter = "") {
     }
 }
 
-// --- AUTOMATED OFFLINE DELIVERY ENGINE ---
-// --- AUTOMATED OFFLINE DELIVERY ENGINE ---
-async function handleOfflineAutoDelivery(chat) {
-    // 1. Guard against double execution or invalid chat state
-    if (!chat || chat.escrow_step !== 1 || isDeliveringAutoCreds) return;
-
-    isDeliveringAutoCreds = true; // Lock execution
-
-    try {
-        const seller = chat.seller;
-        const now = new Date();
-        const lastSeen = seller?.last_seen ? new Date(seller.last_seen) : null;
-        const diffInSeconds = lastSeen ? Math.floor((now - lastSeen) / 1000) : 9999;
-        
-        // Determine if seller is offline (last active > 60 seconds ago or show_online disabled)
-        const isSellerOnline = seller?.show_online && diffInSeconds < 60;
-
-        if (!isSellerOnline) {
-            console.log("[AUTO-DELIVERY] Seller is offline. Attempting atomic credential claim...");
-
-            // 1. Atomically fetch and lock available credential via Database RPC
-            const { data: creds, error: credErr } = await supabase.rpc('claim_offline_credential', {
-                p_listing_id: chat.product_id,
-                p_buyer_id: chat.buyer_id
-            });
-
-            if (credErr || !creds || creds.length === 0) {
-                console.log("[AUTO-DELIVERY] No pre-loaded credentials available or claim failed for product ID:", chat.product_id);
-                return;
-            }
-
-            // RPC returns an array; extract claimed record
-            const cred = creds[0];
-            const BOT_USER_ID = "3c6a749a-b38d-488a-ae4e-0bba719df83e";
-
-            // --- EXTRACT FIELDS DIRECTLY FROM COLUMNS ---
-            const email = cred.email?.trim() || null;
-            const emailPass = cred.email_password?.trim() || null;
-            const accountUsername = cred.account_username?.trim() || null;
-            const accountPass = cred.account_password?.trim() || null;
-            const phone = cred.phone?.trim() || null;
-            const phonePass = cred.phone_password?.trim() || null;
-            const twoFactor = cred.two_factor?.trim() || null;
-            const extra = cred.extra?.trim() || null;
-
-            // --- VALIDATION GUARD ---
-            const hasCredentials = email || accountUsername || phone || accountPass || emailPass || phonePass;
-            if (!hasCredentials) {
-                console.error("[AUTO-DELIVERY] No credential values found in table columns for claim ID:", cred.id);
-                return;
-            }
-
-            // --- DYNAMIC CREDENTIAL FORMATTER ---
-            const credLines = [];
-
-            if (cred.login_type) {
-                credLines.push(`• **Format:** ${cred.login_type}`);
-            }
-
-            // Account / Handle Details
-            if (accountUsername) credLines.push(`• **Username:** ${accountUsername}`);
-            if (accountPass) credLines.push(`• **Account Password:** ${accountPass}`);
-
-            // Email Details
-            if (email) credLines.push(`• **Email:** ${email}`);
-            if (emailPass) credLines.push(`• **Email Password:** ${emailPass}`);
-
-            // Phone Details
-            if (phone) credLines.push(`• **Phone:** ${phone}`);
-            if (phonePass) credLines.push(`• **Phone Password:** ${phonePass}`);
-
-            // 2FA / Backup Keys
-            if (twoFactor) credLines.push(`• **2FA / Backup Codes:** ${twoFactor}`);
-
-            // Extra Notes / Recovery
-            if (extra && extra !== 'N/A') credLines.push(`• **Additional Info:** ${extra}`);
-
-            // 2. Format credentials message with structured Markdown
-            const credMsg = `🤖 **AUTOMATED DELIVERY (Seller Offline)**\n\n🔐 **Account Credentials**\n${credLines.join('\n')}\n\n⚠️ **Buyer Notice:**\nPlease verify these login details immediately. Once confirmed, click **Release Funds** to complete the deal.`;
-
-            // 3. Send credentials as AI Bot user & retrieve inserted object
-            const { data: insertedCredMsg, error: credMsgErr } = await supabase
-                .from('messages')
-                .insert([{
-                    conversation_id: chat.id,
-                    sender_id: BOT_USER_ID,
-                    content: credMsg,
-                    type: 'text'
-                }])
-                .select()
-                .single();
-
-            if (credMsgErr) {
-                console.error("[AUTO-DELIVERY] Failed to insert credential message:", credMsgErr);
-                return;
-            }
-
-            // Immediately append credentials message to DOM
-            if (insertedCredMsg && typeof appendMessageUI === 'function') {
-                appendMessageUI(insertedCredMsg);
-            }
-
-            const systemNotice = "📦 System auto-delivered account credentials while seller was offline. Verify and release funds.";
-
-            // 4. Upgrade conversation step to 2
-            await supabase.from('conversations').update({
-                escrow_step: 2,
-                last_message: systemNotice,
-                updated_at: now.toISOString()
-            }).eq('id', chat.id);
-
-            // SAFE STATE MUTATION: Update step and last message without overriding seller/buyer profile objects
-            if (window.activeChatData && window.activeChatData.id === chat.id) {
-                window.activeChatData.escrow_step = 2;
-                window.activeChatData.last_message = systemNotice;
-            }
-
-            // 5. Post system status message & retrieve inserted object
-            const { data: insertedSysMsg } = await supabase
-                .from('messages')
-                .insert([{
-                    conversation_id: chat.id,
-                    sender_id: currentUser?.id || BOT_USER_ID,
-                    content: systemNotice,
-                    type: 'system'
-                }])
-                .select()
-                .single();
-
-            // Immediately append system notice message to DOM
-            if (insertedSysMsg && typeof appendMessageUI === 'function') {
-                appendMessageUI(insertedSysMsg);
-            }
-
-            // 6. Refresh UI step components
-            if (typeof updateEscrowUI === 'function') updateEscrowUI(2);
-            if (typeof loadSidebar === 'function') await loadSidebar();
-        }
-    } catch (err) {
-        console.error("[AUTO-DELIVERY ERROR]", err);
-    } finally {
-        // Reset lock flag regardless of success or error
-        isDeliveringAutoCreds = false;
-    }
-}
-
 // --- LINK DETECTION ENGINE ---
 function linkify(text) {
     if (!text) return "";
@@ -779,7 +633,7 @@ async function initChatWindow() {
         watchPartnerPresence(otherUser);
     }
 
-    // 4. FETCH AND RENDER EXISTING MESSAGES BEFORE AUTO-DELIVERY
+    // 4. FETCH AND RENDER EXISTING MESSAGES
     const { data: messages } = await supabase
         .from('messages')
         .select(`*, sender:profiles(username, avatar_url, role, trust_score), reply_to:messages!reply_to_id(id, content, type, sender_id, sender:profiles(username))`)
@@ -812,7 +666,7 @@ async function initChatWindow() {
     // Append fetched historical messages to DOM
     if (messages) messages.forEach(msg => appendMessageUI(msg));
 
-    // 5. ESCROW STEP CHECK & AUTO-DELIVERY (Executed AFTER messages are rendered)
+    // 5. ESCROW STEP CHECK
     if (chat) {
         if (chat.escrow_step === 0) {
             console.log("[ESCROW] Initializing Step 1...");
@@ -820,13 +674,9 @@ async function initChatWindow() {
         } else {
             updateEscrowUI(chat.escrow_step);
         }
-
-        // Trigger Auto-delivery safely now that the chat DOM is fully populated
-        if (chat.escrow_step === 1) {
-            await handleOfflineAutoDelivery(chat);
-        }
     }
 }
+
 
 
 // --- 6. PARTNER STATUS WATCHER ---
@@ -1540,12 +1390,8 @@ async function upgradeToStepOne() {
 
     updateEscrowUI(1);
     await loadSidebar();
-
-    // Trigger auto-delivery check immediately after advancing to Step 1
-    if (window.activeChatData) {
-        await handleOfflineAutoDelivery(window.activeChatData);
-    }
 }
+
 
 
 function updateEscrowUI(step) {
