@@ -1871,3 +1871,5 @@ body.dark-mode .back-to-top:hover {
     font-style: italic;
 }
 
+/* Virtual Number Button Platform Color */
+.vn .btn-icon { background: #e0f2fe; color: #0284c7; }

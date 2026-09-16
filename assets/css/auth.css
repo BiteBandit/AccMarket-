@@ -1194,3 +1194,5 @@ body.dark-mode .back-to-top:hover {
     font-size: 0.75rem !important;
     font-style: italic;
 }
+.vn .btn-icon { background: #e0f2fe; color: #0284c7; }
+
