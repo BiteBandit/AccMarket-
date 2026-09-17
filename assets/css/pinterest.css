@@ -989,3 +989,8 @@ body {
 .chat-count-badge.pop {
   transform: scale(1.3);
 }
+
+/* Remove dropdown arrow for the accnumbers.com external link automatically */
+.category-list li > a[href*="accnumbers.com"]:after {
+  content: none !important;
+}

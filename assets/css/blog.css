@@ -766,3 +766,7 @@ body.dark-mode .back-to-top:hover {
   background-color: var(--milk);
 }
 
+/* Remove dropdown arrow for the accnumbers.com external link automatically */
+.category-list li > a[href*="accnumbers.com"]:after {
+  content: none !important;
+}
